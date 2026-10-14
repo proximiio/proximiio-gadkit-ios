@@ -24,11 +24,6 @@ enum LocationAmbiguity: Equatable {
     /// EC04d: the visitor is probably at this stop, but the position is uncertain.
     case lowConfidence(JourneyStop)
 
-    /// Positions less accurate than this are uncertain (metres).
-    static let uncertainAccuracy: Double = 8
-    /// Galleries whose centre lies within this distance count as candidates (metres).
-    static let nearbyGalleryRadius: Double = 20
-
     struct Input {
         var coordinate: ProximiioCoordinate
         var level: Double?
@@ -40,7 +35,9 @@ enum LocationAmbiguity: Equatable {
         var currentGallery: String?
     }
 
-    static func evaluate(_ input: Input) -> LocationAmbiguity? {
+    /// `settings`: positions less accurate than `uncertainAccuracyMeters` are uncertain; galleries
+    /// whose centre lies within `nearbyGalleryMeters` count as candidates.
+    static func evaluate(_ input: Input, settings: GADSettings = .standard) -> LocationAmbiguity? {
         let here = CLLocation(latitude: input.coordinate.latitude, longitude: input.coordinate.longitude)
 
         func sameLevel(_ level: Double?) -> Bool {
@@ -52,7 +49,7 @@ enum LocationAmbiguity: Equatable {
             let nearbyGalleries = input.galleries
                 .filter { sameLevel($0.level) }
                 .map { ($0, here.distance(from: CLLocation(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude))) }
-                .filter { $0.1 <= nearbyGalleryRadius }
+                .filter { $0.1 <= settings.nearbyGalleryMeters }
                 .sorted { $0.1 < $1.1 }
                 .map(\.0)
             if nearbyGalleries.count >= 2 {
@@ -60,7 +57,7 @@ enum LocationAmbiguity: Equatable {
             }
         }
 
-        if input.horizontalAccuracy > uncertainAccuracy, let active = input.activeStop,
+        if input.horizontalAccuracy > settings.uncertainAccuracyMeters, let active = input.activeStop,
            sameLevel(active.floor?.level),
            here.distance(from: CLLocation(latitude: active.coordinate.latitude, longitude: active.coordinate.longitude)) <= input.horizontalAccuracy {
             return .lowConfidence(active)

@@ -10,12 +10,12 @@
 //  artwork at the same time. The geofence and the artwork POI share `remote_id`. A visitor already
 //  inside the geofence when the leg starts gets no enter event, so every fix is also checked
 //  against the artwork geofences (`checkArtworkGeofences`). The journey moves to the next
-//  artwork `autoAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
+//  artwork `GADSettings.artworkAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
 //  the visitor walks past without entering its geofence stays unvisited until it is skipped.
 //  Out of order: a visitor inside the geofence of another open artwork for
-//  `outOfOrderDwellSeconds` (0 s while testing) marks it visited, and the stops still ahead are
+//  `GADSettings.outOfOrderDwell` (0 s while testing) marks it visited, and the stops still ahead are
 //  ordered again from the visitor (PM review 2026-10-12).
-//  An amenity has no geofence. A detour is reached within 5–10 m for 5 s (`detourGuidanceRules`)
+//  An amenity has no geofence. A detour is reached within 5–10 m for 5 s (`GADSettings`)
 //  and the journey continues only after "Resume your Journey" (`JourneyRules.visit`).
 //
 //  Skip, undo and "choose this stop" edit the running navigator. Its route cache, event streams
@@ -24,7 +24,7 @@
 //  Every leg uses the visitor's accessibility needs (`RouteAccessibility`). A new journey is ordered
 //  floor by floor and gallery by gallery (`JourneyOrderStrategy.floorThenGallery`): the stop
 //  nearest the visitor first, then the rest of its gallery, then the rest of its floor. Without a
-//  fix the first stop stays first, and the first fix within `lateOrderWindow` orders the journey
+//  fix the first stop stays first, and the first fix within `GADSettings.lateOrderWindow` orders the journey
 //  again while no stop is reached. A restored journey keeps its order. After a detour the stops
 //  still ahead are ordered again from the visitor. A curated tour (`keepsOrder`) is never ordered.
 //
@@ -53,25 +53,28 @@ final class VisitController {
     @ObservationIgnored var onArtworkDone: ((JourneyStop, _ isActiveStop: Bool) -> Void)?
     private var tasks: [Task<Void, Never>] = []
 
-    /// Time between the arrival at an artwork and the route to the next one (PM review
-    /// 2026-10-12: no "Continue" button).
-    static let autoAdvanceDelay: Duration = .seconds(2)
-    /// How long a journey ordered without a fix waits for the first fix to order it again.
-    static let lateOrderWindow: Duration = .seconds(60)
-    /// How long `start()` waits for a fix before it orders the journey without one.
-    static let fixWait: Duration = .seconds(5)
+    /// Times and distances (`GADSettings`): the move to the next artwork after an arrival, the
+    /// wait for a fix before ordering, the out-of-order dwell, the detour arrival, the off-route
+    /// alert and the route snapping.
+    private let settings: GADSettings
 
     /// Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance
     /// off; the artwork geofence is the only arrival.
     static let artworkGuidanceRules = RouteFollowRules(arrivalDwellSeconds: .infinity)
 
-    /// Guidance on a leg to an amenity detour: arrival within 2.5 × the fix accuracy, at least
-    /// 5 m and at most 10 m, for 5 s. The SDK default (at least 3 m, 2 s) missed visitors who
-    /// walked past a stop with relay fixes.
-    static let detourGuidanceRules = RouteFollowRules(
-        arrival: .fromAccuracy(multiplier: 2.5, minimumMeters: 5, maximumMeters: 10),
-        arrivalDwellSeconds: 5
-    )
+    /// Guidance on a leg to an amenity detour: arrival within 2.5 × the fix accuracy, between
+    /// `amenityArrivalMinimumMeters` and `amenityArrivalMaximumMeters`, for `amenityArrivalDwell`.
+    /// The SDK default (at least 3 m, 2 s) missed visitors who walked past a stop with relay fixes.
+    private var detourGuidanceRules: RouteFollowRules {
+        RouteFollowRules(
+            arrival: .fromAccuracy(
+                multiplier: 2.5,
+                minimumMeters: settings.amenityArrivalMinimumMeters,
+                maximumMeters: settings.amenityArrivalMaximumMeters
+            ),
+            arrivalDwellSeconds: settings.amenityArrivalDwell
+        )
+    }
 
     /// `remote_id` of each artwork POI, by POI id. Set once the venue's features are loaded.
     var artworkRemoteIDs: [String: String] = [:]
@@ -83,25 +86,30 @@ final class VisitController {
     private var outOfOrderDwell = GeofenceDwell()
     /// Out-of-order artworks being marked visited.
     private var markingOutOfOrder: Set<String> = []
-    /// Time inside the geofence of an artwork that is not the active stop before it counts as
-    /// visited. 0 while testing (PM review 2026-10-12); a longer time keeps a visitor who crosses
-    /// the geofence on the way elsewhere from marking it.
-    static let outOfOrderDwellSeconds: TimeInterval = 0
 
     /// A curated tour keeps the curators' order: no ordering at the start, after a detour or
     /// after an artwork visited out of order.
     private let keepsOrder: Bool
 
-    init(session: ProximiioMapSession, journey: Journey, rules: JourneyRules = .visit, keepsOrder: Bool = false) {
+    init(
+        session: ProximiioMapSession,
+        journey: Journey,
+        rules: JourneyRules = .visit,
+        keepsOrder: Bool = false,
+        settings: GADSettings = .standard
+    ) {
         self.keepsOrder = keepsOrder
+        self.settings = settings
         self.session = session
         self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules, guidanceRules: Self.artworkGuidanceRules)
-        session.routeSnapping = Self.routeSnapping
+        var deviation = navigator.deviationRules
+        deviation.farFromRouteMeters = settings.offRouteMeters
+        deviation.offRouteTooLongSeconds = settings.offRouteSeconds
+        navigator.deviationRules = deviation
+        // The dot is drawn on the route within `routeSnapMeters`. Display only: guidance and
+        // arrival use the real position (PM review 2026-10-12).
+        session.routeSnapping = RouteSnapRules(maximumOffsetMeters: settings.routeSnapMeters)
     }
-
-    /// The dot is drawn on the route when the position is within 0.5 m of it. Display only:
-    /// guidance and arrival use the real position (PM review 2026-10-12).
-    static let routeSnapping = RouteSnapRules(maximumOffsetMeters: 0.5)
 
     /// Routes the rest of the journey with `accessibility`. The navigator routes the current leg
     /// again. Nothing changes when the needs are the same.
@@ -114,7 +122,7 @@ final class VisitController {
         await navigator.setRouteOptions(accessibility.routeOptions)
         var isOrderedWithoutFix = false
         if !keepsOrder, navigator.journey.stops.allSatisfy({ $0.state == .pending }) {
-            await waitForFix(upTo: Self.fixWait)
+            await waitForFix(upTo: .seconds(settings.firstFixWait))
             isOrderedWithoutFix = session.position == nil
             if let proposal = await proposedOrder(), proposal.isImprovement {
                 await apply(proposal)
@@ -142,7 +150,7 @@ final class VisitController {
 
     /// Orders the journey from the first fix while no stop is reached, done or skipped.
     private func orderOnFirstFix() async {
-        await waitForFix(upTo: Self.lateOrderWindow)
+        await waitForFix(upTo: .seconds(settings.lateOrderWindow))
         guard session.position != nil, !navigator.hasArrived,
               navigator.journey.stops.allSatisfy({ $0.state == .pending || $0.state == .active }),
               let proposal = await navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
@@ -173,7 +181,7 @@ final class VisitController {
     }
 
     /// The visitor entered an artwork geofence. The active artwork moves on after
-    /// `autoAdvanceDelay`. The geofence of any other artwork is ignored, and every artwork
+    /// `GADSettings.artworkAdvanceDelay`. The geofence of any other artwork is ignored, and every artwork
     /// geofence is ignored during a detour.
     func artworkGeofenceEntered(remoteID: String?) {
         guard navigator.detourStop == nil, let id = Self.activeStopID(forRemoteID: remoteID, in: navigator.journey, remoteIDs: artworkRemoteIDs) else { return }
@@ -184,11 +192,11 @@ final class VisitController {
     /// Checks the fix against the geofences of the open artworks on the visitor's floor. Inside
     /// the active artwork's geofence: the arrival, which also covers a leg that starts inside it,
     /// where the SDK sends no enter event. Inside another open artwork's geofence for
-    /// `outOfOrderDwellSeconds`: that artwork is visited out of order. During a detour to an
+    /// `GADSettings.outOfOrderDwell`: that artwork is visited out of order. During a detour to an
     /// amenity no artwork counts (PM review 2026-10-12).
     func checkArtworkGeofences() {
         guard navigator.detourStop == nil else {
-            _ = outOfOrderDwell.update(inside: [], now: .now, dwell: Self.outOfOrderDwellSeconds)
+            _ = outOfOrderDwell.update(inside: [], now: .now, dwell: settings.outOfOrderDwell)
             return
         }
         guard let position = session.position else { return }
@@ -209,7 +217,7 @@ final class VisitController {
                 inside.insert(stop.id)
             }
         }
-        for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: Self.outOfOrderDwellSeconds) {
+        for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: settings.outOfOrderDwell) {
             markOutOfOrder(id)
         }
     }
@@ -250,12 +258,13 @@ final class VisitController {
         return stop.id
     }
 
-    /// Marks `stopID` visited after `autoAdvanceDelay` if it is still the active stop. The leg to
+    /// Marks `stopID` visited after `GADSettings.artworkAdvanceDelay` if it is still the active stop. The leg to
     /// the next artwork is drawn.
     private func scheduleDone(_ stopID: String) {
         guard scheduledDone.insert(stopID).inserted else { return }
+        let delay = settings.artworkAdvanceDelay
         tasks.append(Task { [weak self] in
-            try? await Task.sleep(for: Self.autoAdvanceDelay)
+            try? await Task.sleep(for: .seconds(delay))
             guard let self else { return }
             self.scheduledDone.remove(stopID)
             guard !Task.isCancelled, self.navigator.activeStop?.id == stopID else { return }
@@ -318,7 +327,7 @@ final class VisitController {
         stop.iconName = AmenityKind.allCases.first { $0.matches(place) }?.icon.rawValue
         // The navigator applies guidance rules to each new leg: the detour leg is reached by
         // distance, the legs after it by the artwork geofence only.
-        navigator.guidanceRules = Self.detourGuidanceRules
+        navigator.guidanceRules = detourGuidanceRules
         await navigator.detour(to: stop)
         navigator.guidanceRules = Self.artworkGuidanceRules
     }

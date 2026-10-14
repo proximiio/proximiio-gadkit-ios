@@ -7,8 +7,8 @@
 //
 //  The signal is `Proximiio.positioningAvailabilityChanges()`: it turns `false` about 10 s
 //  after the last fix from the relay provider, whether the socket failed or the tag went
-//  silent. Unavailable for `lostAfter` seconds is "lost your place"; unavailable for
-//  `stoppedAfter` seconds is "stopped responding". The position stream is not used for this: its timestamps are
+//  silent. Unavailable for `GADSettings.trackingLostAfter` seconds is "lost your place";
+//  unavailable for `trackingStoppedAfter` seconds is "stopped responding". The position stream is not used for this: its timestamps are
 //  publish times, not fix times.
 //
 import Foundation
@@ -24,21 +24,13 @@ enum TrackingHealth: Equatable, Sendable {
     /// "Your wristband has stopped responding".
     case stoppedResponding
 
-    /// Seconds of unavailability before "lost your place". The SDK reports unavailable about
-    /// 10 s after the last fix, so this is about 2 min after it (PM review 2026-10-12).
-    static let lostAfter: TimeInterval = 110
-
-    /// Seconds of unavailability before "stopped responding". The SDK reports unavailable
-    /// about 10 s after the last fix, so this is about 3 min after it.
-    static let stoppedAfter: TimeInterval = 170
-
-    /// Pure; covered by tests.
-    static func evaluate(wasEverAvailable: Bool, unavailableSince: Date?, now: Date) -> TrackingHealth {
+    /// `settings`: `trackingLostAfter` and `trackingStoppedAfter`. Pure; covered by tests.
+    static func evaluate(wasEverAvailable: Bool, unavailableSince: Date?, now: Date, settings: GADSettings = .standard) -> TrackingHealth {
         guard wasEverAvailable else { return .waiting }
         guard let unavailableSince else { return .tracking }
         let unavailable = now.timeIntervalSince(unavailableSince)
-        if unavailable >= stoppedAfter { return .stoppedResponding }
-        return unavailable >= lostAfter ? .lostPlace : .tracking
+        if unavailable >= settings.trackingStoppedAfter { return .stoppedResponding }
+        return unavailable >= settings.trackingLostAfter ? .lostPlace : .tracking
     }
 }
 
@@ -54,10 +46,12 @@ final class TrackingMonitor {
     private var wasEverAvailable = false
     private var unavailableSince: Date?
     private let sdk: Proximiio
+    private let settings: GADSettings
     private var tasks: [Task<Void, Never>] = []
 
-    init(sdk: Proximiio) {
+    init(sdk: Proximiio, settings: GADSettings = .standard) {
         self.sdk = sdk
+        self.settings = settings
     }
 
     func start() {
@@ -110,7 +104,7 @@ final class TrackingMonitor {
     }
 
     private func reevaluate() {
-        let health = TrackingHealth.evaluate(wasEverAvailable: wasEverAvailable, unavailableSince: unavailableSince, now: Date())
+        let health = TrackingHealth.evaluate(wasEverAvailable: wasEverAvailable, unavailableSince: unavailableSince, now: Date(), settings: settings)
         guard health != self.health else { return }
         FieldLog.log("tracking health: \(health)")
         self.health = health

@@ -31,7 +31,7 @@ public struct VisitView: View {
     @State private var dismissedHealth: TrackingHealth?
     /// Name of the geofence (gallery) the visitor is in, from `sdk.geofenceEvents()`.
     @State private var currentGallery: String?
-    @State private var liveActivity = VisitLiveActivity()
+    @State private var liveActivity: VisitLiveActivity
     @State private var isShowingAmenities = false
     /// The amenity picked from search, shown on a card before it becomes a detour.
     @State private var selectedAmenity: VenuePlace?
@@ -54,10 +54,12 @@ public struct VisitView: View {
     @State private var pairing: WristbandPairing?
     /// `true` from "Connect a wristband" until the pairing flow closes. Hides the alert sheet.
     @State private var isPairing = false
-    @State private var stopNotifier = StopNearbyNotifier()
+    @State private var stopNotifier: StopNearbyNotifier
     private let venue: VenueService
     private let wristband: WristbandSession
     private let kind: JourneyKind
+    /// `venue.settings` when the view was created.
+    private let settings: GADSettings
     let onClose: () -> Void
 
     private var accessibility: RouteAccessibility {
@@ -74,18 +76,22 @@ public struct VisitView: View {
         self.venue = venue
         self.wristband = wristband
         self.kind = kind
-        _monitor = State(initialValue: TrackingMonitor(sdk: venue.sdk))
+        let settings = venue.settings
+        self.settings = settings
+        _monitor = State(initialValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
+        _stopNotifier = State(initialValue: StopNearbyNotifier(nearbyMeters: settings.stopNearbyMeters))
+        _liveActivity = State(initialValue: VisitLiveActivity(minimumUpdateInterval: settings.liveActivityMinimumInterval))
         let session = MapStyle.session(
             sdk: venue.sdk,
             // The leg keeps its shape until the arrival; the walked part is translucent (PM review
             // 2026-10-12). No separate trail.
-            options: MapStyle.options(routeMarkers: false)
+            options: MapStyle.options(routeMarkers: false, followZoom: settings.followZoom)
         )
         var rules = JourneyRules.visit
         #if DEBUG
         if DebugLaunch.current.visitAutoAdvance { rules.advance = .onDeparture(meters: 5) }
         #endif
-        _controller = State(initialValue: VisitController(session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder))
+        _controller = State(initialValue: VisitController(session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder, settings: settings))
         self.onClose = onClose
     }
 
@@ -478,9 +484,6 @@ public struct VisitView: View {
 
     // MARK: Ambiguous location (EC04)
 
-    /// Prompts stay quiet this long after the visitor answered one of the same kind.
-    private static let ambiguityQuietPeriod: TimeInterval = 120
-
     private var isPresentingSomething: Bool {
         locationChoice != nil || lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit || controller.isOffRoute
             || amenityToConfirm != nil
@@ -498,8 +501,8 @@ public struct VisitView: View {
             galleries: LocationAmbiguity.galleries(in: places),
             currentGallery: currentGallery
         )
-        guard let ambiguity = LocationAmbiguity.evaluate(input) else { return }
-        if let answered = answeredAmbiguity[ambiguity.kind], Date.now.timeIntervalSince(answered) < Self.ambiguityQuietPeriod {
+        guard let ambiguity = LocationAmbiguity.evaluate(input, settings: settings) else { return }
+        if let answered = answeredAmbiguity[ambiguity.kind], Date.now.timeIntervalSince(answered) < settings.locationQuestionQuietPeriod {
             return
         }
         FieldLog.log("ambiguous location: \(ambiguity.kind)")

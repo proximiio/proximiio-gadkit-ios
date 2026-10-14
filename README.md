@@ -19,7 +19,7 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.9.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.10.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
@@ -83,6 +83,37 @@ let venue = try await VenueService.start(configuration: configuration, binding: 
 - `venue.sdk` is the app's only `Proximiio` instance. Other features of the host app, such as the audio
   guide, use it. Do not create a second `Proximiio`.
 - The package contacts only `apiBaseURL` and the relay-api host.
+
+### Settings
+
+Every time and distance of the screens is in `GADSettings`. Set them in the configuration, or later
+in `venue.settings`; a screen reads them when it opens, so a change applies to the next screen:
+
+```swift
+var settings = GADSettings()
+settings.offRouteMeters = 50
+settings.trackingLostAfter = 90
+let configuration = GADConfiguration(
+    apiBaseURL: apiBaseURL, applicationToken: applicationToken,
+    relayAPI: relayAPI, relayAPIAppToken: relayAPIAppToken,
+    settings: settings
+)
+```
+
+| Setting | Default | Effect |
+|---|---|---|
+| `trackingLostAfter` | 110 s | Seconds without positioning before "We've lost your place". The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
+| `trackingStoppedAfter` | 170 s | Seconds without positioning before "Your wristband has stopped responding" (about 3 min). |
+| `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
+| `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order. |
+| `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
+| `stopNearbyMeters` | 5 m | The "next stop is less than … m away" notification. |
+| `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
+| `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
+| `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
+| `uncertainAccuracyMeters`, `nearbyGalleryMeters`, `locationQuestionQuietPeriod` | 8 m, 20 m, 120 s | "Where are you?": an uncertain position near the next stop, galleries close to each other, and how long an answered question stays quiet. |
+| `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
+| `liveActivityMinimumInterval` | 5 s | The shortest gap between two Live Activity updates of the instruction. |
 
 Notifications for geofence enter and exit:
 
@@ -353,6 +384,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.10.0 | `GADSettings`: every time and distance of the screens, in `GADConfiguration.settings` and `VenueService.settings`. |
 | 0.9.2 | Map amenities of a kind the design draws (restrooms, café, help desk, prayer room, shop, stairs, elevator) use the design's 30 pt markers. |
 | 0.9.1 | The journey list scrolls when a drag starts on a row (iOS 18 and later). |
 | 0.9.0 | A curated tour keeps the curators' order (`JourneyKind.keepsOrder`). |

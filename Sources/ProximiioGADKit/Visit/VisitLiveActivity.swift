@@ -13,8 +13,13 @@ import SwiftUI
 
 @MainActor
 final class VisitLiveActivity {
-    /// The shortest gap between two updates. Guidance changes with every position.
-    static let minimumUpdateInterval: TimeInterval = 5
+    /// The shortest gap between two updates (`GADSettings.liveActivityMinimumInterval`).
+    /// Guidance changes with every position.
+    private let minimumUpdateInterval: TimeInterval
+
+    init(minimumUpdateInterval: TimeInterval = GADSettings.standard.liveActivityMinimumInterval) {
+        self.minimumUpdateInterval = minimumUpdateInterval
+    }
 
     /// Id of the running activity. The activity itself is looked up by id inside each task,
     /// because `Activity` is not `Sendable`.
@@ -31,7 +36,7 @@ final class VisitLiveActivity {
         let now = Date()
         // Step changes (title, level, finished) are sent at once; instruction changes are throttled.
         let isStepChange = state.title != lastState?.title || state.level != lastState?.level || state.isFinished
-        guard isStepChange || now.timeIntervalSince(lastUpdate) >= Self.minimumUpdateInterval else { return }
+        guard isStepChange || now.timeIntervalSince(lastUpdate) >= minimumUpdateInterval else { return }
         lastState = state
         lastUpdate = now
         let content = ActivityContent(state: state, staleDate: nil)

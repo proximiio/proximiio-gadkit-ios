@@ -3,7 +3,7 @@
 //  ProximiioGADKit
 //
 //  Posts a local notification when the next stop of the journey (the navigator's active stop) is
-//  less than `nearbyMeters` away, on the visitor's level. Each stop posts once per visit. The
+//  less than `GADSettings.stopNearbyMeters` away, on the visitor's level. Each stop posts once per visit. The
 //  title is the stop title.
 //
 //  The distance is the route still to walk (`RouteGuidance.remainingMeters`) while the visitor
@@ -21,16 +21,17 @@ import UserNotifications
 
 @MainActor
 final class StopNearbyNotifier {
-    nonisolated static let nearbyMeters: CLLocationDistance = 5
-
+    private let nearbyMeters: CLLocationDistance
     private var notifiedStopIDs: Set<String> = []
     private let post: @MainActor (UNNotificationRequest) -> Void
 
     /// `post` delivers the notification. The default adds it to `UNUserNotificationCenter`. A test
     /// process without a host app has no notification center, so tests pass their own.
-    init(post: @escaping @MainActor (UNNotificationRequest) -> Void = { request in
-        Task { try? await UNUserNotificationCenter.current().add(request) }
-    }) {
+    init(nearbyMeters: CLLocationDistance = GADSettings.standard.stopNearbyMeters,
+         post: @escaping @MainActor (UNNotificationRequest) -> Void = { request in
+             Task { try? await UNUserNotificationCenter.current().add(request) }
+         }) {
+        self.nearbyMeters = nearbyMeters
         self.post = post
     }
 
@@ -42,10 +43,11 @@ final class StopNearbyNotifier {
         guard let position, let stop, !notifiedStopIDs.contains(stop.id),
               Self.isNearby(position.coordinate.proximiio, level: position.floor?.level,
                             stop: stop.coordinate.proximiio, stopLevel: stop.floor?.level,
-                            routeMeters: guidance.flatMap { $0.isOffRoute ? nil : $0.remainingMeters })
+                            routeMeters: guidance.flatMap { $0.isOffRoute ? nil : $0.remainingMeters },
+                            within: nearbyMeters)
         else { return nil }
         notifiedStopIDs.insert(stop.id)
-        let request = Self.request(for: stop)
+        let request = Self.request(for: stop, within: nearbyMeters)
         FieldLog.log("notification: \(request.identifier) \(stop.title)")
         post(request)
         return stop
@@ -56,7 +58,7 @@ final class StopNearbyNotifier {
     /// covered by tests.
     nonisolated static func isNearby(
         _ position: ProximiioCoordinate, level: Double?, stop: ProximiioCoordinate, stopLevel: Double?,
-        routeMeters: Double? = nil
+        routeMeters: Double? = nil, within nearbyMeters: CLLocationDistance = GADSettings.standard.stopNearbyMeters
     ) -> Bool {
         guard VenueLevel.matches(level, stopLevel) else { return false }
         if let routeMeters { return routeMeters < nearbyMeters }
@@ -65,7 +67,7 @@ final class StopNearbyNotifier {
     }
 
     /// The notification for `stop`. Pure; covered by tests.
-    nonisolated static func request(for stop: JourneyStop) -> UNNotificationRequest {
+    nonisolated static func request(for stop: JourneyStop, within nearbyMeters: CLLocationDistance = GADSettings.standard.stopNearbyMeters) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = stop.title
         content.body = String(localized: "The next stop of your journey is less than \(Int(nearbyMeters)) m away.", bundle: .module)

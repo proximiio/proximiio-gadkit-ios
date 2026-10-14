@@ -23,11 +23,21 @@ public struct GADConfiguration: Equatable, Sendable {
     /// relay-api app token of the site. The SDK sends it on `GET /v1/meta` and
     /// `POST /v1/bindings`.
     public var relayAPIAppToken: String
+    /// Times and distances of the screens. `VenueService.start` copies them to
+    /// `VenueService.settings`.
+    public var settings: GADSettings
 
-    public init(apiBaseURL: URL, applicationToken: String, relayAPI: BlueiotCloudRelayEndpoint, relayAPIAppToken: String) {
+    public init(
+        apiBaseURL: URL,
+        applicationToken: String,
+        relayAPI: BlueiotCloudRelayEndpoint,
+        relayAPIAppToken: String,
+        settings: GADSettings = .standard
+    ) {
         self.apiBaseURL = apiBaseURL
         self.applicationToken = applicationToken
         self.relayAPI = relayAPI
         self.relayAPIAppToken = relayAPIAppToken
+        self.settings = settings
     }
 }

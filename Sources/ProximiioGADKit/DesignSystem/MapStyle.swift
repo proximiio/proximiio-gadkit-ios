@@ -34,15 +34,15 @@ enum MapStyle {
     /// needs no permission. Before the first compass reading the map uses the walking direction.
     /// The map stays top-down: tilting is off (PM review 2026-10-12).
     ///
-    /// "Centre on me" and the first position zoom to `recentreZoom` (PM review 2026-10-12: the
-    /// library default 18.5 is too far out).
+    /// "Centre on me" and the first position zoom to `followZoom` (`GADSettings.followZoom`; PM
+    /// review 2026-10-12: the library default 18.5 is too far out).
     ///
     /// POI labels, floor names and `session.guidanceText` use the app language.
     ///
     /// With `walkedTrail`, the route behind the visitor is not drawn. On arrival the SDK marks
     /// the whole leg as traveled, and the computed leg differs from the path the visitor
     /// walked; the trail shows the walked path instead.
-    static func options(routeMarkers: Bool = true, walkedTrail: Bool = false) -> MapOptions {
+    static func options(routeMarkers: Bool = true, walkedTrail: Bool = false, followZoom: Double = GADSettings.standard.followZoom) -> MapOptions {
         var position = PositionStyle.venue
         position.dot.color = location
         position.dot.radiusPoints = 15
@@ -68,11 +68,9 @@ enum MapStyle {
         // The MapLibre attribution is hidden until the app has a place for licence notices
         // (DAILY-CALL R16).
         .with(chrome: MapOptions.Chrome(showsAttribution: false, allowsTilting: false))
-        options.recentreZoom = recentreZoom
+        options.recentreZoom = followZoom
         return options
     }
-
-    static let recentreZoom: Double = 21
 
     /// Journey stop markers, drawn by the map library. Skipped stops have no marker and no number.
     static let journeyStops: JourneyStopMarkerStyle = {

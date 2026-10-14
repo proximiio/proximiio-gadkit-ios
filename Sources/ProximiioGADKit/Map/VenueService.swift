@@ -20,6 +20,9 @@ import ProximiioBlueiot
 @MainActor
 public final class VenueService {
     public let sdk: Proximiio
+    /// Times and distances of the screens, from `GADConfiguration.settings`. A screen reads them
+    /// when it opens, so a change applies to the next one.
+    public var settings: GADSettings
     /// The binding client whose provider delivers the wristband's positions.
     private let binding: BlueiotWristbandBinding
     /// Name of the attached position provider. Providers are detached by name.
@@ -27,8 +30,9 @@ public final class VenueService {
     /// Writes the attached binding provider's samples to `FieldLog`.
     private var sampleLog: Task<Void, Never>?
 
-    private init(sdk: Proximiio, binding: BlueiotWristbandBinding) {
+    private init(sdk: Proximiio, binding: BlueiotWristbandBinding, settings: GADSettings) {
         self.sdk = sdk
+        self.settings = settings
         self.binding = binding
     }
 
@@ -63,7 +67,7 @@ public final class VenueService {
         _ = try await sdk.authenticate()
         try await sdk.start()
         _ = try await sdk.loadRouteNetwork()
-        let venue = VenueService(sdk: sdk, binding: binding)
+        let venue = VenueService(sdk: sdk, binding: binding, settings: backend.settings)
         await venue.attachBinding()
         venue.cacheMapStyle()
         if FieldLog.isEnabled {
