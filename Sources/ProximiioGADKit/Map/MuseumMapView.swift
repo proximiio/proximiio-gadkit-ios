@@ -22,6 +22,7 @@ struct MuseumMapView: View {
     let showsLegend: Bool
 
     @StateObject private var session: ProximiioMapSession
+    @Environment(\.routeAccessibility) private var accessibility
     @State private var places: [VenuePlace] = []
     @State private var selectedPlace: VenuePlace?
     @State private var destination: VenuePlace?
@@ -82,6 +83,9 @@ struct MuseumMapView: View {
         // The follow camera keeps the initial venue framing. The first position zooms
         // in to `MapOptions.recentreZoom` on the visitor.
         .levelChangeAnimation(for: session, venue: venue)
+        .onChange(of: accessibility) {
+            if let destination { Task { await route(to: destination) } }
+        }
         .onChange(of: session.position == nil) { _, hasNoPosition in
             if !hasNoPosition { session.recentre() }
         }
@@ -245,12 +249,13 @@ struct MuseumMapView: View {
                 fromLevel: here.floor?.level ?? 0,
                 to: place.coordinate,
                 toLevel: place.level,
-                options: RoutePreferences.options()
+                options: accessibility.routeOptions
             )
             session.setRoute(route)
             routeError = nil
             #if DEBUG
-            DebugLaunch.log("route to \(place.title): \(Int(route.distanceMeters)) m")
+            let changers = route.levelChanges.map { "\($0.featureType) L\(Int($0.fromLevel))→L\(Int($0.toLevel))" }
+            DebugLaunch.log("route to \(place.title): \(Int(route.distanceMeters)) m via \(changers) avoiding \(accessibility.routeOptions.effectiveAvoidances.map(\.rawValue).sorted())")
             #endif
         } catch {
             #if DEBUG
@@ -258,7 +263,7 @@ struct MuseumMapView: View {
             #endif
             session.clearRoute()
             if case WayfindingRoutingError.noRoute(.noAccessibleRoute) = error {
-                routeError = String(localized: "No step-free route from here.", bundle: .module)
+                routeError = String(localized: "No route from here with your accessibility settings.", bundle: .module)
             } else {
                 routeError = String(localized: "No route from here.", bundle: .module)
             }

@@ -17,6 +17,7 @@ import SwiftUI
 public struct VisitView: View {
     @Environment(\.visitEventHandler) private var emit
     @Environment(\.wristbandConnectionScreen) private var connectionScreen
+    @Environment(\.routeAccessibility) private var accessibility
     @State private var controller: VisitController
     @State private var mode: VisitMode = .map
     @State private var stopToSkip: JourneyStop?
@@ -114,6 +115,9 @@ public struct VisitView: View {
         }
         .animation(.default, value: mode)
         .onChange(of: mode) { _, mode in emit(.modeChanged(mode)) }
+        .onChange(of: accessibility) { _, accessibility in
+            Task { await controller.setAccessibility(accessibility) }
+        }
         .task {
             controller.onArtworkDone = { [emit] stop, isActiveStop in
                 emit(isActiveStop ? .artworkReached(stop) : .artworkVisitedOutOfOrder(stop))
@@ -149,7 +153,7 @@ public struct VisitView: View {
             // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).
             mapLayers.attach(to: controller.session)
             refreshMapLayers()
-            await controller.start()
+            await controller.start(accessibility: accessibility)
             // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
             // map did not turn until "Centre on me").
             if controller.session.position != nil { recentre(withHeading: true, reason: "journey started") }
@@ -781,6 +785,11 @@ private struct VisitCard: View {
     }
 
     private var instruction: String? {
+        // The navigator keeps a stop that no route with the visitor's accessibility needs reaches,
+        // with no route line. The visitor can skip it in the list.
+        if let stop = navigator.activeStop, case .noAccessibleRoute = navigator.noRouteReasons[stop.id] {
+            return String(localized: "No route to this stop with your accessibility settings.", bundle: .module)
+        }
         switch state {
         case .walking, .nextStopOnOtherLevel:
             if let guidance = navigator.guidance { return GuidanceText.instruction(for: guidance) }

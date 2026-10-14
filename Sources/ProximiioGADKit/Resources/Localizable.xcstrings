@@ -886,12 +886,22 @@
         }
       }
     },
-    "No step-free route from here." : {
+    "No route to this stop with your accessibility settings." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "لا يوجد مسار بدون درج من هنا."
+            "value" : "لا يوجد مسار إلى هذه المحطة يناسب إعدادات إمكانية الوصول لديك."
+          }
+        }
+      }
+    },
+    "No route from here with your accessibility settings." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لا يوجد مسار من هنا يناسب إعدادات إمكانية الوصول لديك."
           }
         }
       }

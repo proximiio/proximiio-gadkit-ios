@@ -19,7 +19,7 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.5.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.6.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
@@ -148,6 +148,31 @@ let journey = VisitPlan.journey(poiIDs: poiIDs, places: places)
 `VisitStore.save(_:)` and `VisitStore.load()` keep the journey in progress across launches. `VisitView`
 saves it on every change.
 
+## Accessibility
+
+The host app passes the visitor's accessibility needs to the map and journey screens. Every route
+then avoids what they name, and a change re-routes the route on screen:
+
+```swift
+ContentView()
+    .routeAccessibility(RouteAccessibility(avoidsStairs: true, avoidsRevolvingDoors: true))
+```
+
+| Need | Avoids, where the venue data marks it |
+|---|---|
+| `avoidsStairs` | Level changers with `type` `staircase`. |
+| `avoidsEscalators` | Level changers with `type` `escalator`. |
+| `avoidsRevolvingDoors` | Path pieces within `radius` of a `door` point feature. |
+| `avoidsInaccessiblePaths` | Routing paths with `narrowPath: true`. |
+
+- The GAD venue data on 2026-10-14 has staircases and elevators. It has no escalators, no `door`
+  features and no `narrowPath` paths, so only `avoidsStairs` changes routes until the data has them.
+- `RouteAccessibility.routeOptions` is the SDK's `RouteOptions` for the needs, for routes the host app
+  computes itself.
+- When no route meets the needs, the museum map shows "No route from here with your accessibility
+  settings." In a journey, the stop card shows "No route to this stop with your accessibility
+  settings." and the stop keeps its place; the visitor can skip it in the list.
+
 ## Events from VisitView
 
 `VisitView` performs every action itself. The host app receives a `VisitEvent` for each visitor action
@@ -239,6 +264,7 @@ await DebugLaunch.current.run(with: venue, wristband: wristband)
 | `-visitList` | `VisitView` opens in List mode. |
 | `-visitAutoAdvance` | `VisitView` advances 5 m after the visitor leaves a stop, without the Continue tap. |
 | `-routeTo <title>` | `MuseumMapScreen` routes to the first place whose title matches, after the first position. |
+| `-routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `DebugLaunch.routeAccessibility`. The host app passes it to `routeAccessibility(_:)`. |
 
 `DebugLaunch` also parses `-demoWristbandPairing`, `-hubPage`, `-openMap` and `-visit`. The package
 does not act on them; the Proximi GAD app reads them.
@@ -290,6 +316,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.6.0 | `RouteAccessibility` and `routeAccessibility(_:)`: avoid stairs, escalators, revolving doors and inaccessible paths. |
 | 0.5.0 | SDK 6.0.0-beta.58 and Map 6.0.0-beta.43. Geofence events are sent as they happen. See "Privacy". |
 | 0.4.1 | `VenueService.start` caches the map style. The map is clear instead of black until MapLibre draws its first frame. |
 | 0.4.0 | The package moves to this repository from `proximiio/guggenheim-ios`. `DebugLaunch.openScreen` is removed. |

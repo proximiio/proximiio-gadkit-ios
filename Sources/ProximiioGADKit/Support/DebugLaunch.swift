@@ -16,6 +16,7 @@
 //    -visitList                           with -visit: open the journey in List mode
 //    -visitAutoAdvance                    with -visit: advance 5 m after leaving a stop
 //    -routeTo <title>                     with -openMap: route to the first place whose title matches
+//    -routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths   accessibility needs for routes
 //    -visit "<title>,<title>,…"            start a visit through the first place matching each title
 //
 #if DEBUG
@@ -31,6 +32,8 @@ public struct DebugLaunch: Equatable, Sendable {
     public var openMap = false
     public var hubPage: String?
     public var routeTo: String?
+    /// `-routeAvoid`. The host app applies it with `routeAccessibility(_:)`.
+    public var routeAccessibility = RouteAccessibility.none
     public var visitStops: [String] = []
     public var visitAutoAdvance = false
     public var visitList = false
@@ -54,6 +57,13 @@ public struct DebugLaunch: Equatable, Sendable {
         openMap = arguments.contains("-openMap")
         hubPage = value(after: "-hubPage")
         routeTo = value(after: "-routeTo")
+        let avoid = Set(value(after: "-routeAvoid")?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? [])
+        routeAccessibility = RouteAccessibility(
+            avoidsStairs: avoid.contains("stairs"),
+            avoidsEscalators: avoid.contains("escalators"),
+            avoidsRevolvingDoors: avoid.contains("revolvingDoors"),
+            avoidsInaccessiblePaths: avoid.contains("inaccessiblePaths")
+        )
         visitAutoAdvance = arguments.contains("-visitAutoAdvance")
         visitList = arguments.contains("-visitList")
         visitStops = value(after: "-visit")?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []

@@ -21,7 +21,7 @@
 //  Skip, undo and "choose this stop" edit the running navigator. Its route cache, event streams
 //  and deviation state are kept.
 //
-//  Every leg uses the visitor's route preference (`RoutePreferences`). A new journey is ordered
+//  Every leg uses the visitor's accessibility needs (`RouteAccessibility`). A new journey is ordered
 //  floor by floor and gallery by gallery (`JourneyOrderStrategy.floorThenGallery`): the stop
 //  nearest the visitor first, then the rest of its gallery, then the rest of its floor. Without a
 //  fix the first stop stays first, and the first fix within `lateOrderWindow` orders the journey
@@ -98,9 +98,15 @@ final class VisitController {
     /// guidance and arrival use the real position (PM review 2026-10-12).
     static let routeSnapping = RouteSnapRules(maximumOffsetMeters: 0.5)
 
-    func start() async {
+    /// Routes the rest of the journey with `accessibility`. The navigator routes the current leg
+    /// again. Nothing changes when the needs are the same.
+    func setAccessibility(_ accessibility: RouteAccessibility) async {
+        await navigator.setRouteOptions(accessibility.routeOptions)
+    }
+
+    func start(accessibility: RouteAccessibility) async {
         navigator.deviationPolicy = .askApp
-        await navigator.setRouteOptions(RoutePreferences.options())
+        await navigator.setRouteOptions(accessibility.routeOptions)
         var isOrderedWithoutFix = false
         if navigator.journey.stops.allSatisfy({ $0.state == .pending }) {
             await waitForFix(upTo: Self.fixWait)
