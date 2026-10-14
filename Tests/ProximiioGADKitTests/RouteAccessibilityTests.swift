@@ -25,6 +25,13 @@ struct RouteAccessibilityTests {
         #expect(all.routeOptions.effectiveAvoidances == [.staircases, .escalators, .revolvingDoors, .narrowPaths])
     }
 
+    @Test func theAccessibleRoutesButtonAvoidsAllFour() {
+        let host = RouteAccessibility(avoidsStairs: true)
+        #expect(RouteAccessibility.effective(hostNeeds: host, accessibleRoutes: false) == host)
+        let on = RouteAccessibility.effective(hostNeeds: host, accessibleRoutes: true)
+        #expect(on.routeOptions.effectiveAvoidances == [.staircases, .escalators, .revolvingDoors, .narrowPaths])
+    }
+
     #if DEBUG
     @Test func launchArgumentSetsTheNeeds() {
         let launch = DebugLaunch(arguments: ["app", "-routeAvoid", "stairs, revolvingDoors"])

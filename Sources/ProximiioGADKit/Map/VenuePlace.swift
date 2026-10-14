@@ -28,6 +28,13 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
     public var isArtwork = false
     /// First entry of the feature's `images` property, if it is an absolute URL.
     public var imageURL: URL?
+    /// `metadata.artist_name`: the artist shown under an artwork's title. A string, or an i18n
+    /// object like `title_i18n`.
+    public var artist: String?
+    /// `metadata.has_ar`: the artwork has an AR view ("AR" in the journey list).
+    public var hasAR = false
+    /// `metadata.has_audio`: the artwork has audio (a note in the journey list).
+    public var hasAudio = false
 
     /// Every point POI in `features`, sorted by title.
     public static func all(in features: [ProximiioFeature]) -> [VenuePlace] {
@@ -100,6 +107,11 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
         amenityID = Self.text(feature.properties?["amenity"])
         remoteID = Self.text(properties?["remote_id"])
         isArtwork = Self.isArtwork(amenityID: amenityID, metadata: properties?["metadata"], remoteID: remoteID)
+        if case .object(let metadata)? = properties?["metadata"] {
+            artist = Self.localized(metadata["artist_name"]) ?? Self.text(metadata["artist_name"])
+            hasAR = Self.flag(metadata["has_ar"])
+            hasAudio = Self.flag(metadata["has_audio"])
+        }
         if case .array(let images)? = properties?["images"], let first = images.first.flatMap(Self.text),
            let url = URL(string: first), url.scheme != nil {
             imageURL = url
@@ -123,6 +135,16 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
         guard case .object(let translations)? = value, let language else { return nil }
         let base = String(language.prefix(while: { $0 != "-" }))
         return text(translations[language]) ?? text(translations[base])
+    }
+
+    /// `true`, `"true"` or a non-zero number. Pure; covered by tests.
+    static func flag(_ value: JSONValue?) -> Bool {
+        switch value {
+        case .bool(let flag)?: flag
+        case .string(let text)?: text.lowercased() == "true"
+        case .number(let number)?: number != 0
+        default: false
+        }
     }
 
     private static func text(_ value: JSONValue?) -> String? {

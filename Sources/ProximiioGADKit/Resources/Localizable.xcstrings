@@ -155,6 +155,16 @@
         }
       }
     },
+    "Accessible routes" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "مسارات سهلة الوصول"
+          }
+        }
+      }
+    },
     "Allow camera access in Settings to scan your wristband, or enter its code." : {
       "localizations" : {
         "ar" : {
@@ -177,12 +187,32 @@
         }
       }
     },
+    "AR view" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "عرض الواقع المعزز"
+          }
+        }
+      }
+    },
     "Arrive in %lld m" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "الوصول بعد %lld م"
+          }
+        }
+      }
+    },
+    "Audio" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "صوت"
           }
         }
       }
@@ -922,6 +952,26 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "لست هنا"
+          }
+        }
+      }
+    },
+    "Off" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "إيقاف"
+          }
+        }
+      }
+    },
+    "On" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "تشغيل"
           }
         }
       }

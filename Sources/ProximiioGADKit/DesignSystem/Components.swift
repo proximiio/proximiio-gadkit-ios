@@ -28,18 +28,36 @@ struct StopNumberBadge: View {
     }
 }
 
-/// Outlined label such as "AR" or a floor "L2": 1 pt ink stroke, 6 pt radius, SemiBold 10.
+/// Outlined label such as "AR" or a floor "L2", or an outlined symbol such as the audio note
+/// (Figma journey list): 1 pt ink stroke, 6 pt radius, SemiBold 10.
 struct OutlineBadge: View {
-    let text: String
+    private let text: String?
+    private let systemImage: String?
+
+    init(text: String) {
+        self.text = text
+        systemImage = nil
+    }
+
+    init(systemImage: String) {
+        text = nil
+        self.systemImage = systemImage
+    }
 
     var body: some View {
-        Text(text)
-            .font(GADFonts.custom("GuggenheimSansDisplay-SemiBold", size: 10, relativeTo: .caption2))
-            .tracking(0.6)
-            .foregroundStyle(Palette.ink)
-            .padding(.horizontal, 5)
-            .frame(minWidth: 25, minHeight: 20)
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.ink, lineWidth: 1))
+        Group {
+            if let systemImage {
+                Image(systemName: systemImage).font(.system(size: 10, weight: .semibold))
+            } else {
+                Text(text ?? "")
+                    .font(GADFonts.custom("GuggenheimSansDisplay-SemiBold", size: 10, relativeTo: .caption2))
+                    .tracking(0.6)
+            }
+        }
+        .foregroundStyle(Palette.ink)
+        .padding(.horizontal, 5)
+        .frame(minWidth: 25, minHeight: 20)
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.ink, lineWidth: 1))
     }
 }
 

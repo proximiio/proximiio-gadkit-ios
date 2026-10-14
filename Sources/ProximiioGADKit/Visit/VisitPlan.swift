@@ -126,7 +126,8 @@ enum VisitCardState: Equatable {
 /// | Stop card | names the gallery until the visitor is in it, then the artwork | names the artwork |
 /// | List | stops under gallery names | stops without gallery names |
 /// | Skip | the visitor can skip an artwork | no skip |
-/// | Background | multicolour | the curated tour colour (Highlights Tour, green) |
+///
+/// The background is the same (PM 2026-10-14: ignore the curated tour colour).
 public enum JourneyKind: String, Codable, Sendable, CaseIterable {
     case personalised
     case curated

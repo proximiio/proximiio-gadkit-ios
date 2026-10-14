@@ -17,8 +17,6 @@ import SwiftUI
 public enum ScreenBackground: String {
     case hub = "BackgroundHub"
     case map = "BackgroundMap"
-    /// The curated tour's map background (Figma `Backgrounds` `Idle_7`, Highlights Tour).
-    case curatedMap = "BackgroundMapCurated"
 
     public var view: some View {
         Image(rawValue, bundle: .module).resizable().scaledToFill().ignoresSafeArea()

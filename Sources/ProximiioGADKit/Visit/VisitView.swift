@@ -20,7 +20,8 @@ import SwiftUI
 public struct VisitView: View {
     @Environment(\.visitEventHandler) private var emit
     @Environment(\.wristbandConnectionScreen) private var connectionScreen
-    @Environment(\.routeAccessibility) private var accessibility
+    @Environment(\.routeAccessibility) private var hostAccessibility
+    @AppStorage(RouteAccessibility.accessibleRoutesKey) private var accessibleRoutes = false
     @State private var controller: VisitController
     @State private var mode: VisitMode = .map
     @State private var stopToSkip: JourneyStop?
@@ -59,6 +60,10 @@ public struct VisitView: View {
     private let kind: JourneyKind
     let onClose: () -> Void
 
+    private var accessibility: RouteAccessibility {
+        RouteAccessibility.effective(hostNeeds: hostAccessibility, accessibleRoutes: accessibleRoutes)
+    }
+
     public init(
         venue: VenueService,
         wristband: WristbandSession,
@@ -87,14 +92,14 @@ public struct VisitView: View {
     public var body: some View {
         GeometryReader { geometry in
             ZStack {
-                (kind == .curated ? ScreenBackground.curatedMap : ScreenBackground.map).view
+                ScreenBackground.map.view
                 VisitLiveActivityDriver(navigator: controller.navigator, session: controller.session, liveActivity: liveActivity)
                 VStack(spacing: 10) {
                     MapGlassFrame {
                         ProximiioMapView(session: controller.session)
                             .clearBackground()
                         if mode == .list {
-                            VisitStopList(controller: controller, galleries: kind.listsGalleries ? galleries : [], allowsSkip: kind.allowsSkip, onSkip: { stop in
+                            VisitStopList(controller: controller, galleries: kind.listsGalleries ? galleries : [], places: places, allowsSkip: kind.allowsSkip, onSkip: { stop in
                                 stopToSkip = stop
                                 emit(.skipRequested(stop))
                             })
@@ -611,6 +616,7 @@ public struct VisitView: View {
                             GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)
                         }
                         .accessibilityLabel(Text("Centre on me", bundle: .module))
+                        AccessibleRoutesButton(isOn: $accessibleRoutes) { emit(.accessibleRoutesChanged($0)) }
                         GlassSquareButton(action: { controller.session.followMyFloor() }) {
                             Text(GuidanceText.floorLabel(controller.session.selectedFloor.level)).textStyle(.largeBodyBold)
                         }

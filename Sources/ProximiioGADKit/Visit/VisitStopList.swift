@@ -6,7 +6,9 @@
 //  visit order and grouped under the gallery they lie in; visited stops are dimmed; swiping
 //  left offers Skip; a skipped stop is hidden and the list renumbers. "Undo skip" restores
 //  the last skipped stop and reports `VisitEvent.skipUndone`. A curated tour passes no
-//  galleries and no skip: its stops have no gallery names and cannot be skipped.
+//  galleries and no skip: its stops have no gallery names and cannot be skipped. A row shows the
+//  artist and "AR" and audio badges from the artwork's place (`VenuePlace.artist`, `hasAR`,
+//  `hasAudio`), or the level when the place names no artist.
 //
 import Proximiio
 import ProximiioMap
@@ -16,11 +18,19 @@ struct VisitStopList: View {
     @Environment(\.visitEventHandler) private var emit
     let controller: VisitController
     var galleries: [Gallery] = []
+    var places: [VenuePlace] = []
     var allowsSkip = true
     let onSkip: (JourneyStop) -> Void
 
     var body: some View {
-        StopList(navigator: controller.navigator, galleries: galleries, allowsSkip: allowsSkip, lastSkippedStopID: controller.lastSkippedStopID, onSkip: onSkip) {
+        StopList(
+            navigator: controller.navigator,
+            galleries: galleries,
+            places: Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
+            allowsSkip: allowsSkip,
+            lastSkippedStopID: controller.lastSkippedStopID,
+            onSkip: onSkip
+        ) {
             let stop = controller.navigator.journey.stops.first { $0.id == controller.lastSkippedStopID }
             Task { await controller.undoSkip() }
             if let stop { emit(.skipUndone(stop)) }
@@ -31,6 +41,8 @@ struct VisitStopList: View {
 private struct StopList: View {
     @ObservedObject var navigator: JourneyNavigator
     let galleries: [Gallery]
+    /// Places by id, for the artist and the badges of a stop.
+    let places: [String: VenuePlace]
     let allowsSkip: Bool
     let lastSkippedStopID: String?
     let onSkip: (JourneyStop) -> Void
@@ -101,6 +113,7 @@ private struct StopList: View {
 
     /// A stop as a frosted card (Figma journey list): number badge, title, floor.
     private func row(_ stop: JourneyStop, number: Int, isRevealed: Bool) -> some View {
+        let place = places[stop.poiID ?? stop.id]
         let isVisited = stop.state == .done
         let isActive = stop.state == .active || stop.state == .reached
         return HStack(spacing: 16) {
@@ -110,11 +123,19 @@ private struct StopList: View {
             )
             VStack(alignment: .leading, spacing: 5) {
                 Text(stop.title).textStyle(.bodyMedium)
-                if let level = stop.floor?.level {
+                if let artist = place?.artist {
+                    Text(artist).textStyle(.bodySmallRegular)
+                } else if let level = stop.floor?.level {
                     Text(String(localized: "Level \(Int(level.rounded()))", bundle: .module)).textStyle(.bodySmallRegular)
                 }
             }
             Spacer(minLength: 0)
+            if place?.hasAR == true {
+                OutlineBadge(text: "AR").accessibilityLabel(Text("AR view", bundle: .module))
+            }
+            if place?.hasAudio == true {
+                OutlineBadge(systemImage: "music.note").accessibilityLabel(Text("Audio", bundle: .module))
+            }
         }
         .foregroundStyle(Palette.ink)
         .padding(.horizontal, 16)

@@ -41,6 +41,9 @@ public enum VisitEvent: Sendable, Equatable {
     case journeyResumed
     /// The visitor tapped "Centre on me".
     case recentred
+    /// The visitor turned the accessible routes button on (`true`) or off. Routes avoid stairs,
+    /// escalators, revolving doors and inaccessible paths while it is on.
+    case accessibleRoutesChanged(Bool)
     /// The visitor tapped Back during a visit in progress. `VisitView` asks before it closes.
     case exitRequested
     /// The visitor confirmed leaving the visit. `onClose` follows.

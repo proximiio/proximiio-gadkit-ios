@@ -22,7 +22,12 @@ struct MuseumMapView: View {
     let showsLegend: Bool
 
     @StateObject private var session: ProximiioMapSession
-    @Environment(\.routeAccessibility) private var accessibility
+    @Environment(\.routeAccessibility) private var hostAccessibility
+    @AppStorage(RouteAccessibility.accessibleRoutesKey) private var accessibleRoutes = false
+
+    private var accessibility: RouteAccessibility {
+        RouteAccessibility.effective(hostNeeds: hostAccessibility, accessibleRoutes: accessibleRoutes)
+    }
     @State private var places: [VenuePlace] = []
     @State private var selectedPlace: VenuePlace?
     @State private var destination: VenuePlace?
@@ -143,6 +148,7 @@ struct MuseumMapView: View {
                     }
                     .disabled(session.position == nil)
                     .accessibilityLabel(Text("Centre on me", bundle: .module))
+                    AccessibleRoutesButton(isOn: $accessibleRoutes)
                     floorButton
                 }
             }

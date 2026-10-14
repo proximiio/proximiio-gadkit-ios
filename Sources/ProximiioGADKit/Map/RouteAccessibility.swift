@@ -6,6 +6,10 @@
 //  `routeAccessibility(_:)`, for example from its settings screen. The museum map and the journey
 //  use them for every route they compute; a change re-routes the route on screen.
 //
+//  The maps also have an accessible routes button (wheelchair, PM 2026-10-14). While it is on,
+//  routes avoid all four, whatever the host app set. Its state is kept in `UserDefaults`
+//  (`accessibleRoutesKey`) for both maps and later launches.
+//
 //  Each need is an SDK avoidance (`RouteOptions.Avoidance`) and works only where the venue data
 //  marks it:
 //  - stairs: level changers with `type` `staircase`
@@ -38,6 +42,19 @@ public struct RouteAccessibility: Codable, Hashable, Sendable {
     /// No need set: routes may use every path.
     public static let none = RouteAccessibility()
 
+    /// Every need set: the accessible routes button.
+    public static let accessible = RouteAccessibility(
+        avoidsStairs: true, avoidsEscalators: true, avoidsRevolvingDoors: true, avoidsInaccessiblePaths: true
+    )
+
+    /// The `UserDefaults` key of the accessible routes button.
+    public static let accessibleRoutesKey = "ProximiioGADKit.accessibleRoutes"
+
+    /// `.accessible` while the button is on, else the host app's needs. Pure; covered by tests.
+    static func effective(hostNeeds: RouteAccessibility, accessibleRoutes: Bool) -> RouteAccessibility {
+        accessibleRoutes ? .accessible : hostNeeds
+    }
+
     /// The SDK route options: the pedestrian profile with these avoidances.
     public var routeOptions: RouteOptions {
         var avoid: Set<RouteOptions.Avoidance> = []
@@ -65,5 +82,37 @@ extension View {
     /// A change re-routes the route on screen. Default `RouteAccessibility.none`.
     public func routeAccessibility(_ accessibility: RouteAccessibility) -> some View {
         environment(\.routeAccessibility, accessibility)
+    }
+}
+
+/// The accessible routes button of the maps: a wheelchair on glass while it is off; white on a
+/// filled `Palette.position` square while it is on (PM 2026-10-14: an indicator for both states).
+struct AccessibleRoutesButton: View {
+    @Binding var isOn: Bool
+    var onToggle: (Bool) -> Void = { _ in }
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+            onToggle(isOn)
+        } label: {
+            Image(systemName: "figure.roll")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(isOn ? Palette.white : Palette.ink)
+                .frame(width: 50, height: 50)
+                .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
+                .overlay {
+                    if isOn {
+                        RoundedRectangle(cornerRadius: 12).fill(Palette.position)
+                        Image(systemName: "figure.roll")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Palette.white)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Accessible routes", bundle: .module))
+        .accessibilityValue(isOn ? Text("On", bundle: .module) : Text("Off", bundle: .module))
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

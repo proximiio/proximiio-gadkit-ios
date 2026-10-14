@@ -19,7 +19,7 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.7.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.8.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
@@ -158,9 +158,24 @@ A journey the visitor built with the guide is `.personalised`; a tour by the mus
 | Stop card | Names the gallery of the next stop until the visitor is in it, then the artwork. | Names the artwork. |
 | List | Stops under gallery names. | Stops without gallery names. |
 | Skip | The visitor can skip an artwork. | No skip. |
-| Background | Multicolour. | The curated tour colour (Highlights Tour, green). |
+
+The map and the background are the same for both.
 
 `VisitMeta.kind` stores the kind with the journey for the host app's own screens.
+
+## Artwork details in the list
+
+A journey list row shows the artist and "AR" and audio badges from the artwork's POI
+`properties.metadata`. Without `artist_name` the row shows the level.
+
+| Key | Value | Shows |
+|---|---|---|
+| `artist_name` | String, or an i18n object like `title_i18n` | The artist under the title. |
+| `has_ar` | `true` | "AR". |
+| `has_audio` | `true` | A note. |
+
+`VenuePlace.artist`, `hasAR` and `hasAudio` hold the values. The GAD venue data on 2026-10-14 has
+none of the three keys.
 
 ## Accessibility
 
@@ -183,6 +198,10 @@ ContentView()
   features and no `narrowPath` paths, so only `avoidsStairs` changes routes until the data has them.
 - `RouteAccessibility.routeOptions` is the SDK's `RouteOptions` for the needs, for routes the host app
   computes itself.
+- The museum map and the journey map have an accessible routes button (a wheelchair, blue while on).
+  While it is on, routes avoid all four (`RouteAccessibility.accessible`), whatever the host app
+  passed. Its state is kept in `UserDefaults` under `RouteAccessibility.accessibleRoutesKey`, for both
+  maps and later launches. `VisitView` reports `VisitEvent.accessibleRoutesChanged(_:)`.
 - When no route meets the needs, the museum map shows "No route from here with your accessibility
   settings." In a journey, the stop card shows "No route to this stop with your accessibility
   settings." and the stop keeps its place; in a personalised journey the visitor can skip it in the
@@ -218,6 +237,7 @@ VisitView(venue: venue, wristband: wristband, journey: journey) { isVisiting = f
 | `detourStarted(VenuePlace)` | "Change your route?" confirmed, or the route to the Welcome Desk from a tracking alert. |
 | `journeyResumed` | "Resume your Journey" or "Show the route from here". |
 | `recentred` | "Centre on me". |
+| `accessibleRoutesChanged(Bool)` | The accessible routes button turned on (`true`) or off. |
 | `exitRequested` | Back during a visit in progress. "Leave" or "Carry on" follows. |
 | `exitConfirmed` | "Leave". `onClose` follows. |
 | `exitCancelled` | "Carry on". |
@@ -332,6 +352,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.8.0 | The accessible routes button on both maps and `VisitEvent.accessibleRoutesChanged(_:)`. Artist and AR/audio badges from `metadata` in the journey list. Curated tours keep the multicolour background. |
 | 0.7.0 | `JourneyKind` and `VisitView(kind:)`: curated tours go straight to the artwork, list no galleries, have no skip and the tour colour. After an artwork visited out of order, the leg to the next stop starts from the visitor. |
 | 0.6.0 | `RouteAccessibility` and `routeAccessibility(_:)`: avoid stairs, escalators, revolving doors and inaccessible paths. |
 | 0.5.0 | SDK 6.0.0-beta.58 and Map 6.0.0-beta.43. Geofence events are sent as they happen. See "Privacy". |
