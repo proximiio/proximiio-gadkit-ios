@@ -118,13 +118,49 @@ enum VisitCardState: Equatable {
     }
 }
 
-/// Title and summary of a visit, shown on Journey ready (02.10A) and the Hub card.
+/// A journey the visitor built with the guide, or a tour by the museum's curators (PM 2026-10-14,
+/// Figma "Personalised" and "Guided"). `VisitView` differs by kind:
+///
+/// | | Personalised | Curated |
+/// |---|---|---|
+/// | Stop card | names the gallery until the visitor is in it, then the artwork | names the artwork |
+/// | List | stops under gallery names | stops without gallery names |
+/// | Skip | the visitor can skip an artwork | no skip |
+/// | Background | multicolour | the curated tour colour (Highlights Tour, green) |
+public enum JourneyKind: String, Codable, Sendable, CaseIterable {
+    case personalised
+    case curated
+
+    /// Whether the stop card names the gallery of the next stop first. Pure; covered by tests.
+    public var guidesToGalleryFirst: Bool { self == .personalised }
+    /// Whether the list shows gallery names. Pure; covered by tests.
+    public var listsGalleries: Bool { self == .personalised }
+    /// Whether the visitor can skip an artwork. Pure; covered by tests.
+    public var allowsSkip: Bool { self == .personalised }
+}
+
+/// Title, summary and kind of a visit, shown on Journey ready (02.10A) and the Hub card.
 public struct VisitMeta: Codable, Equatable, Sendable {
     public var title: String
     public var summary: String?
+    /// `personalised` for a stored visit from before the kind existed.
+    public var kind: JourneyKind
 
-    public static func standard(stopCount: Int) -> VisitMeta {
-        VisitMeta(title: String(localized: "Your journey", bundle: .module), summary: String(localized: "\(stopCount) stops", bundle: .module))
+    public init(title: String, summary: String? = nil, kind: JourneyKind = .personalised) {
+        self.title = title
+        self.summary = summary
+        self.kind = kind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decode(String.self, forKey: .title)
+        summary = try container.decodeIfPresent(String.self, forKey: .summary)
+        kind = try container.decodeIfPresent(JourneyKind.self, forKey: .kind) ?? .personalised
+    }
+
+    public static func standard(stopCount: Int, kind: JourneyKind = .personalised) -> VisitMeta {
+        VisitMeta(title: String(localized: "Your journey", bundle: .module), summary: String(localized: "\(stopCount) stops", bundle: .module), kind: kind)
     }
 }
 

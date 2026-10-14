@@ -32,7 +32,8 @@ public struct JourneyReadyView: View {
             VStack(spacing: 0) {
                 Spacer()
                 VStack(spacing: 15) {
-                    Text("YOUR PERSONALISED JOURNEY", bundle: .module).textStyle(.caption)
+                    // Figma 02.10A, and "CURATED" on the curated tour's start frame.
+                    Text(meta.kind == .curated ? "CURATED" : "YOUR PERSONALISED JOURNEY", bundle: .module).textStyle(.caption)
                     Text(meta.title).font(GADFonts.custom("GuggenheimSansDisplay-SemiBold", size: 32, relativeTo: .largeTitle))
                     if let summary = meta.summary {
                         Text(summary).textStyle(.bodySmallRegular)

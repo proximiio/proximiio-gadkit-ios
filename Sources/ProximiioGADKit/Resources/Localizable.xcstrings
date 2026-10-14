@@ -237,6 +237,16 @@
         }
       }
     },
+    "CURATED" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "منسقة"
+          }
+        }
+      }
+    },
     "Café" : {
       "localizations" : {
         "ar" : {

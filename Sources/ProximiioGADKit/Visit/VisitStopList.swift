@@ -5,7 +5,8 @@
 //  The journey as a list (Figma: "Personalized Journey list"). Stops are numbered in
 //  visit order and grouped under the gallery they lie in; visited stops are dimmed; swiping
 //  left offers Skip; a skipped stop is hidden and the list renumbers. "Undo skip" restores
-//  the last skipped stop and reports `VisitEvent.skipUndone`.
+//  the last skipped stop and reports `VisitEvent.skipUndone`. A curated tour passes no
+//  galleries and no skip: its stops have no gallery names and cannot be skipped.
 //
 import Proximiio
 import ProximiioMap
@@ -15,10 +16,11 @@ struct VisitStopList: View {
     @Environment(\.visitEventHandler) private var emit
     let controller: VisitController
     var galleries: [Gallery] = []
+    var allowsSkip = true
     let onSkip: (JourneyStop) -> Void
 
     var body: some View {
-        StopList(navigator: controller.navigator, galleries: galleries, lastSkippedStopID: controller.lastSkippedStopID, onSkip: onSkip) {
+        StopList(navigator: controller.navigator, galleries: galleries, allowsSkip: allowsSkip, lastSkippedStopID: controller.lastSkippedStopID, onSkip: onSkip) {
             let stop = controller.navigator.journey.stops.first { $0.id == controller.lastSkippedStopID }
             Task { await controller.undoSkip() }
             if let stop { emit(.skipUndone(stop)) }
@@ -29,6 +31,7 @@ struct VisitStopList: View {
 private struct StopList: View {
     @ObservedObject var navigator: JourneyNavigator
     let galleries: [Gallery]
+    let allowsSkip: Bool
     let lastSkippedStopID: String?
     let onSkip: (JourneyStop) -> Void
     let onUndo: () -> Void
@@ -56,7 +59,7 @@ private struct StopList: View {
                             .accessibilityAddTraits(.isHeader)
                     }
                     ForEach(group.stops) { stop in
-                    let canSkip = stop.state == .pending || stop.state == .active
+                    let canSkip = allowsSkip && (stop.state == .pending || stop.state == .active)
                     SwipeToSkipRow(
                         isRevealed: Binding(
                             get: { revealedStopID == stop.id },
@@ -73,13 +76,15 @@ private struct StopList: View {
                     }
                     }
                 }
-                if lastSkippedStopID != nil {
-                    Button(String(localized: "Undo skip", bundle: .module), action: onUndo).buttonStyle(.small).padding(.top, 6)
+                if allowsSkip {
+                    if lastSkippedStopID != nil {
+                        Button(String(localized: "Undo skip", bundle: .module), action: onUndo).buttonStyle(.small).padding(.top, 6)
+                    }
+                    Text("Swipe left to skip an artwork", bundle: .module)
+                        .textStyle(.bodyExtraSmall)
+                        .foregroundStyle(Palette.ink)
+                        .padding(.top, 10)
                 }
-                Text("Swipe left to skip an artwork", bundle: .module)
-                    .textStyle(.bodyExtraSmall)
-                    .foregroundStyle(Palette.ink)
-                    .padding(.top, 10)
             }
             .padding(.horizontal, 20)
             .padding(.top, 90)

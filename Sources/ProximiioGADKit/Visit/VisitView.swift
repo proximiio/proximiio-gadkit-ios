@@ -9,6 +9,9 @@
 //  Every visitor action and every journey event is also reported to the host app as a
 //  `VisitEvent` (`onVisitEvent(_:)`).
 //
+//  A personalised and a curated journey differ in the stop card, the list, skipping and the
+//  background (`JourneyKind`).
+//
 import CoreLocation
 import Proximiio
 import ProximiioMap
@@ -53,11 +56,19 @@ public struct VisitView: View {
     @State private var stopNotifier = StopNearbyNotifier()
     private let venue: VenueService
     private let wristband: WristbandSession
+    private let kind: JourneyKind
     let onClose: () -> Void
 
-    public init(venue: VenueService, wristband: WristbandSession, journey: Journey, onClose: @escaping () -> Void) {
+    public init(
+        venue: VenueService,
+        wristband: WristbandSession,
+        journey: Journey,
+        kind: JourneyKind = .personalised,
+        onClose: @escaping () -> Void
+    ) {
         self.venue = venue
         self.wristband = wristband
+        self.kind = kind
         _monitor = State(initialValue: TrackingMonitor(sdk: venue.sdk))
         let session = ProximiioMapSession(
             sdk: venue.sdk,
@@ -76,14 +87,14 @@ public struct VisitView: View {
     public var body: some View {
         GeometryReader { geometry in
             ZStack {
-                ScreenBackground.map.view
+                (kind == .curated ? ScreenBackground.curatedMap : ScreenBackground.map).view
                 VisitLiveActivityDriver(navigator: controller.navigator, session: controller.session, liveActivity: liveActivity)
                 VStack(spacing: 10) {
                     MapGlassFrame {
                         ProximiioMapView(session: controller.session)
                             .clearBackground()
                         if mode == .list {
-                            VisitStopList(controller: controller, galleries: galleries, onSkip: { stop in
+                            VisitStopList(controller: controller, galleries: kind.listsGalleries ? galleries : [], allowsSkip: kind.allowsSkip, onSkip: { stop in
                                 stopToSkip = stop
                                 emit(.skipRequested(stop))
                             })
@@ -621,7 +632,8 @@ public struct VisitView: View {
                     VisitCard(
                         navigator: controller.navigator,
                         session: controller.session,
-                        galleries: galleries,
+                        // Without galleries the card names the artwork at once.
+                        galleries: kind.guidesToGalleryFirst ? galleries : [],
                         places: places,
                         onResume: {
                             Task { await controller.resumeJourney() }

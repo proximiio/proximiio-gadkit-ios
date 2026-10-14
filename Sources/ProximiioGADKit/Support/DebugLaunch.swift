@@ -14,6 +14,7 @@
 //    -hubPage welcome|craft               open the Hub on that page
 //    -openMap                             open the museum map after launch
 //    -visitList                           with -visit: open the journey in List mode
+//    -visitKind personalised|curated      with -visit: the kind of journey, default personalised
 //    -visitAutoAdvance                    with -visit: advance 5 m after leaving a stop
 //    -routeTo <title>                     with -openMap: route to the first place whose title matches
 //    -routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths   accessibility needs for routes
@@ -37,6 +38,8 @@ public struct DebugLaunch: Equatable, Sendable {
     public var visitStops: [String] = []
     public var visitAutoAdvance = false
     public var visitList = false
+    /// `-visitKind`. The host app passes it to `VisitView`.
+    public var visitKind = JourneyKind.personalised
 
     public static let current = DebugLaunch(arguments: ProcessInfo.processInfo.arguments)
 
@@ -66,6 +69,7 @@ public struct DebugLaunch: Equatable, Sendable {
         )
         visitAutoAdvance = arguments.contains("-visitAutoAdvance")
         visitList = arguments.contains("-visitList")
+        visitKind = value(after: "-visitKind").flatMap(JourneyKind.init(rawValue:)) ?? .personalised
         visitStops = value(after: "-visit")?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
     }
 

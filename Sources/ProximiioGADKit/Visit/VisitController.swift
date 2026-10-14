@@ -210,7 +210,9 @@ final class VisitController {
     }
 
     /// Marks a pending artwork visited out of order and orders the stops still ahead again from
-    /// the visitor.
+    /// the visitor. The leg to the active stop is then drawn from the visitor: the navigator draws
+    /// a new leg only when the active stop changes, and the old leg started where the visitor was
+    /// before (PM 2026-10-14: the old route stayed on the map).
     private func markOutOfOrder(_ stopID: String) {
         guard markingOutOfOrder.insert(stopID).inserted else { return }
         tasks.append(Task { [weak self] in
@@ -220,10 +222,16 @@ final class VisitController {
                   self.navigator.journey.stops.first(where: { $0.id == stopID })?.state == .pending
             else { return }
             FieldLog.log("artwork visited out of order: \(stopID)")
+            let activeStopID = self.navigator.activeStop?.id
             if await self.navigator.markDone(stopID: stopID), let stop = self.stop(stopID) {
                 self.onArtworkDone?(stop, false)
             }
             await self.orderRemaining()
+            if let activeStopID, self.navigator.activeStop?.id == activeStopID {
+                FieldLog.log("leg to \(activeStopID) drawn again from the visitor")
+                self.isOffRoute = false
+                await self.navigator.resumeJourney()
+            }
             VisitStore.save(self.navigator.journey)
         })
     }

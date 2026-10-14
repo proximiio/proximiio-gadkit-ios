@@ -19,7 +19,7 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.6.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.7.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
@@ -134,7 +134,7 @@ Proximi GAD app.
 | View | Content |
 |---|---|
 | `MuseumMapScreen(venue:onBack:)` | The museum map: floors, amenities, the visitor's position, a route to a tapped place. |
-| `VisitView(venue:wristband:journey:onClose:)` | The journey: map and list with a toggle, skip and undo, the stop card, tracking alerts, the Live Activity. |
+| `VisitView(venue:wristband:journey:kind:onClose:)` | The journey: map and list with a toggle, skip and undo, the stop card, tracking alerts, the Live Activity. `kind` is `.personalised` (default) or `.curated`. |
 | `WristbandPairingView(pairing:onFinish:)` | Optional: the pairing flow of the Proximi GAD app, with its QR scanner. Create the pairing with `WristbandPairing(connector: wristband)`. |
 | `VisitPlanPicker(places:onStart:onCancel:)` | Choosing stops by hand. |
 
@@ -147,6 +147,20 @@ let journey = VisitPlan.journey(poiIDs: poiIDs, places: places)
 
 `VisitStore.save(_:)` and `VisitStore.load()` keep the journey in progress across launches. `VisitView`
 saves it on every change.
+
+### Personalised and curated journeys
+
+A journey the visitor built with the guide is `.personalised`; a tour by the museum's curators is
+`.curated` (Figma "Personalised" and "Guided"):
+
+| | `.personalised` | `.curated` |
+|---|---|---|
+| Stop card | Names the gallery of the next stop until the visitor is in it, then the artwork. | Names the artwork. |
+| List | Stops under gallery names. | Stops without gallery names. |
+| Skip | The visitor can skip an artwork. | No skip. |
+| Background | Multicolour. | The curated tour colour (Highlights Tour, green). |
+
+`VisitMeta.kind` stores the kind with the journey for the host app's own screens.
 
 ## Accessibility
 
@@ -263,6 +277,7 @@ await DebugLaunch.current.run(with: venue, wristband: wristband)
 | `-pairWristband <code>` | Binds the wristband after the SDK starts. Ignored with `-journeyPlayback`. |
 | `-visitList` | `VisitView` opens in List mode. |
 | `-visitAutoAdvance` | `VisitView` advances 5 m after the visitor leaves a stop, without the Continue tap. |
+| `-visitKind personalised\|curated` | Sets `DebugLaunch.visitKind`. The host app passes it to `VisitView`. |
 | `-routeTo <title>` | `MuseumMapScreen` routes to the first place whose title matches, after the first position. |
 | `-routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `DebugLaunch.routeAccessibility`. The host app passes it to `routeAccessibility(_:)`. |
 
@@ -316,6 +331,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.7.0 | `JourneyKind` and `VisitView(kind:)`: curated tours go straight to the artwork, list no galleries, have no skip and the tour colour. After an artwork visited out of order, the leg to the next stop starts from the visitor. |
 | 0.6.0 | `RouteAccessibility` and `routeAccessibility(_:)`: avoid stairs, escalators, revolving doors and inaccessible paths. |
 | 0.5.0 | SDK 6.0.0-beta.58 and Map 6.0.0-beta.43. Geofence events are sent as they happen. See "Privacy". |
 | 0.4.1 | `VenueService.start` caches the map style. The map is clear instead of black until MapLibre draws its first frame. |
