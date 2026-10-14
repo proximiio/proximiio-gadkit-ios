@@ -798,7 +798,7 @@ private struct VisitCard: View {
 
     private var instruction: String? {
         // The navigator keeps a stop that no route with the visitor's accessibility needs reaches,
-        // with no route line. The visitor can skip it in the list.
+        // with no route line. In a personalised journey the visitor can skip it in the list.
         if let stop = navigator.activeStop, case .noAccessibleRoute = navigator.noRouteReasons[stop.id] {
             return String(localized: "No route to this stop with your accessibility settings.", bundle: .module)
         }

@@ -185,7 +185,8 @@ ContentView()
   computes itself.
 - When no route meets the needs, the museum map shows "No route from here with your accessibility
   settings." In a journey, the stop card shows "No route to this stop with your accessibility
-  settings." and the stop keeps its place; the visitor can skip it in the list.
+  settings." and the stop keeps its place; in a personalised journey the visitor can skip it in the
+  list.
 
 ## Events from VisitView
 
