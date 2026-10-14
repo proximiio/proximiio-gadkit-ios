@@ -75,7 +75,7 @@ public struct VisitView: View {
         self.wristband = wristband
         self.kind = kind
         _monitor = State(initialValue: TrackingMonitor(sdk: venue.sdk))
-        let session = ProximiioMapSession(
+        let session = MapStyle.session(
             sdk: venue.sdk,
             // The leg keeps its shape until the arrival; the walked part is translucent (PM review
             // 2026-10-12). No separate trail.

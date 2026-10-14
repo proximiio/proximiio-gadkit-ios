@@ -353,6 +353,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.9.2 | Map amenities of a kind the design draws (restrooms, café, help desk, prayer room, shop, stairs, elevator) use the design's 30 pt markers. |
 | 0.9.1 | The journey list scrolls when a drag starts on a row (iOS 18 and later). |
 | 0.9.0 | A curated tour keeps the curators' order (`JourneyKind.keepsOrder`). |
 | 0.8.0 | The accessible routes button on both maps and `VisitEvent.accessibleRoutesChanged(_:)`. Artist and AR/audio badges from `metadata` in the journey list. Curated tours keep the multicolour background. |

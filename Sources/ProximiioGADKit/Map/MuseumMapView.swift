@@ -38,10 +38,7 @@ struct MuseumMapView: View {
         self.venue = venue
         self.initialDestination = initialDestination
         self.showsLegend = showsLegend
-        _session = StateObject(wrappedValue: ProximiioMapSession(
-            sdk: venue.sdk,
-            options: MapStyle.options()
-        ))
+        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.options()))
     }
 
     @State private var isShowingAmenities = false

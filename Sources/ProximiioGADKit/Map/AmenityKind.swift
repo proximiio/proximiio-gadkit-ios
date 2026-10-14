@@ -75,14 +75,26 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
     }
 
     func matches(_ place: VenuePlace) -> Bool {
-        let text = "\(place.amenityID ?? "") \(place.title)".lowercased()
+        matches(text: "\(place.amenityID ?? "") \(place.title)".lowercased())
+    }
+
+    /// `text` is lower case: an amenity id and a title.
+    private func matches(text: String) -> Bool {
         switch self {
         case .mensRestroom:
             // "women's restroom" contains "men's"; exclude it.
-            return keywords.contains { text.contains($0) } && !AmenityKind.womensRestroom.matches(place)
+            return keywords.contains { text.contains($0) } && !AmenityKind.womensRestroom.matches(text: text)
         default:
             return keywords.contains { text.contains($0) }
         }
+    }
+
+    /// The kind an amenity's id and title name, or `nil`. The data's variants for a visited stop
+    /// or a destination ("Womens restroom visited") are left out. Pure; covered by tests.
+    static func kind(forAmenityID id: String, title: String?) -> AmenityKind? {
+        let text = "\(id) \(title ?? "")".lowercased()
+        guard !["visited", "destination", "distination"].contains(where: text.contains) else { return nil }
+        return allCases.first { $0.matches(text: text) }
     }
 
     /// The nearest place of this kind. Places on the visitor's level come first; distance is

@@ -18,6 +18,7 @@
 //
 //  The gradient runs per floor: on the floor after a lift, it starts at the lift.
 //
+import Proximiio
 import ProximiioMap
 import UIKit
 
@@ -112,6 +113,27 @@ enum MapStyle {
         widthPoints: 6,
         cap: .round
     )
+
+    /// A map session that draws amenities with the design's icons (`amenityImage(for:scale:)`).
+    @MainActor static func session(sdk: Proximiio, options: MapOptions) -> ProximiioMapSession {
+        let session = ProximiioMapSession(sdk: sdk, options: options)
+        let scale = UIScreen.main.scale
+        session.amenityImageDecoder = { amenityImage(for: $0, scale: scale) }
+        return session
+    }
+
+    /// The map icon of an amenity. A kind the design draws (`AmenityKind`) gets its 30 pt marker,
+    /// the size of the stop markers and the position arrow (PM 2026-10-14, "Amenity icons
+    /// larger"): the data's icons are 30 px, which the map library draws at the screen scale, 10 pt
+    /// on a 3x screen. Other amenities, such as artworks and gallery labels, keep their icon.
+    static func amenityImage(for amenity: ProximiioAmenity, scale: CGFloat) -> UIImage? {
+        if let kind = AmenityKind.kind(forAmenityID: amenity.id, title: amenity.title),
+           let name = kind.icon.markerImageName,
+           let image = UIImage(named: name, in: .module, compatibleWith: nil) {
+            return image
+        }
+        return amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }
+    }
 
     /// Waits up to 5 s until the map view has created its canvas.
     @MainActor static func waitForCanvas(of session: ProximiioMapSession) async {
