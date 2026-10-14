@@ -13,6 +13,7 @@
 import Proximiio
 import ProximiioMap
 import SwiftUI
+import UIKit
 
 struct VisitStopList: View {
     @Environment(\.visitEventHandler) private var emit
@@ -192,9 +193,7 @@ private struct SwipeToSkipRow<Content: View>: View {
                 .opacity(min(1, -offset / revealWidth))
                 .accessibilityHidden(true)
             }
-            content
-                .offset(x: offset)
-                .simultaneousGesture(isEnabled ? drag : nil)
+            draggable(content.offset(x: offset))
                 .onTapGesture {
                     if isRevealed { withAnimation(.snappy) { isRevealed = false } }
                 }
@@ -208,6 +207,37 @@ private struct SwipeToSkipRow<Content: View>: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: Text("Skip", bundle: .module)) { if isEnabled { onSkip() } }
+        // For UI tests; VoiceOver does not read identifiers.
+        .accessibilityIdentifier(isRevealed ? "journeyStopRow.skipShown" : "journeyStopRow")
+    }
+
+    /// From iOS 18 a SwiftUI drag on a row takes every drag that starts on it, also as a
+    /// simultaneous gesture, and the list did not scroll (PM 2026-10-12 and 2026-10-14,
+    /// `ListScrollUITests`). There the row uses a pan recognizer that begins only for a mostly
+    /// horizontal drag; a vertical drag stays with the scroll view.
+    @ViewBuilder
+    private func draggable(_ row: some View) -> some View {
+        if !isEnabled {
+            row
+        } else if #available(iOS 18.0, *) {
+            // No `isSwiping`: the list's pan already waits for this one (`HorizontalPan`).
+            row.gesture(HorizontalPan(
+                onBegan: {},
+                onChanged: { dragX = $0 },
+                onEnded: { translation, velocity in
+                    let projected = (isRevealed ? -revealWidth : 0) + translation + velocity * 0.2
+                    withAnimation(.snappy(duration: 0.25)) {
+                        dragX = 0
+                        isRevealed = projected < -revealWidth / 2
+                    }
+                },
+                onCancelled: {
+                    withAnimation(.snappy(duration: 0.25)) { dragX = 0 }
+                }
+            ))
+        } else {
+            row.simultaneousGesture(drag)
+        }
     }
 
     private var drag: some Gesture {
@@ -235,5 +265,56 @@ private struct SwipeToSkipRow<Content: View>: View {
                     isRevealed = projected < -revealWidth / 2
                 }
             }
+    }
+}
+
+/// A pan that begins only when the drag is more horizontal than vertical. Reports the horizontal
+/// translation, and the horizontal velocity at the end.
+@available(iOS 18.0, *)
+private struct HorizontalPan: UIGestureRecognizerRepresentable {
+    let onBegan: () -> Void
+    let onChanged: (CGFloat) -> Void
+    let onEnded: (_ translation: CGFloat, _ velocity: CGFloat) -> Void
+    let onCancelled: () -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.delegate = context.coordinator
+        return pan
+    }
+
+    func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
+        let translation = pan.translation(in: pan.view).x
+        switch pan.state {
+        case .began:
+            onBegan()
+            onChanged(translation)
+        case .changed:
+            onChanged(translation)
+        case .ended:
+            onEnded(translation, pan.velocity(in: pan.view).x)
+        case .cancelled, .failed:
+            onCancelled()
+        default:
+            break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
+            let velocity = pan.velocity(in: pan.view)
+            return abs(velocity.x) > abs(velocity.y)
+        }
+
+        /// The list's pan waits for this one. A vertical drag fails it at once, so scrolling
+        /// starts without delay; a horizontal drag keeps the list still.
+        func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            other is UIPanGestureRecognizer && other.view is UIScrollView
+        }
     }
 }
