@@ -41,9 +41,12 @@ public final class VenueService {
         configuration.apiBaseURL = backend.apiBaseURL
         // No fallback hosts: a production build must not fall back to *.proximi.fi.
         configuration.fallbackAPIBaseURLs = []
-        // Visitor reporting: `PUT /core/visitors`, then batched positions (`/core/positions/batch`)
-        // and geofence enter and exit events (`/core/events/batch`) to `apiBaseURL`. The client
-        // requires no visitor consent for it (2026-10-14), so it is on in every build.
+        // Visitor reporting: `PUT /core/visitors`, then positions in batches every 60 s
+        // (`/core/positions/batch`) and each geofence enter and exit event as it happens
+        // (`/core/events`) to `apiBaseURL`. Events that could not be sent wait on the device and go
+        // out in a batch (`/core/events/batch`) once the network is back. The client requires no
+        // visitor consent for it (2026-10-14), so it is on in every build. It is the SDK default
+        // since 6.0.0-beta.58; it is set here so a later default does not turn it off.
         configuration.visitorReportingEnabled = true
         return configuration
     }

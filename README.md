@@ -19,11 +19,11 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.4.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.5.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.57 and `proximiio-map-ios-binary`
-6.0.0-beta.42 exactly. A host app that also depends on these packages must use the same versions.
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
+6.0.0-beta.43 exactly. A host app that also depends on these packages must use the same versions.
 
 ## Host app setup
 
@@ -267,6 +267,19 @@ passes the SDK's `ProximiioJourney.validate()`. `-listJourneys` prints the curre
 | DCT Office walk | `7405e6e6-d9f6-4146-adda-de6adbf4a8a1:99a3beee-65cc-43c4-9b35-9e6dbee06e09` | 8 | 34 m, at the DCT office, not the museum |
 | Test DCT Walk_Pranav | `7405e6e6-d9f6-4146-adda-de6adbf4a8a1:b9aab2da-09fc-4371-bb46-7071fc010c2f` | 3 | 14 m, at the DCT office, not the museum |
 
+## Privacy
+
+- The SDK reports the visitor to `apiBaseURL`: a visitor id, positions at most every 10 s (or after
+  5 m), and geofence enter and exit events. Positions are uploaded every 60 s, when the app goes to the
+  background and when it terminates. Geofence enter and exit events are sent as they happen. Without
+  network they wait on the device and go out once the network is back. The client requires no consent
+  prompt for it.
+- The SDK's privacy manifest declares Precise Location (App Functionality, Analytics) and Device ID
+  (the anonymous visitor id: Analytics; the wristband binding id, sent only to the relay-api: App
+  Functionality), neither linked to the user nor used for tracking. The host app's App Store privacy
+  details declare the same.
+- `VenueService.start` asks for "While Using the App" location only.
+
 ## Tests
 
 ```
@@ -277,6 +290,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.5.0 | SDK 6.0.0-beta.58 and Map 6.0.0-beta.43. Geofence events are sent as they happen. See "Privacy". |
 | 0.4.1 | `VenueService.start` caches the map style. The map is clear instead of black until MapLibre draws its first frame. |
 | 0.4.0 | The package moves to this repository from `proximiio/guggenheim-ios`. `DebugLaunch.openScreen` is removed. |
 | 0.1.0–0.3.0 | Tags of `proximiio/guggenheim-ios`. |
