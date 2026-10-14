@@ -1,0 +1,259 @@
+# ProximiioGADKit
+
+ProximiioGADKit is a Swift package with the museum map and the journey (map and list) screens of the
+Proximi GAD app (Guggenheim Abu Dhabi) and the wristband binding, built on the Proximi.io iOS SDK and
+Map. A host app with its own QR scanner passes the scanned wristband code to
+`WristbandSession.connect(code:)`. The Proximi GAD app uses the package the same way a host app does.
+
+| Product | Add to | Content |
+|---|---|---|
+| `ProximiioGADKit` | The app target | Screens, design system, SDK start, wristband session, field log. |
+| `ProximiioGADLiveActivity` | The widget extension | `VisitActivityAttributes` and `VisitActivityWidget`. |
+
+## Requirements
+
+- iOS 17 or later. Swift 6 language mode (`swift-tools-version: 6.0`).
+- Built and tested with Xcode 26.3 and Xcode 27.
+- Read access to this repository. The SDK and Map binary packages are public.
+
+## Adding the package
+
+In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
+dependency rule "Up to Next Minor Version" from `0.4.0`. The versions are the git tags of this
+repository. Before 1.0, a minor version can change the API.
+
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.57 and `proximiio-map-ios-binary`
+6.0.0-beta.42 exactly. A host app that also depends on these packages must use the same versions.
+
+## Host app setup
+
+### Info.plist
+
+| Key | Why |
+|---|---|
+| `NSLocationWhenInUseUsageDescription` | `VenueService.start` requests location authorization. The relay-api needs a fix for a wristband take-over. |
+| `NSLocationTemporaryUsageDescriptionDictionary` → `WristbandTakeover` | Asked when the visitor allowed approximate location only and a take-over needs a precise fix. |
+| `NSCameraUsageDescription` | The host app's QR code scanner, or `WristbandPairingView`, which has one. |
+| `UIBackgroundModes` → `location` | Positions keep arriving while the phone is locked. |
+| `NSSupportsLiveActivities` = `YES` | The visit Live Activity. |
+| `NSBluetoothAlwaysUsageDescription`, `NSMotionUsageDescription`, `NSLocationAlwaysAndWhenInUseUsageDescription`, `NSNearbyInteractionUsageDescription` | Never requested. App Store processing requires them because the SDK binary references these APIs (ITMS-90683). |
+
+### Languages
+
+The package ships English and Arabic strings. The host app also declares English and Arabic
+(`CFBundleLocalizations`, or Known Regions in the project), so the language setting of the app applies
+to the package screens too.
+
+### Fonts
+
+The app target lists no fonts. The package registers Guggenheim Sans Display for the process when the
+first text style is drawn (`GADFonts`). Call `GADFonts.register()` before `UIFont(name:size:)` with
+these fonts.
+
+The widget extension does not register fonts. Add `GuggenheimSansDisplay-Regular.ttf`, `-Medium.ttf`
+and `-Bold.ttf` from `Sources/ProximiioGADKit/Resources/Fonts` to the extension and list them in its
+`UIAppFonts`.
+
+## Starting
+
+```swift
+import ProximiioGADKit
+
+let configuration = GADConfiguration(
+    apiBaseURL: URL(string: "https://api.example.com")!,
+    applicationToken: applicationToken,
+    relayAPI: BlueiotCloudRelayEndpoint(text: "https://relay-api.example.com")!,
+    relayAPIAppToken: relayAPIAppToken
+)
+let wristband = WristbandSession(configuration: configuration)
+Task { await wristband.run() }   // Follows the binding state. Call once at launch.
+let venue = try await VenueService.start(configuration: configuration, binding: wristband.binding)
+```
+
+- `VenueService.start` creates the SDK (`ProximiioConfiguration.relayOnly`, no fallback host), requests
+  location authorization, authenticates, starts positioning, loads the route network and attaches the
+  wristband's position provider. Visitor reporting is on.
+- `venue.sdk` is the app's only `Proximiio` instance. Other features of the host app, such as the audio
+  guide, use it. Do not create a second `Proximiio`.
+- The package contacts only `apiBaseURL` and the relay-api host.
+
+Notifications for geofence enter and exit:
+
+```swift
+let notifier = GeofenceNotifier()
+await notifier.requestAuthorization()
+Task { await notifier.run(sdk: venue.sdk) }
+```
+
+`run(sdk:)` sets the `UNUserNotificationCenter` delegate, which shows notifications while the app is in
+the foreground. A host app with its own delegate sets it again after this call and presents the
+notifications with the thread identifiers `geofence` and `journey` itself.
+
+## Wristband
+
+The host app scans the wristband's QR code, or the visitor types the code printed on it. Pass the
+result to `connect(code:)`:
+
+```swift
+do {
+    try await wristband.connect(code: scannedCode)
+} catch {
+    errorText = WristbandCopy.message(for: error)   // the text for the visitor, English or Arabic
+}
+```
+
+- `connect(code:)` trims the code and sends it to the relay-api, which resolves every label format.
+  When the relay-api needs the phone's location for a take-over, the iOS location dialog comes first.
+  It returns when the session is active and throws `BlueiotBindingError` otherwise (`.invalidTagID`
+  for an empty code).
+- A wristband that another phone follows is taken over when the relay-api allows it. The other phone's
+  session ends.
+- `isActive`, `state` and `endNotice` describe the session. Positions arrive only while it is active.
+- When the session ends during a visit, `VisitView` shows "wristband no longer connected" with
+  "Connect a wristband". That button opens the host app's screen:
+
+```swift
+VisitView(venue: venue, wristband: wristband, journey: journey) { isVisiting = false }
+    .wristbandConnectionScreen { close in
+        MyWristbandScanner(onFinish: close)   // calls wristband.connect(code:)
+    }
+```
+
+Without `wristbandConnectionScreen`, the button opens `WristbandPairingView`, the pairing flow of the
+Proximi GAD app.
+
+## Screens
+
+| View | Content |
+|---|---|
+| `MuseumMapScreen(venue:onBack:)` | The museum map: floors, amenities, the visitor's position, a route to a tapped place. |
+| `VisitView(venue:wristband:journey:onClose:)` | The journey: map and list with a toggle, skip and undo, the stop card, tracking alerts, the Live Activity. |
+| `WristbandPairingView(pairing:onFinish:)` | Optional: the pairing flow of the Proximi GAD app, with its QR scanner. Create the pairing with `WristbandPairing(connector: wristband)`. |
+| `VisitPlanPicker(places:onStart:onCancel:)` | Choosing stops by hand. |
+
+A journey from Proximi.io POI ids, for example from the audio guide:
+
+```swift
+let places = VenuePlace.all(in: await venue.sdk.features())
+let journey = VisitPlan.journey(poiIDs: poiIDs, places: places)
+```
+
+`VisitStore.save(_:)` and `VisitStore.load()` keep the journey in progress across launches. `VisitView`
+saves it on every change.
+
+## Events from VisitView
+
+`VisitView` performs every action itself. The host app receives a `VisitEvent` for each visitor action
+and each journey change:
+
+```swift
+VisitView(venue: venue, wristband: wristband, journey: journey) { isVisiting = false }
+    .onVisitEvent { event in
+        switch event {
+        case .skipRequested(let stop): print("Swiped \(stop.title)")
+        case .stopSkipped(let stop): print("Skipped \(stop.title)")
+        case .artworkReached(let stop): print("At \(stop.title)")
+        default: break
+        }
+    }
+```
+
+| Event | When |
+|---|---|
+| `modeChanged(VisitMode)` | The Map / List toggle, or "Where are you?", which shows the map. |
+| `skipRequested(JourneyStop)` | A swipe on a stop in the list, or its "Skip" accessibility action. "Skip artwork?" follows. |
+| `stopSkipped(JourneyStop)` | "Skip artwork" confirmed. |
+| `skipCancelled(JourneyStop)` | "Keep it". |
+| `skipUndone(JourneyStop)` | "Undo skip" in the list. |
+| `stopChosen(JourneyStop)` | The visitor picked the stop they are at in "Where are you?". |
+| `galleryChosen(String)` | The visitor picked the gallery they are in. |
+| `amenitySelected(VenuePlace)` | An amenity picked on the map. A card shows it. |
+| `detourStarted(VenuePlace)` | "Change your route?" confirmed, or the route to the Welcome Desk from a tracking alert. |
+| `journeyResumed` | "Resume your Journey" or "Show the route from here". |
+| `recentred` | "Centre on me". |
+| `exitRequested` | Back during a visit in progress. "Leave" or "Carry on" follows. |
+| `exitConfirmed` | "Leave". `onClose` follows. |
+| `exitCancelled` | "Carry on". |
+| `stopNearby(JourneyStop)` | The active stop is less than 5 m away on the visitor's level. Once per stop per visit. |
+| `artworkReached(JourneyStop)` | The visitor entered the artwork geofence of the active stop, or stands in its area. The stop is done 2 s later, when the event arrives, and the route leads to the next stop. |
+| `artworkVisitedOutOfOrder(JourneyStop)` | The visitor stayed at an artwork further down the journey. The stop is done and the stops ahead are ordered again. |
+| `journey(JourneyEvent)` | Every event of the journey navigator: `legChanged`, `stopSkipped`, `rerouted`, `detourStarted`, `stopReached` (detours only), `journeyFinished` and others. The navigator does not report artworks reached: use `artworkReached`. |
+
+Handlers of enclosing views are called first. Events arrive on the main actor.
+
+## Live Activity
+
+`VisitView` starts, updates and ends the Live Activity. The widget extension shows it:
+
+```swift
+import ProximiioGADLiveActivity
+import SwiftUI
+import WidgetKit
+
+@main
+struct Widgets: WidgetBundle {
+    var body: some Widget {
+        VisitActivityWidget()
+    }
+}
+```
+
+## Field log
+
+`FieldLog` writes positions, tracking health, geofence, journey and binding events to
+`Documents/gad-debug.log`. It is off by default. Turn it on at launch, before `VenueService.start`, in
+test builds only:
+
+```swift
+FieldLog.isEnabled = true
+FieldLog.logLaunch()
+```
+
+`FieldLogShareButton()` opens the share sheet with the file.
+
+## Debug builds
+
+In the Debug configuration `DebugLaunch` reads launch arguments. The SDK-dependent arguments take
+effect when the host app calls `run(with:wristband:)` after `VenueService.start`:
+
+```swift
+#if DEBUG
+await DebugLaunch.current.run(with: venue, wristband: wristband)
+#endif
+```
+
+| Argument | Effect |
+|---|---|
+| `-journeyPlayback <journey id>` | Plays a journey stored on Proximi.io instead of the wristband. |
+| `-journeySpeed <x>` | Playback speed. Default 1. |
+| `-journeyLoop` | Restarts playback after the last waypoint. |
+| `-listJourneys` | Prints the organisation's places and journeys with their ids. |
+| `-pairWristband <code>` | Binds the wristband after the SDK starts. Ignored with `-journeyPlayback`. |
+| `-visitList` | `VisitView` opens in List mode. |
+| `-visitAutoAdvance` | `VisitView` advances 5 m after the visitor leaves a stop, without the Continue tap. |
+| `-routeTo <title>` | `MuseumMapScreen` routes to the first place whose title matches, after the first position. |
+
+`DebugLaunch` also parses `-demoWristbandPairing`, `-hubPage`, `-openMap` and `-visit`. The package
+does not act on them; the Proximi GAD app reads them.
+
+Sandbox data (GAD Sandbox organisation):
+
+| Kind | Value |
+|---|---|
+| Hosts | `https://api.proximi.fi`, `https://relay-api-sandbox.proximi.fi` |
+| Test wristbands | `1000054522`, `1000045550`, `1000045662` |
+| Journey "Guggenheim walk 1" | `7405e6e6-d9f6-4146-adda-de6adbf4a8a1:c77dfca6-07fd-4c19-bf76-fb92bfdf361c` |
+| Journey "Guggenheim walk 7" | `7405e6e6-d9f6-4146-adda-de6adbf4a8a1:5bebd389-4f28-4e53-814f-b1ef829fcc3c` |
+
+## Tests
+
+```
+xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simulator,name=iPhone 17'
+```
+
+## Versions
+
+| Version | Change |
+|---|---|
+| 0.4.0 | The package moves to this repository from `proximiio/guggenheim-ios`. `DebugLaunch.openScreen` is removed. |
+| 0.1.0–0.3.0 | Tags of `proximiio/guggenheim-ios`. |

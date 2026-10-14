@@ -1,0 +1,33 @@
+{
+  "originHash" : "e59cace44fa1126c5173f09b0efaf0ae7848f1b0dbef47ad3951379cbe10d7e2",
+  "pins" : [
+    {
+      "identity" : "maplibre-gl-native-distribution",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/maplibre/maplibre-gl-native-distribution",
+      "state" : {
+        "revision" : "86992aabad3e89ce8818adec2e8b9d03177d69da",
+        "version" : "6.29.0"
+      }
+    },
+    {
+      "identity" : "proximiio-map-ios-binary",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/proximiio/proximiio-map-ios-binary",
+      "state" : {
+        "revision" : "9550873b3c2695f4637606e0ec2d27fe32fd60bd",
+        "version" : "6.0.0-beta.42"
+      }
+    },
+    {
+      "identity" : "proximiio-sdk-ios-binary",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/proximiio/proximiio-sdk-ios-binary",
+      "state" : {
+        "revision" : "5735ae408b6e8bd4393649ed23f680934cd758e5",
+        "version" : "6.0.0-beta.57"
+      }
+    }
+  ],
+  "version" : 3
+}
