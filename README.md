@@ -19,7 +19,7 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.8.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.9.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
@@ -158,6 +158,7 @@ A journey the visitor built with the guide is `.personalised`; a tour by the mus
 | Stop card | Names the gallery of the next stop until the visitor is in it, then the artwork. | Names the artwork. |
 | List | Stops under gallery names. | Stops without gallery names. |
 | Skip | The visitor can skip an artwork. | No skip. |
+| Order | Ordered floor by floor and gallery by gallery from the visitor, at the start and after a detour or an artwork visited out of order. | The curators' order. An artwork visited out of order is marked visited; the rest keep their order. |
 
 The map and the background are the same for both.
 
@@ -352,6 +353,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.9.0 | A curated tour keeps the curators' order (`JourneyKind.keepsOrder`). |
 | 0.8.0 | The accessible routes button on both maps and `VisitEvent.accessibleRoutesChanged(_:)`. Artist and AR/audio badges from `metadata` in the journey list. Curated tours keep the multicolour background. |
 | 0.7.0 | `JourneyKind` and `VisitView(kind:)`: curated tours go straight to the artwork, list no galleries, have no skip and the tour colour. After an artwork visited out of order, the leg to the next stop starts from the visitor. |
 | 0.6.0 | `RouteAccessibility` and `routeAccessibility(_:)`: avoid stairs, escalators, revolving doors and inaccessible paths. |

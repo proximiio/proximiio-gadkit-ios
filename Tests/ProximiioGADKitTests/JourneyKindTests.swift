@@ -11,12 +11,14 @@ struct JourneyKindTests {
         #expect(JourneyKind.personalised.guidesToGalleryFirst)
         #expect(JourneyKind.personalised.listsGalleries)
         #expect(JourneyKind.personalised.allowsSkip)
+        #expect(!JourneyKind.personalised.keepsOrder)
     }
 
     @Test func curatedGoesStraightToTheArtworkWithoutSkip() {
         #expect(!JourneyKind.curated.guidesToGalleryFirst)
         #expect(!JourneyKind.curated.listsGalleries)
         #expect(!JourneyKind.curated.allowsSkip)
+        #expect(JourneyKind.curated.keepsOrder)
     }
 
     @Test func storedMetaWithoutKindIsPersonalised() throws {

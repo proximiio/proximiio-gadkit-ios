@@ -85,7 +85,7 @@ public struct VisitView: View {
         #if DEBUG
         if DebugLaunch.current.visitAutoAdvance { rules.advance = .onDeparture(meters: 5) }
         #endif
-        _controller = State(initialValue: VisitController(session: session, journey: journey, rules: rules))
+        _controller = State(initialValue: VisitController(session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder))
         self.onClose = onClose
     }
 

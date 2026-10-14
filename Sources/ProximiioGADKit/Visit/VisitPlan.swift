@@ -126,6 +126,7 @@ enum VisitCardState: Equatable {
 /// | Stop card | names the gallery until the visitor is in it, then the artwork | names the artwork |
 /// | List | stops under gallery names | stops without gallery names |
 /// | Skip | the visitor can skip an artwork | no skip |
+/// | Order | ordered floor by floor and gallery by gallery from the visitor | the curators' order |
 ///
 /// The background is the same (PM 2026-10-14: ignore the curated tour colour).
 public enum JourneyKind: String, Codable, Sendable, CaseIterable {
@@ -138,6 +139,9 @@ public enum JourneyKind: String, Codable, Sendable, CaseIterable {
     public var listsGalleries: Bool { self == .personalised }
     /// Whether the visitor can skip an artwork. Pure; covered by tests.
     public var allowsSkip: Bool { self == .personalised }
+    /// Whether the stops keep their order: no ordering from the visitor at the start, after a
+    /// detour or after an artwork visited out of order. Pure; covered by tests.
+    public var keepsOrder: Bool { self == .curated }
 }
 
 /// Title, summary and kind of a visit, shown on Journey ready (02.10A) and the Hub card.

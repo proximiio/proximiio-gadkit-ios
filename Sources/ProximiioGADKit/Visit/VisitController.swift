@@ -26,7 +26,7 @@
 //  nearest the visitor first, then the rest of its gallery, then the rest of its floor. Without a
 //  fix the first stop stays first, and the first fix within `lateOrderWindow` orders the journey
 //  again while no stop is reached. A restored journey keeps its order. After a detour the stops
-//  still ahead are ordered again from the visitor.
+//  still ahead are ordered again from the visitor. A curated tour (`keepsOrder`) is never ordered.
 //
 //  Leaving the route does not re-route the leg (`JourneyDeviationPolicy.askApp`). The visitor
 //  gets a warning (`isOffRoute`) once they are far from the route or off it for too long, and
@@ -88,7 +88,12 @@ final class VisitController {
     /// the geofence on the way elsewhere from marking it.
     static let outOfOrderDwellSeconds: TimeInterval = 0
 
-    init(session: ProximiioMapSession, journey: Journey, rules: JourneyRules = .visit) {
+    /// A curated tour keeps the curators' order: no ordering at the start, after a detour or
+    /// after an artwork visited out of order.
+    private let keepsOrder: Bool
+
+    init(session: ProximiioMapSession, journey: Journey, rules: JourneyRules = .visit, keepsOrder: Bool = false) {
+        self.keepsOrder = keepsOrder
         self.session = session
         self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules, guidanceRules: Self.artworkGuidanceRules)
         session.routeSnapping = Self.routeSnapping
@@ -108,7 +113,7 @@ final class VisitController {
         navigator.deviationPolicy = .askApp
         await navigator.setRouteOptions(accessibility.routeOptions)
         var isOrderedWithoutFix = false
-        if navigator.journey.stops.allSatisfy({ $0.state == .pending }) {
+        if !keepsOrder, navigator.journey.stops.allSatisfy({ $0.state == .pending }) {
             await waitForFix(upTo: Self.fixWait)
             isOrderedWithoutFix = session.position == nil
             if let proposal = await proposedOrder(), proposal.isImprovement {
@@ -266,7 +271,7 @@ final class VisitController {
 
     /// Orders the stops still ahead from the visitor, floor by floor and gallery by gallery.
     private func orderRemaining() async {
-        guard let proposal = await navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
+        guard !keepsOrder, let proposal = await navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
               proposal.isImprovement
         else { return }
         await apply(proposal)
