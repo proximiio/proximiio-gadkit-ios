@@ -353,6 +353,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.9.1 | The journey list scrolls when a drag starts on a row (iOS 18 and later). |
 | 0.9.0 | A curated tour keeps the curators' order (`JourneyKind.keepsOrder`). |
 | 0.8.0 | The accessible routes button on both maps and `VisitEvent.accessibleRoutesChanged(_:)`. Artist and AR/audio badges from `metadata` in the journey list. Curated tours keep the multicolour background. |
 | 0.7.0 | `JourneyKind` and `VisitView(kind:)`: curated tours go straight to the artwork, list no galleries, have no skip and the tour colour. After an artwork visited out of order, the leg to the next stop starts from the visitor. |
