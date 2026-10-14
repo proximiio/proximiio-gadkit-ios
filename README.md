@@ -73,6 +73,13 @@ let venue = try await VenueService.start(configuration: configuration, binding: 
 - `VenueService.start` creates the SDK (`ProximiioConfiguration.relayOnly`, no fallback host), requests
   location authorization, authenticates, starts positioning, loads the route network and attaches the
   wristband's position provider. Visitor reporting is on.
+- Call `VenueService.start` at launch, before the first map screen. After the start it fetches the
+  organisation's map style in the background, and the map library writes it to Caches. A map screen
+  then starts on that style instead of an empty one, and the venue data is already loaded.
+- On the first map screen after an install, MapLibre downloads the basemap tiles while the map is on
+  screen. Until they arrive, the map shows the style's white background. MapLibre keeps the tiles in
+  its cache for later screens and launches.
+- Until MapLibre draws the first frame, the map is clear and the screen behind it shows.
 - `venue.sdk` is the app's only `Proximiio` instance. Other features of the host app, such as the audio
   guide, use it. Do not create a second `Proximiio`.
 - The package contacts only `apiBaseURL` and the relay-api host.
@@ -270,5 +277,6 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.4.1 | `VenueService.start` caches the map style. The map is clear instead of black until MapLibre draws its first frame. |
 | 0.4.0 | The package moves to this repository from `proximiio/guggenheim-ios`. `DebugLaunch.openScreen` is removed. |
 | 0.1.0–0.3.0 | Tags of `proximiio/guggenheim-ios`. |

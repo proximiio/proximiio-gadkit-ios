@@ -12,6 +12,7 @@
 //
 import Foundation
 import Proximiio
+import ProximiioMap
 #if canImport(ProximiioBlueiot)
 import ProximiioBlueiot
 #endif
@@ -61,6 +62,7 @@ public final class VenueService {
         _ = try await sdk.loadRouteNetwork()
         let venue = VenueService(sdk: sdk, binding: binding)
         await venue.attachBinding()
+        venue.cacheMapStyle()
         if FieldLog.isEnabled {
             // The visitor id finds this phone's visitor, positions and events on the backend.
             let consent = await sdk.visitorReportingConsent
@@ -79,6 +81,21 @@ public final class VenueService {
             }
         }
         return venue
+    }
+
+    /// Fetches the organisation's map style in the background. The map library writes it to
+    /// Caches, and a map screen opened later starts on it instead of an empty style. Without it,
+    /// the first map screen after an install fetches the style while it is on screen.
+    private func cacheMapStyle() {
+        let sdk = sdk
+        Task {
+            do {
+                _ = try await VenueStyle.load(from: sdk)
+                FieldLog.log("map style cached")
+            } catch {
+                FieldLog.log("map style not cached: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Attaches the binding's position provider in place of the attached provider. A

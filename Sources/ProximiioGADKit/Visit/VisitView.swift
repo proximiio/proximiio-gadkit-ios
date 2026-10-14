@@ -80,6 +80,7 @@ public struct VisitView: View {
                 VStack(spacing: 10) {
                     MapGlassFrame {
                         ProximiioMapView(session: controller.session)
+                            .clearBackground()
                         if mode == .list {
                             VisitStopList(controller: controller, galleries: galleries, onSkip: { stop in
                                 stopToSkip = stop

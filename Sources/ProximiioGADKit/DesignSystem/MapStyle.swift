@@ -19,6 +19,7 @@
 //  The gradient runs per floor: on the floor after a lift, it starts at the lift.
 //
 import ProximiioMap
+import UIKit
 
 enum MapStyle {
     static let location = MapColor(hex: 0x3F69FF)
@@ -116,6 +117,17 @@ enum MapStyle {
     @MainActor static func waitForCanvas(of session: ProximiioMapSession) async {
         for _ in 0..<50 where session.canvas == nil {
             try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+}
+
+extension ProximiioMapView {
+    /// The map library fills the map with black until MapLibre draws the first frame of the style.
+    /// A clear background shows the screen behind the map instead.
+    func clearBackground() -> ProximiioMapView {
+        proximiioMap { canvas in
+            canvas.backgroundColor = .clear
+            canvas.mapView.backgroundColor = .clear
         }
     }
 }

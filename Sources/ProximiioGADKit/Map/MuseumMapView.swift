@@ -45,6 +45,7 @@ struct MuseumMapView: View {
     var body: some View {
         ZStack {
             ProximiioMapView(session: session)
+                .clearBackground()
                 .ignoresSafeArea(edges: .bottom)
             controls
         }
