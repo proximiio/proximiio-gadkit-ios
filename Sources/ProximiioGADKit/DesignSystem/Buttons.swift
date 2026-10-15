@@ -48,6 +48,7 @@ public struct GhostButtonStyle: ButtonStyle {
 
 public struct SmallButtonStyle: ButtonStyle {
     var isSelected = false
+    var strength: GlassStrength = .light
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -55,7 +56,7 @@ public struct SmallButtonStyle: ButtonStyle {
             .foregroundStyle(Palette.ink)
             .padding(.horizontal, 16)
             .frame(minHeight: 32)
-            .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .light)
+            .glassSurface(RoundedRectangle(cornerRadius: 12), strength: strength)
             .overlay {
                 if isSelected {
                     RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1.5)
@@ -100,7 +101,9 @@ extension ButtonStyle where Self == GhostButtonStyle {
 
 extension ButtonStyle where Self == SmallButtonStyle {
     public static var small: SmallButtonStyle { SmallButtonStyle() }
-    public static func small(selected: Bool) -> SmallButtonStyle { SmallButtonStyle(isSelected: selected) }
+    public static func small(selected: Bool, strength: GlassStrength = .light) -> SmallButtonStyle {
+        SmallButtonStyle(isSelected: selected, strength: strength)
+    }
 }
 
 extension ButtonStyle where Self == IconGlassButtonStyle {

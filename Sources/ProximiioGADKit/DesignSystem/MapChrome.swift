@@ -119,7 +119,9 @@ struct AmenityChipList: View {
                     }
                     .padding(.horizontal, -6)
                 }
-                .buttonStyle(.small(selected: kind == selected))
+                // Frosted: on the clear glass the titles were hard to read over the map
+                // (PM 2026-10-15, "Search menu transparency").
+                .buttonStyle(.small(selected: kind == selected, strength: .frosted))
             }
         }
     }

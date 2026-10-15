@@ -347,32 +347,12 @@
         }
       }
     },
-    "Closes the level change" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "يغلق تغيير الطابق"
-          }
-        }
-      }
-    },
     "Connect" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "اربط"
-          }
-        }
-      }
-    },
-    "Connect a wristband" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "اربط سوارًا"
           }
         }
       }
@@ -599,16 +579,6 @@
         }
       }
     },
-    "Going to level %lld" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "متجه إلى الطابق %lld"
-          }
-        }
-      }
-    },
     "Guide Me" : {
       "localizations" : {
         "ar" : {
@@ -649,16 +619,6 @@
         }
       }
     },
-    "In the lift" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "في المصعد"
-          }
-        }
-      }
-    },
     "It will be ready when you arrive at GAD" : {
       "localizations" : {
         "ar" : {
@@ -675,26 +635,6 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "ستتم إزالته من مسارك. تبقى الأعمال الفنية التي زرتها محفوظة."
-          }
-        }
-      }
-    },
-    "Its battery may have run out. Your journey is saved - nothing is lost." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "ربما نفدت بطاريته. رحلتك محفوظة - لم يضِع شيء."
-          }
-        }
-      }
-    },
-    "Its battery may have run out. Your journey is saved at Stop %lld - nothing is lost." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "ربما نفدت بطاريته. رحلتك محفوظة عند المحطة %lld - لم يضِع شيء."
           }
         }
       }
@@ -739,16 +679,6 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "أبقِه على معصمك - ستتعرّف عليه القاعات أثناء تجوّلك."
-          }
-        }
-      }
-    },
-    "Last Seen" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "آخر ظهور"
           }
         }
       }
@@ -1121,16 +1051,6 @@
         }
       }
     },
-    "Search Again" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "البحث مجددًا"
-          }
-        }
-      }
-    },
     "Search the museum" : {
       "localizations" : {
         "ar" : {
@@ -1249,16 +1169,6 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "المحطة %1$lld من %2$lld"
-          }
-        }
-      }
-    },
-    "Swap it at the Welcome Desk" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "استبدله في مكتب الاستقبال"
           }
         }
       }
@@ -1667,32 +1577,12 @@
         }
       }
     },
-    "Walk a few steps toward the centre of the gallery and we’ll find you again." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "امشِ بضع خطوات نحو وسط القاعة وسنحدد موقعك مجددًا."
-          }
-        }
-      }
-    },
     "We couldn’t connect" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "لم نتمكن من ربط"
-          }
-        }
-      }
-    },
-    "We’ve lost your place in the room" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "فقدنا موقعك في القاعة"
           }
         }
       }
@@ -1733,16 +1623,6 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "رمز السوار"
-          }
-        }
-      }
-    },
-    "You are now on level %lld" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "أنت الآن في الطابق %lld"
           }
         }
       }
@@ -1895,16 +1775,6 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "توقف سوارك عن الاستجابة"
-          }
-        }
-      }
-    },
-    "Your wristband is no longer connected" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "سوارك لم يعد متصلًا"
           }
         }
       }

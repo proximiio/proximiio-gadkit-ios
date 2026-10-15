@@ -163,11 +163,4 @@ struct TrackingHealthTests {
         #expect(TrackingMonitor.nearest(to: here, level: 3, in: places)?.id == "c")
         #expect(TrackingMonitor.nearest(to: nil, level: 1, in: places) == nil)
     }
-
-    @Test func welcomeDeskIsFoundByTitleOrAmenity() {
-        let coordinate = ProximiioCoordinate(latitude: 0, longitude: 0)
-        #expect(VenuePlace.welcomeDesk(in: [VenuePlace(id: "d", title: "Help Desk", coordinate: coordinate, level: 0)])?.id == "d")
-        #expect(VenuePlace.welcomeDesk(in: [VenuePlace(id: "e", title: "Desk", coordinate: coordinate, level: 0, amenityID: "services:information")])?.id == "e")
-        #expect(VenuePlace.welcomeDesk(in: [VenuePlace(id: "f", title: "Café", coordinate: coordinate, level: 0)]) == nil)
-    }
 }

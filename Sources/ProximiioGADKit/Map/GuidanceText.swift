@@ -14,8 +14,9 @@ enum GuidanceText {
     /// design's "70 m · <1 min".
     static let walkingSpeed = 1.2
 
-    /// The instruction line, e.g. "Turn left in 50 m".
-    static func instruction(for guidance: RouteGuidance) -> String {
+    /// The instruction line, e.g. "Turn left in 50 m". `markers`: the route's level changes
+    /// (`RouteGeometry.markers`), which give the floor a ride ends on (`rideEnd`).
+    static func instruction(for guidance: RouteGuidance, markers: [RouteGeometry.Marker] = []) -> String {
         if guidance.hasArrived { return String(localized: "You have arrived", bundle: .module) }
         if guidance.isOffRoute { return String(localized: "You have left the route", bundle: .module) }
         let metres = Int(guidance.distanceToManoeuvreMeters.rounded())
@@ -25,7 +26,7 @@ enum GuidanceText {
         case .turnRight, .turnSharpRight: return String(localized: "Turn right in \(metres) m", bundle: .module)
         case .turnSlightRight: return String(localized: "Bear right in \(metres) m", bundle: .module)
         case .levelChange(let change):
-            let level = Int(change.toLevel.rounded())
+            let level = rideEnd(featureType: change.featureType, coordinate: change.coordinate, from: change.fromLevel, to: change.toLevel, markers: markers)
             return String(localized: "Take the \(levelChanger(change.featureType)) to level \(level)", bundle: .module)
         case .arrive: return String(localized: "Arrive in \(metres) m", bundle: .module)
         default: return String(localized: "Head straight for \(metres) m", bundle: .module)
@@ -34,7 +35,7 @@ enum GuidanceText {
 
     /// The card title while the next stop is on another floor: the route's first level change
     /// that leaves the visitor's floor, e.g. "Take the stairs to level 3". A route from level 1 to
-    /// level 4 can take the stairs to level 3 first (PM 2026-10-15). Without a level change on the
+    /// level 4 can take the stairs to level 3 and then the lift. Without a level change on the
     /// route: "Go to level 4". Pure; covered by tests.
     static func levelChangeTitle(markers: [RouteGeometry.Marker], visitorLevel: Double?, stopLevel: Int) -> String {
         let pending = markers.filter { !$0.isCompleted }
@@ -44,8 +45,29 @@ enum GuidanceText {
         guard let change = fromHere ?? pending.first else {
             return String(localized: "Go to level \(stopLevel)", bundle: .module)
         }
-        let level = Int(change.to.level.rounded())
+        let level = rideEnd(featureType: change.featureType, coordinate: change.coordinate, from: change.from.level, to: change.to.level, markers: pending)
         return String(localized: "Take the \(levelChanger(change.featureType)) to level \(level)", bundle: .module)
+    }
+
+    /// The floor a ride in one staircase or lift ends on. The SDK router splits a ride into one
+    /// level change per floor with paths near the staircase or lift: from level 1 to level 4 the
+    /// stairs go to level 3, then from level 3 to level 4, at the same coordinate (Monday
+    /// "Instructions guide first to level 3, then level 4", 2026-10-15). The level changes in
+    /// `markers` that follow the one from `from` to `to`, with the same type and coordinate, are
+    /// the same ride. Pure; covered by tests.
+    static func rideEnd(featureType: String, coordinate: MapCoordinate, from: Double, to: Double, markers: [RouteGeometry.Marker]) -> Int {
+        func isSameChanger(_ marker: RouteGeometry.Marker) -> Bool {
+            marker.featureType == featureType && marker.coordinate == coordinate
+        }
+        var end = Int(to.rounded())
+        guard let start = markers.firstIndex(where: {
+            isSameChanger($0) && Int($0.from.level.rounded()) == Int(from.rounded()) && Int($0.to.level.rounded()) == end
+        }) else { return end }
+        for marker in markers[(start + 1)...] {
+            guard isSameChanger(marker), Int(marker.from.level.rounded()) == end else { break }
+            end = Int(marker.to.level.rounded())
+        }
+        return end
     }
 
     /// Remaining distance and time, e.g. "70 m · <1 min".

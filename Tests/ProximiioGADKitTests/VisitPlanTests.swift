@@ -43,6 +43,23 @@ struct VisitPlanTests {
         #expect(!square.contains(ProximiioCoordinate(latitude: 24.502, longitude: 54.4005)))
     }
 
+    /// GAD data 2026-10-15: "DCT Mother/Earth" shares `remote_id` with the Guggenheim artwork.
+    /// Only the first geofence was kept, so the visitor inside the DCT one did not reach it.
+    @Test func everyGeofenceOfAnArtworkIsKept() {
+        let artwork: JSONValue = .object(["geofence_type": .string("artwork")])
+        let guggenheim = ProximiioCoordinate(latitude: 24.5, longitude: 54.4)
+        let dct = ProximiioCoordinate(latitude: 25.2, longitude: 55.3)
+        let areas = VisitController.artworkAreas(of: [
+            ProximiioGeofence(id: "g", area: guggenheim, radius: 2, metadata: artwork, remoteId: "GAD.2018.00034"),
+            ProximiioGeofence(id: "d", area: dct, radius: 2, metadata: artwork, remoteId: "GAD.2018.00034"),
+            ProximiioGeofence(id: "n", area: dct, radius: 2, metadata: artwork, remoteId: ""),
+            ProximiioGeofence(id: "x", area: dct, radius: 2, metadata: .object(["geofence_type": .string("gallery")]), remoteId: "e07fe5d7"),
+        ])
+        #expect(areas.keys.sorted() == ["GAD.2018.00034"])
+        #expect(areas["GAD.2018.00034"]?.contains { $0.contains(dct) } == true)
+        #expect(areas["GAD.2018.00034"]?.contains { $0.contains(guggenheim) } == true)
+    }
+
     @Test func geofenceDwellCountsUnbrokenTimeInside() {
         var dwell = GeofenceDwell()
         let start = Date(timeIntervalSince1970: 0)

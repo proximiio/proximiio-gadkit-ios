@@ -19,8 +19,9 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.12.0`. The versions are the git tags of this
-repository. Before 1.0, a minor version can change the API.
+dependency rule "Up to Next Minor Version" from `0.13.0`. The versions are the git tags of this
+repository. Before 1.0, a minor version can change the API. The [Changelog](#changelog) lists every
+change of each version; changes that need a change in the host app are marked **Breaking**.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
 6.0.0-beta.43 exactly. A host app that also depends on these packages must use the same versions.
@@ -102,8 +103,8 @@ let configuration = GADConfiguration(
 
 | Setting | Default | Effect |
 |---|---|---|
-| `trackingLostAfter` | 110 s | Seconds without positioning before "We've lost your place". The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
-| `trackingStoppedAfter` | 170 s | Seconds without positioning before "Your wristband has stopped responding" (about 3 min). |
+| `trackingLostAfter` | 110 s | Seconds without positioning before `VisitEvent.trackingChanged(.lostPlace)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
+| `trackingStoppedAfter` | 170 s | Seconds without positioning before `VisitEvent.trackingChanged(.stoppedResponding)` (about 3 min). |
 | `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order. |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
@@ -111,7 +112,7 @@ let configuration = GADConfiguration(
 | `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
-| `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before "In the lift" or "Level up", and the fixes outside that end the ride. |
+| `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `liveActivityMinimumInterval` | 5 s | The shortest gap between two Live Activity updates of the instruction. |
@@ -148,25 +149,16 @@ do {
 - A wristband that another phone follows is taken over when the relay-api allows it. The other phone's
   session ends.
 - `isActive`, `state` and `endNotice` describe the session. Positions arrive only while it is active.
-- When the session ends during a visit, `VisitView` shows "wristband no longer connected" with
-  "Connect a wristband". That button opens the host app's screen:
-
-```swift
-VisitView(venue: venue, wristband: wristband, journey: journey) { isVisiting = false }
-    .wristbandConnectionScreen { close in
-        MyWristbandScanner(onFinish: close)   // calls wristband.connect(code:)
-    }
-```
-
-Without `wristbandConnectionScreen`, the button opens `WristbandPairingView`, the pairing flow of the
-Proximi GAD app.
+- `VisitView` shows no wristband alerts: the host app handles the wristband states, for example an
+  ended session (`state`, `endNotice`). `VisitView` reports lost and returning positions as
+  `VisitEvent.trackingChanged(TrackingHealth)`.
 
 ## Screens
 
 | View | Content |
 |---|---|
 | `MuseumMapScreen(venue:onBack:)` | The museum map: floors, amenities, the visitor's position, a route to a tapped place. |
-| `VisitView(venue:wristband:journey:kind:onClose:)` | The journey: map and list with a toggle, skip and undo, the stop card, tracking alerts, the Live Activity. `kind` is `.personalised` (default) or `.curated`. |
+| `VisitView(venue:journey:kind:onClose:)` | The journey: map and list with a toggle, skip and undo, the stop card, the Live Activity. `kind` is `.personalised` (default) or `.curated`. |
 | `WristbandPairingView(pairing:onFinish:)` | Optional: the pairing flow of the Proximi GAD app, with its QR scanner. Create the pairing with `WristbandPairing(connector: wristband)`. |
 | `VisitPlanPicker(places:onStart:onCancel:)` | Choosing stops by hand. |
 
@@ -213,10 +205,10 @@ none of the three keys.
 ### Gallery headers
 
 In a personalised journey the list shows a header before the stops of each gallery. The gallery of
-an artwork is its `metadata.gallery_id` (`VenuePlace.galleryID`), named by the gallery geofence
-(`geofence_type` `gallery`) whose `remote_id` is that id. An artwork without one is under the
-gallery outline it lies in, else under its level ("Level 4"). The GAD venue data on 2026-10-15 has
-`gallery_id` on 153 artworks in 15 galleries; 11 of the 15 have a gallery geofence.
+an artwork is its `metadata.gallery_id` (`VenuePlace.galleryID`), named by the title of the POI whose
+`remote_id` is that id ("G403 Weaving"). An artwork without one is under the gallery outline it lies
+in, else under its level ("Level 4"). The GAD venue data on 2026-10-15 has `gallery_id` on artworks in
+18 galleries; 14 of the 18 have a gallery POI.
 
 ## Accessibility
 
@@ -254,7 +246,7 @@ ContentView()
 and each journey change:
 
 ```swift
-VisitView(venue: venue, wristband: wristband, journey: journey) { isVisiting = false }
+VisitView(venue: venue, journey: journey) { isVisiting = false }
     .onVisitEvent { event in
         switch event {
         case .skipRequested(let stop): print("Swiped \(stop.title)")
@@ -273,7 +265,7 @@ VisitView(venue: venue, wristband: wristband, journey: journey) { isVisiting = f
 | `skipCancelled(JourneyStop)` | "Keep it". |
 | `skipUndone(JourneyStop)` | "Undo skip" in the list. |
 | `amenitySelected(VenuePlace)` | An amenity picked on the map. A card shows it. |
-| `detourStarted(VenuePlace)` | "Change your route?" confirmed, or the route to the Welcome Desk from a tracking alert. |
+| `detourStarted(VenuePlace)` | "Change your route?" confirmed. |
 | `journeyResumed` | "Resume your Journey" or "Show the route from here". |
 | `recentred` | "Centre on me". |
 | `accessibleRoutesChanged(Bool)` | The accessible routes button turned on (`true`) or off. |
@@ -283,6 +275,7 @@ VisitView(venue: venue, wristband: wristband, journey: journey) { isVisiting = f
 | `stopNearby(JourneyStop)` | The active stop is less than 5 m away on the visitor's level. Once per stop per visit. |
 | `artworkReached(JourneyStop)` | The visitor entered the artwork geofence of the active stop, or stands in its area. The stop is done 2 s later, when the event arrives, and the route leads to the next stop. |
 | `artworkVisitedOutOfOrder(JourneyStop)` | The visitor stayed at an artwork further down the journey. The stop is done and the stops ahead are ordered again. |
+| `trackingChanged(TrackingHealth)` | The wristband's positions stopped (`lostPlace` after `trackingLostAfter`, `stoppedResponding` after `trackingStoppedAfter`) or came back (`tracking`). `VisitView` shows no alert. |
 | `journey(JourneyEvent)` | Every event of the journey navigator: `legChanged`, `stopSkipped`, `rerouted`, `detourStarted`, `stopReached` (detours only), `journeyFinished` and others. The navigator does not report artworks reached: use `artworkReached`. |
 
 Handlers of enclosing views are called first. Events arrive on the main actor.
@@ -387,20 +380,185 @@ passes the SDK's `ProximiioJourney.validate()`. `-listJourneys` prints the curre
 xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
-## Versions
+## Changelog
 
-| Version | Change |
-|---|---|
-| 0.12.0 | Gallery headers in the journey list from the artwork's `metadata.gallery_id` and the gallery geofence's `remote_id` (`VenuePlace.galleryID`); a stop without a gallery is under its level. The list is one flat list, so its rows follow the journey order after the journey is ordered again. |
-| 0.11.0 | The card names the route's next level change ("Take the stairs to level 3"), and the map marks that lift or stairs in red. The lift animation takes its floor from the route only when the route uses that lift. The amenity detour marker shows the amenity's icon. "Change your route?" is a card on the map. No "Which one are you in?" and no "Pick my stop manually" (`VisitEvent.stopChosen`, `galleryChosen` and `GADSettings.nearbyGalleryMeters` removed). `GADSettings.liftRideDwell`, `liftExitFixes`. A visit closes after its "Journey Complete", exit or wristband sheet is dismissed. |
-| 0.10.0 | `GADSettings`: every time and distance of the screens, in `GADConfiguration.settings` and `VenueService.settings`. |
-| 0.9.2 | Map amenities of a kind the design draws (restrooms, café, help desk, prayer room, shop, stairs, elevator) use the design's 30 pt markers. |
-| 0.9.1 | The journey list scrolls when a drag starts on a row (iOS 18 and later). |
-| 0.9.0 | A curated tour keeps the curators' order (`JourneyKind.keepsOrder`). |
-| 0.8.0 | The accessible routes button on both maps and `VisitEvent.accessibleRoutesChanged(_:)`. Artist and AR/audio badges from `metadata` in the journey list. Curated tours keep the multicolour background. |
-| 0.7.0 | `JourneyKind` and `VisitView(kind:)`: curated tours go straight to the artwork, list no galleries, have no skip and the tour colour. After an artwork visited out of order, the leg to the next stop starts from the visitor. |
-| 0.6.0 | `RouteAccessibility` and `routeAccessibility(_:)`: avoid stairs, escalators, revolving doors and inaccessible paths. |
-| 0.5.0 | SDK 6.0.0-beta.58 and Map 6.0.0-beta.43. Geofence events are sent as they happen. See "Privacy". |
-| 0.4.1 | `VenueService.start` caches the map style. The map is clear instead of black until MapLibre draws its first frame. |
-| 0.4.0 | The package moves to this repository from `proximiio/guggenheim-ios`. `DebugLaunch.openScreen` is removed. |
-| 0.1.0–0.3.0 | Tags of `proximiio/guggenheim-ios`. |
+Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
+dependencies; the entry says what to change. `VisitEvent` gets new cases in minor versions: a `switch`
+over `VisitEvent` with a `default` case compiles with every version.
+
+### 0.13.0 (2026-10-15)
+
+Breaking:
+
+- `VisitView(venue:journey:kind:onClose:)` takes no `wristband`. Remove the argument.
+- `wristbandConnectionScreen(_:)` is removed: `VisitView` no longer offers "Connect a wristband".
+  Remove the modifier.
+- New `VisitEvent.trackingChanged(TrackingHealth)`. A `switch` over `VisitEvent` without `default`
+  needs the case.
+
+Removed:
+
+- The tracking alerts "We've lost your place" and "Your wristband has stopped responding", and the
+  "Your wristband is no longer connected" sheet with its route to the Welcome Desk. The host app
+  handles the wristband states (PM 2026-10-15).
+- The level change animation over the map. The map still moves to the visitor's floor.
+
+Added:
+
+- `VisitEvent.trackingChanged(TrackingHealth)`: `tracking`, `lostPlace` after
+  `GADSettings.trackingLostAfter`, `stoppedResponding` after `trackingStoppedAfter`.
+- `.small(selected:strength:)`: the glass strength of `SmallButtonStyle`, `.light` by default.
+
+Changed:
+
+- Gallery headers in the journey list show the title of the POI whose `remote_id` is the artwork's
+  `gallery_id` ("G403 Weaving"), not the name of the gallery geofence.
+- The stop card and the instruction name the floor where a ride in one staircase or lift ends ("Take
+  the stairs to level 4"). The SDK router splits a ride into one level change per floor, and the card
+  named the first one ("level 3").
+- Lifts, staircases and escalators show on their floor and on every floor in their `levels`, on the
+  journey map and the museum map. The route's next one stays red.
+- The amenity menu buttons use the frosted glass.
+
+Fixed:
+
+- An artwork with several geofences of the same `remote_id` is reached in any of them. Each DCT test
+  artwork shares its `remote_id` with the Guggenheim artwork, and only the first geofence counted, so
+  a visitor in the DCT geofence did not reach "DCT Mother/Earth", at the start of a journey or out of
+  order.
+
+### 0.12.0 (2026-10-15)
+
+Added:
+
+- `VenuePlace.galleryID`: the artwork's `metadata.gallery_id`.
+
+Changed:
+
+- Gallery headers in the journey list come from the artwork's `gallery_id`, named by the gallery
+  geofence with that `remote_id`; else the gallery outline the stop lies in; else its level ("Level 4").
+
+Fixed:
+
+- The journey list is one flat list. After the journey was ordered again it showed rows of the older
+  order (two rows numbered 25).
+
+### 0.11.0 (2026-10-15)
+
+Breaking:
+
+- `VisitEvent.stopChosen` and `VisitEvent.galleryChosen` are removed. Remove these cases from a
+  `switch`.
+- `GADSettings.nearbyGalleryMeters` is removed.
+
+Added:
+
+- `GADSettings.liftRideDwell` (3 s) and `liftExitFixes` (2).
+
+Changed:
+
+- While the next stop is on another floor, the card names the route's next level change ("Take the
+  stairs to level 3"), and the map marks that lift or stairs in red.
+- The lift animation takes its floor from the route only when the route uses that lift.
+- The amenity detour marker shows the amenity's icon.
+- "Change your route?" is a card on the map with "Go here" and "Close", not a bottom sheet.
+- A visit closes after its "Journey Complete", exit or wristband sheet is dismissed.
+
+Removed:
+
+- "Which one are you in?" and "Pick my stop manually".
+
+### 0.10.0 (2026-10-14)
+
+Added:
+
+- `GADSettings`: every time and distance of the screens. `GADConfiguration(…, settings:)`, default
+  `.standard`, and `VenueService.settings`.
+
+### 0.9.2 (2026-10-14)
+
+Changed:
+
+- Map amenities of a kind the design draws (restrooms, café, help desk, prayer room, shop, stairs,
+  elevator) use the design's 30 pt markers.
+
+### 0.9.1 (2026-10-14)
+
+Fixed:
+
+- The journey list scrolls when a drag starts on a row (iOS 18 and later).
+
+### 0.9.0 (2026-10-14)
+
+Added:
+
+- `JourneyKind.keepsOrder`.
+
+Changed:
+
+- A curated tour keeps the curators' order.
+
+### 0.8.0 (2026-10-14)
+
+Breaking:
+
+- New `VisitEvent.accessibleRoutesChanged(Bool)`. A `switch` over `VisitEvent` without `default`
+  needs the case.
+
+Added:
+
+- The accessible routes button on both maps, `RouteAccessibility.accessible` and
+  `RouteAccessibility.accessibleRoutesKey`.
+- Artist and AR and audio badges in the journey list from `metadata` (`VenuePlace.artist`, `hasAR`,
+  `hasAudio`).
+
+Removed:
+
+- The tour colour background of curated tours (0.7.0).
+
+### 0.7.0 (2026-10-14)
+
+Added:
+
+- `JourneyKind` and `VisitView(kind:)`, default `.personalised`; `VisitMeta.kind`.
+
+Changed:
+
+- Curated tours go straight to the artwork, list no galleries and have no skip.
+- After an artwork visited out of order, the leg to the next stop starts from the visitor.
+
+### 0.6.0 (2026-10-14)
+
+Added:
+
+- `RouteAccessibility` and `routeAccessibility(_:)`: avoid stairs, escalators, revolving doors and
+  inaccessible paths.
+
+### 0.5.0 (2026-10-14)
+
+Breaking:
+
+- SDK 6.0.0-beta.58 and Map 6.0.0-beta.43. A host app that depends on these packages moves to the
+  same versions.
+
+Changed:
+
+- Geofence events are sent as they happen. See "Privacy".
+
+### 0.4.1 (2026-10-14)
+
+Changed:
+
+- `VenueService.start` caches the map style.
+- The map is clear instead of black until MapLibre draws its first frame.
+
+### 0.4.0 (2026-10-14)
+
+Breaking:
+
+- The package is in this repository, not in `proximiio/guggenheim-ios`. Change the package URL.
+- `DebugLaunch.openScreen` is removed.
+
+### 0.1.0–0.3.0
+
+Tags of `proximiio/guggenheim-ios`.

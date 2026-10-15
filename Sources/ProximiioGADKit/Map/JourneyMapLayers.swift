@@ -11,11 +11,13 @@
 //    route has no line from the dot to the route without it.
 //  - the lift or stairs of the route's next level change: the red marker with a white glyph, as
 //    an amenity detour (PM 2026-10-15, "Level changer highlighting")
+//  - every other lift, staircase and escalator that serves the shown floor, with its amenity icon
+//    (`LevelChangerPlace`; Monday "All level changers visible", 2026-10-15)
 //
 //  The stop markers are the map library's (`MapStyle.journeyStops`).
 //
-//  The layers are added after each style load and show the selected floor only. The connector goes
-//  and the gallery fills go through `ProximiioMapCanvas.addLayer(_:at:)`.
+//  The layers are added after each style load and show the selected floor only. The layers go
+//  through `ProximiioMapCanvas.addLayer(_:at:)`.
 //
 import MapLibre
 import Proximiio
@@ -39,6 +41,9 @@ final class JourneyMapLayers {
         var imageName: String { Self.imageName(for: featureType) }
 
         static func imageName(for featureType: String) -> String { "gad-level-changer-\(featureType)" }
+
+        /// The amenity icon of a level changer that is not on the route.
+        static func standardImageName(for featureType: String) -> String { "gad-level-changer-standard-\(featureType)" }
     }
 
     private static let gallerySource = "gad-journey-galleries"
@@ -55,6 +60,7 @@ final class JourneyMapLayers {
     private var level: Double = 0
     private var connector: [ProximiioCoordinate] = []
     private var changer: LevelChanger?
+    private var changers: [LevelChangerPlace] = []
 
     func attach(to session: ProximiioMapSession) {
         self.session = session
@@ -63,12 +69,15 @@ final class JourneyMapLayers {
         }
     }
 
+    /// The gallery fills and the shown floor.
     func update(fills: [GalleryFill], level: Double) {
         guard fills != self.fills || level != self.level else { return }
+        let levelChanged = level != self.level
         self.fills = fills
         self.level = level
         guard let style = session?.canvas?.style else { return }
         apply(on: style)
+        if levelChanged { applyLevelChanger(on: style) }
     }
 
     /// The line from the visitor to the start of the route ahead. An empty array removes it.
@@ -78,6 +87,14 @@ final class JourneyMapLayers {
         connector = points
         guard let style = session?.canvas?.style else { return }
         applyConnector(on: style)
+    }
+
+    /// The venue's lifts, staircases and escalators. Each shows on the floors it serves.
+    func updateLevelChangers(_ changers: [LevelChangerPlace]) {
+        guard changers != self.changers else { return }
+        self.changers = changers
+        guard let style = session?.canvas?.style else { return }
+        applyLevelChanger(on: style)
     }
 
     /// The highlighted level changer, or `nil` for none.
@@ -114,8 +131,11 @@ final class JourneyMapLayers {
             canvas.addLayer(layer, at: .below(.route))
         }
         if style.source(withIdentifier: Self.changerSource) == nil {
-            for type in ["elevator", "staircase", "escalator"] {
+            for type in LevelChangerPlace.featureTypes {
                 if let image = Self.changerImage(featureType: type) { canvas.floors.register(image, named: LevelChanger.imageName(for: type)) }
+                if let image = UIImage(named: Self.icon(featureType: type).markerImageName ?? "", in: .module, compatibleWith: nil) {
+                    canvas.floors.register(image, named: LevelChanger.standardImageName(for: type))
+                }
             }
             let source = MLNShapeSource(identifier: Self.changerSource, shape: nil)
             style.addSource(source)
@@ -123,6 +143,8 @@ final class JourneyMapLayers {
             layer.iconImageName = NSExpression(forKeyPath: "image")
             layer.iconAllowsOverlap = NSExpression(forConstantValue: true)
             layer.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+            // The highlighted level changer over the others.
+            layer.symbolSortKey = NSExpression(forKeyPath: "sort")
             canvas.addLayer(layer, at: .above(.route))
         }
         apply(on: style)
@@ -132,21 +154,32 @@ final class JourneyMapLayers {
 
     private func applyLevelChanger(on style: MLNStyle) {
         guard let source = style.source(withIdentifier: Self.changerSource) as? MLNShapeSource else { return }
-        guard let changer, sameLevel(changer.level) else {
-            source.shape = nil
-            return
+        let highlighted = changer.flatMap { sameLevel($0.level) ? $0 : nil }
+        var features = changers
+            .filter { $0.serves(level) && $0.coordinate != highlighted?.coordinate }
+            .map { Self.point($0.coordinate, image: LevelChanger.standardImageName(for: $0.featureType), sort: 0) }
+        if let highlighted {
+            features.append(Self.point(highlighted.coordinate, image: highlighted.imageName, sort: 1))
         }
+        source.shape = MLNShapeCollectionFeature(shapes: features)
+    }
+
+    private static func point(_ coordinate: ProximiioCoordinate, image: String, sort: Int) -> MLNPointFeature {
         let feature = MLNPointFeature()
-        feature.coordinate = CLLocationCoordinate2D(latitude: changer.coordinate.latitude, longitude: changer.coordinate.longitude)
-        feature.attributes = ["image": changer.imageName]
-        source.shape = feature
+        feature.coordinate = CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        feature.attributes = ["image": image, "sort": NSNumber(value: sort)]
+        return feature
+    }
+
+    /// The design's icon of a level changer type.
+    private static func icon(featureType: String) -> GADIcon {
+        featureType == "elevator" ? .elevator : .stairs
     }
 
     /// The 30 pt red marker of the journey's active stop and detour (`MapStyle.journeyStops`) with
     /// the design's lift or stairs glyph in white.
     private static func changerImage(featureType: String) -> UIImage? {
-        let icon: GADIcon = featureType == "elevator" ? .elevator : .stairs
-        guard let glyph = UIImage(named: icon.rawValue, in: .module, compatibleWith: nil)?
+        guard let glyph = UIImage(named: icon(featureType: featureType).rawValue, in: .module, compatibleWith: nil)?
             .withTintColor(.white, renderingMode: .alwaysOriginal) else { return nil }
         let size = CGSize(width: 30, height: 30)
         return UIGraphicsImageRenderer(size: size).image { _ in

@@ -43,15 +43,15 @@ public struct Gallery: Identifiable, Equatable, Sendable {
         }
     }
 
-    /// Gallery names by the gallery's id: the `remote_id` of a gallery geofence, which an
-    /// artwork names in `metadata.gallery_id` (`VenuePlace.galleryID`). On 2026-10-15 the GAD data
-    /// names galleries on every floor this way; gallery outlines with a gallery POI exist on
-    /// level 3 only. Pure; covered by tests.
-    static func names(geofences: [ProximiioGeofence]) -> [String: String] {
+    /// Gallery names by the gallery's id: the title of the POI whose `remote_id` is the id that an
+    /// artwork names in `metadata.gallery_id` (`VenuePlace.galleryID`), such as "G403 Weaving"
+    /// (PM 2026-10-15). Artworks are left out: their `remote_id` is a collection id. Pure; covered
+    /// by tests.
+    static func names(places: [VenuePlace]) -> [String: String] {
         Dictionary(
-            geofences.compactMap { geofence -> (String, String)? in
-                guard geofence.isGallery, let id = geofence.remoteId, !id.isEmpty,
-                      let name = geofence.name, !name.isEmpty else { return nil }
+            places.compactMap { place -> (String, String)? in
+                let name = place.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !place.isArtwork, let id = place.remoteID, !id.isEmpty, !name.isEmpty else { return nil }
                 return (id, name)
             },
             uniquingKeysWith: { first, _ in first }

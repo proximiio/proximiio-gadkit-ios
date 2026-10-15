@@ -35,8 +35,8 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
     public var hasAR = false
     /// `metadata.has_audio`: the artwork has audio (a note in the journey list).
     public var hasAudio = false
-    /// `metadata.gallery_id`: the gallery of an artwork. The gallery's geofence holds the same
-    /// value in `remote_id` (`Gallery.names(geofences:)`).
+    /// `metadata.gallery_id`: the gallery of an artwork. The gallery's POI holds the same value in
+    /// `remote_id` (`Gallery.names(places:)`).
     public var galleryID: String?
 
     /// Every point POI in `features`, sorted by title.
@@ -53,16 +53,6 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
             if let place = places.first(where: { $0.id == identifier }) { return place }
         }
         return nil
-    }
-
-    /// The visitor service desk: an amenity id or title naming the help, welcome or information desk.
-    static func welcomeDesk(in places: [VenuePlace]) -> VenuePlace? {
-        let names = ["welcome desk", "help desk", "information", "front desk", "info desk"]
-        return places.first { place in
-            let title = place.title.lowercased()
-            let amenity = place.amenityID?.lowercased() ?? ""
-            return names.contains { title.contains($0) } || amenity.contains("help") || amenity.contains("info")
-        }
     }
 
     /// Case- and diacritic-insensitive substring match on the title. An empty query matches all.

@@ -33,6 +33,8 @@ struct MuseumMapView: View {
     @State private var destination: VenuePlace?
     @State private var routeError: String?
     @State private var isSearching = false
+    /// The lifts, staircases and escalators on every floor they serve.
+    @State private var mapLayers = JourneyMapLayers()
 
     init(venue: VenueService, initialDestination: VenuePlace? = nil, showsLegend: Bool = false) {
         self.venue = venue
@@ -67,7 +69,13 @@ struct MuseumMapView: View {
                     }
                 }
             }
-            places = VenuePlace.all(in: await venue.sdk.features())
+            let features = await venue.sdk.features()
+            places = VenuePlace.all(in: features)
+            let levelChangers = LevelChangerPlace.all(in: features)
+            mapLayers.updateLevelChangers(levelChangers)
+            session.hiddenFeatureIDs = Set(levelChangers.map(\.id))
+            mapLayers.attach(to: session)
+            mapLayers.update(fills: [], level: session.selectedFloor.level)
             if let initialDestination {
                 while session.position == nil { try? await Task.sleep(for: .milliseconds(500)) }
                 await route(to: initialDestination)
@@ -84,7 +92,10 @@ struct MuseumMapView: View {
         }
         // The follow camera keeps the initial venue framing. The first position zooms
         // in to `MapOptions.recentreZoom` on the visitor.
-        .levelChangeAnimation(for: session, venue: venue)
+        .followsVisitorFloor(session, venue: venue)
+        .onReceive(session.$selectedFloor) { floor in
+            mapLayers.update(fills: [], level: floor.level)
+        }
         .onChange(of: accessibility) {
             if let destination { Task { await route(to: destination) } }
         }
@@ -153,7 +164,7 @@ struct MuseumMapView: View {
                 StopInfoCard(
                     caption: "NEXT STOP",
                     title: destination.title,
-                    instruction: routeError ?? session.guidance.map(GuidanceText.instruction(for:)),
+                    instruction: routeError ?? session.guidance.map { GuidanceText.instruction(for: $0, markers: session.routeRenderer?.geometry?.markers ?? []) },
                     remaining: remainingText
                 ) {
                     destinationIcon(for: destination)

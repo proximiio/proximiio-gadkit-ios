@@ -56,8 +56,8 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Lift
 
-    /// Seconds of fixes inside a lift outline before the visitor counts as riding it ("In the
-    /// lift", "Level up"). A shorter stay is walking past the lift.
+    /// Seconds of fixes inside a lift outline before the visitor counts as riding it. A shorter
+    /// stay is walking past the lift.
     public var liftRideDwell: TimeInterval = 3
     /// Consecutive fixes outside the lift outline that end the ride.
     public var liftExitFixes: Int = 2

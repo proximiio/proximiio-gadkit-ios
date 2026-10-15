@@ -2,29 +2,19 @@
 //  LevelChange.swift
 //  ProximiioGADKit
 //
-//  The level change animation (`design/level-changing`, the colleague's GIFs): a floor plate splits
-//  into two, then an up or down arrow with "Level up" or "Level down". The journey screen and the
-//  museum map show it over the map (`levelChangeAnimation(for:venue:)`):
-//
-//  - while the visitor rides a lift: positions stay inside a lift outline for `GADSettings.liftRideDwell`
-//    seconds. With a route level change at the lift, the overlay plays the animation towards the
-//    route's floor. Without one, it shows "In the lift" until the floor changes.
-//  - when the position changes floor: the animation towards the new floor, then the map on that
-//    floor. A tap closes the overlay.
-//
-//  The resources `Resources/LevelChange/level-{up,down}-{en,ar}.apng` are the EN and AR GIFs
-//  cropped to their content (x 245–1744, y 25–1064 of 1920×1080), scaled to 480 px and reduced to
-//  their alpha channel. The app tints them with the position colour.
+//  Floor changes and lift rides of the visitor. The journey screen and the museum map move the map
+//  to the visitor's floor when the position changes floor (`followsVisitorFloor(_:venue:)`). The
+//  level change animation over the map was removed (PM 2026-10-15).
 //
 //  A floor counts as changed after `confirmations` consecutive fixes on the new floor. The default
-//  is 1: the map switches floors on the first fix on the new floor, and the overlay starts on the
-//  same fix, so the switch happens under the animation.
+//  is 1: the map switches floors on the first fix on the new floor.
 //
-import ImageIO
+//  A lift ride: positions stay inside a lift outline for `GADSettings.liftRideDwell` seconds. The
+//  field log records the ride and the route's floor at that lift.
+//
 import Proximiio
 import ProximiioMap
 import SwiftUI
-import UIKit
 
 struct LevelChange: Equatable, Identifiable {
     var from: Int
@@ -137,26 +127,15 @@ struct LiftDetector {
     }
 }
 
-/// What the overlay shows: the ride, then the arrival on the new floor.
-struct LevelChangeCard: Equatable {
-    enum Phase: Equatable { case riding, arrived }
-
-    var phase: Phase
-    var from: Int
-    /// The floor the visitor goes to. During a ride it comes from the route's level change at this
-    /// lift, and is `nil` without one.
-    var to: Int?
-}
-
 extension View {
-    /// Shows `LevelChangeOverlay` while the visitor rides a lift and when the session's position
-    /// changes floor, and moves the map to the visitor's floor.
-    func levelChangeAnimation(for session: ProximiioMapSession, venue: VenueService) -> some View {
-        modifier(LevelChangeModifier(session: session, venue: venue))
+    /// Moves the map to the visitor's floor when the session's position changes floor, and logs
+    /// lift rides.
+    func followsVisitorFloor(_ session: ProximiioMapSession, venue: VenueService) -> some View {
+        modifier(VisitorFloorModifier(session: session, venue: venue))
     }
 }
 
-private struct LevelChangeModifier: ViewModifier {
+private struct VisitorFloorModifier: ViewModifier {
     let session: ProximiioMapSession
     let venue: VenueService
     @State private var floors = LevelChangeDetector()
@@ -164,7 +143,6 @@ private struct LevelChangeModifier: ViewModifier {
     @State private var lifts: [LiftArea] = []
     /// The lift the last fix was in.
     @State private var currentLift: LiftArea?
-    @State private var card: LevelChangeCard?
 
     func body(content: Content) -> some View {
         content
@@ -175,14 +153,6 @@ private struct LevelChangeModifier: ViewModifier {
             .onReceive(session.$position) { position in
                 if let position { update(with: position) }
             }
-            .overlay {
-                if let card {
-                    LevelChangeOverlay(card: card)
-                        .onTapGesture { self.card = nil }
-                        .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.15), value: card)
     }
 
     private func update(with position: VenuePosition) {
@@ -191,17 +161,12 @@ private struct LevelChangeModifier: ViewModifier {
         if let area { currentLift = area }
         let event = lift.update(inLift: area != nil, at: .now)
         if let change = floors.update(level: position.floor?.level) {
-            arrive(change)
+            FieldLog.log("level change: L\(change.from) → L\(change.to)")
+            session.followMyFloor()
             return
         }
-        switch event {
-        case .boarded:
-            guard let from = floors.level else { return }
-            board(LevelChangeCard(phase: .riding, from: from, to: routeTarget(from: from)))
-        case .left:
-            if card?.phase == .riding { card = nil }
-        case nil:
-            break
+        if event == .boarded, let from = floors.level {
+            FieldLog.log("lift boarded on L\(from), target \(routeTarget(from: from).map { "L\($0)" } ?? "unknown")")
         }
     }
 
@@ -210,127 +175,5 @@ private struct LevelChangeModifier: ViewModifier {
     private func routeTarget(from: Int) -> Int? {
         guard case .levelChange(let change)? = session.guidance?.manoeuvre?.kind else { return nil }
         return currentLift?.rideTarget(of: change, from: from)
-    }
-
-    private func board(_ riding: LevelChangeCard) {
-        FieldLog.log("lift boarded on L\(riding.from), target \(riding.to.map { "L\($0)" } ?? "unknown")")
-        card = riding
-    }
-
-    private func arrive(_ change: LevelChange) {
-        FieldLog.log("level change: L\(change.from) → L\(change.to)")
-        let arrived = LevelChangeCard(phase: .arrived, from: change.from, to: change.to)
-        card = arrived
-        session.followMyFloor()
-        Task {
-            try? await Task.sleep(for: .seconds(2.8))
-            if card == arrived { card = nil }
-        }
-    }
-}
-
-/// Full-screen overlay: the animation and "Level X". It plays once and keeps the last frame.
-/// A ride with an unknown target shows the first frame and "In the lift"; the animation plays when
-/// the floor changes.
-struct LevelChangeOverlay: View {
-    let card: LevelChangeCard
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        ZStack {
-            Palette.white.opacity(0.92).ignoresSafeArea()
-            VStack(spacing: 16) {
-                Group {
-                    if let to = card.to {
-                        LevelChangeAnimation(isUp: to > card.from, plays: !reduceMotion)
-                    } else {
-                        LevelChangeAnimation(isUp: true, plays: false, showsFirstFrame: true)
-                    }
-                }
-                .id(card.to)
-                .frame(width: 280, height: 194)
-                if let to = card.to {
-                    Text("Level \(to)", bundle: .module).textStyle(.h1Bold)
-                } else {
-                    Text("In the lift", bundle: .module).textStyle(.h1Bold)
-                }
-            }
-        }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint(Text("Closes the level change", bundle: .module))
-    }
-
-    private var accessibilityText: Text {
-        switch (card.phase, card.to) {
-        case (.arrived, let to?): Text("You are now on level \(to)", bundle: .module)
-        case (.riding, let to?): Text("Going to level \(to)", bundle: .module)
-        default: Text("In the lift", bundle: .module)
-        }
-    }
-}
-
-private struct LevelChangeAnimation: UIViewRepresentable {
-    let isUp: Bool
-    let plays: Bool
-    var showsFirstFrame = false
-
-    func makeUIView(context: Context) -> UIImageView {
-        let view = UIImageView()
-        view.contentMode = .scaleAspectFit
-        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        guard let animation = LevelChangeFrames.load(isUp: isUp) else { return view }
-        view.image = showsFirstFrame ? animation.frames.first : animation.frames.last
-        if plays {
-            view.animationImages = animation.frames
-            view.animationDuration = animation.duration
-            view.animationRepeatCount = 1
-            view.startAnimating()
-        }
-        return view
-    }
-
-    func updateUIView(_ view: UIImageView, context: Context) {}
-}
-
-enum LevelChangeFrames {
-    struct Animation {
-        var frames: [UIImage]
-        var duration: TimeInterval
-    }
-
-    /// The frames of the APNG for the app's language, tinted with the position colour.
-    static func load(isUp: Bool) -> Animation? {
-        let language = Bundle.main.preferredLocalizations.first == "ar" ? "ar" : "en"
-        guard let url = Bundle.module.url(forResource: "level-\(isUp ? "up" : "down")-\(language)", withExtension: "apng"),
-              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        let tint = UIColor(Palette.position)
-        var frames: [UIImage] = []
-        var duration: TimeInterval = 0
-        for index in 0..<CGImageSourceGetCount(source) {
-            guard let image = CGImageSourceCreateImageAtIndex(source, index, nil) else { continue }
-            let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]
-            let png = properties?[kCGImagePropertyPNGDictionary] as? [CFString: Any]
-            duration += (png?[kCGImagePropertyAPNGUnclampedDelayTime] as? Double)
-                ?? (png?[kCGImagePropertyAPNGDelayTime] as? Double) ?? 0.04
-            frames.append(tinted(image, with: tint))
-        }
-        return frames.isEmpty ? nil : Animation(frames: frames, duration: duration)
-    }
-
-    /// Fills the frame's opaque pixels with `color`.
-    private static func tinted(_ image: CGImage, with color: UIColor) -> UIImage {
-        let size = CGSize(width: image.width, height: image.height)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        return UIGraphicsImageRenderer(size: size, format: format).image { context in
-            let rect = CGRect(origin: .zero, size: size)
-            UIImage(cgImage: image).draw(in: rect)
-            color.setFill()
-            context.fill(rect, blendMode: .sourceIn)
-        }
     }
 }

@@ -19,7 +19,6 @@ import SwiftUI
 
 public struct VisitView: View {
     @Environment(\.visitEventHandler) private var emit
-    @Environment(\.wristbandConnectionScreen) private var connectionScreen
     @Environment(\.routeAccessibility) private var hostAccessibility
     @AppStorage(RouteAccessibility.accessibleRoutesKey) private var accessibleRoutes = false
     @State private var controller: VisitController
@@ -27,8 +26,6 @@ public struct VisitView: View {
     @State private var stopToSkip: JourneyStop?
     @State private var monitor: TrackingMonitor
     @State private var places: [VenuePlace] = []
-    /// The alert the visitor dismissed. It is shown again only after tracking recovers.
-    @State private var dismissedHealth: TrackingHealth?
     /// Name of the geofence (gallery) the visitor is in, from `sdk.geofenceEvents()`.
     @State private var currentGallery: String?
     @State private var liveActivity: VisitLiveActivity
@@ -43,7 +40,7 @@ public struct VisitView: View {
     @State private var answeredAmbiguity: [String: Date] = [:]
     @State private var isConfirmingExit = false
     @State private var galleries: [Gallery] = []
-    /// Gallery names by gallery id, for the list's headers (`Gallery.names(geofences:)`).
+    /// Gallery names by gallery id, for the list's headers (`Gallery.names(places:)`).
     @State private var galleryNames: [String: String] = [:]
     /// Galleries the visitor has been in during this visit.
     @State private var visitedGalleries: Set<String> = []
@@ -53,14 +50,8 @@ public struct VisitView: View {
     /// presentation is dismissed. Closing the visit while its own sheet is still dismissing can
     /// leave the screen below without taps (Monday "UI gets stuck", 2026-10-15).
     @State private var leavesAfterDismiss = false
-    /// The pairing flow, opened from `WristbandEndedSheet`: the host app's
-    /// `wristbandConnectionScreen`, else `WristbandPairingView`.
-    @State private var pairing: WristbandPairing?
-    /// `true` from "Connect a wristband" until the pairing flow closes. Hides the alert sheet.
-    @State private var isPairing = false
     @State private var stopNotifier: StopNearbyNotifier
     private let venue: VenueService
-    private let wristband: WristbandSession
     private let kind: JourneyKind
     /// `venue.settings` when the view was created.
     private let settings: GADSettings
@@ -72,13 +63,11 @@ public struct VisitView: View {
 
     public init(
         venue: VenueService,
-        wristband: WristbandSession,
         journey: Journey,
         kind: JourneyKind = .personalised,
         onClose: @escaping () -> Void
     ) {
         self.venue = venue
-        self.wristband = wristband
         self.kind = kind
         let settings = venue.settings
         self.settings = settings
@@ -168,17 +157,15 @@ public struct VisitView: View {
                 uniquingKeysWith: { first, _ in first }
             )
             // The journey map shows artworks only as the numbered stop markers. Amenities,
-            // galleries and level changers stay (PM review 2026-10-12).
-            controller.session.hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id))
+            // galleries and level changers stay (PM review 2026-10-12). `mapLayers` draws the
+            // level changers on every floor they serve.
+            let levelChangers = LevelChangerPlace.all(in: features)
+            mapLayers.updateLevelChangers(levelChangers)
+            controller.session.hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
             let geofences = await venue.sdk.geofences()
-            controller.artworkAreas = Dictionary(
-                geofences.compactMap { geofence in
-                    geofence.isArtwork ? geofence.remoteId.map { ($0, ArtworkArea(geofence)) } : nil
-                },
-                uniquingKeysWith: { first, _ in first }
-            )
+            controller.artworkAreas = VisitController.artworkAreas(of: geofences)
             galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
-            galleryNames = Gallery.names(geofences: geofences)
+            galleryNames = Gallery.names(places: places)
             FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", ")) · \(galleryNames.count) named by id")
             await MapStyle.waitForCanvas(of: controller.session)
             controller.session.journeyStopMarkerStyle = MapStyle.journeyStops
@@ -288,43 +275,13 @@ public struct VisitView: View {
             monitor.stop()
             liveActivity.end()
         }
-        .onChange(of: monitor.health) { _, health in
-            if health == .tracking { dismissedHealth = nil }
-        }
-        .sheet(isPresented: isShowingTrackingAlert, onDismiss: leaveIfAsked) {
-            if let notice = wristband.endNotice {
-                WristbandEndedSheet(notice: notice, onConnect: connectWristband, onBackToHub: { leave(dismissing: {}) })
-                    .interactiveDismissDisabled()
-                    .onAppear {
-                        FieldLog.log("sheet: wristband ended (\(wristband.state.map(WristbandCopy.logLine) ?? "-")), last fix \(monitor.lastFix?.formatted(.iso8601) ?? "-")")
-                    }
-            } else {
-                TrackingAlertSheet(
-                    health: monitor.health,
-                    lastSeen: monitor.lastSeen(in: places),
-                    activeStopNumber: controller.navigator.activeStop.flatMap { VisitPlan.numbers(for: controller.navigator.journey)[$0.id] },
-                    canRouteToDesk: VenuePlace.welcomeDesk(in: places) != nil,
-                    onSearchAgain: searchAgain,
-                    onRouteToDesk: routeToDesk,
-                    onDismiss: { dismissedHealth = monitor.health }
-                )
-                .interactiveDismissDisabled()
-                .onAppear {
-                    FieldLog.log("sheet: tracking \(monitor.health), last fix \(monitor.lastFix?.formatted(.iso8601) ?? "-")")
-                }
-            }
-        }
-        .fullScreenCover(item: $pairing, onDismiss: pairingClosed) { pairing in
-            if let connectionScreen {
-                connectionScreen { self.pairing = nil }
-            } else {
-                WristbandPairingView(pairing: pairing) { self.pairing = nil }
-            }
-        }
+        // No tracking or wristband alerts: the host app handles the wristband states
+        // (PM 2026-10-15).
+        .onChange(of: monitor.health) { _, health in emit(.trackingChanged(health)) }
         .onChange(of: controller.session.position == nil) { _, hasNoPosition in
             if !hasNoPosition { recentre(reason: "first position") }
         }
-        .levelChangeAnimation(for: controller.session, venue: venue)
+        .followsVisitorFloor(controller.session, venue: venue)
         .onReceive(controller.session.$guidance) { _ in
             Task { @MainActor in
                 refreshConnector()
@@ -377,24 +334,10 @@ public struct VisitView: View {
         }
     }
 
-    /// The tracking alert, or `WristbandEndedSheet` while the wristband session is ended. An
-    /// ended session delivers no positions, so the tracking alert would not clear.
-    private var isShowingTrackingAlert: Binding<Bool> {
-        Binding(
-            get: {
-                guard !isPairing, !leavesAfterDismiss, stopToSkip == nil else { return false }
-                if wristband.endNotice != nil { return true }
-                return (monitor.health == .lostPlace || monitor.health == .stoppedResponding)
-                    && monitor.health != dismissedHealth
-            },
-            set: { if !$0 { dismissedHealth = monitor.health } }
-        )
-    }
-
     /// The off-route warning, unless another prompt is up.
     private var isShowingOffRouteWarning: Binding<Bool> {
         Binding(
-            get: { controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !isShowingTrackingAlert.wrappedValue },
+            get: { controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil },
             set: { if !$0 { controller.dismissOffRoute() } }
         )
     }
@@ -498,8 +441,7 @@ public struct VisitView: View {
 
     private var isPresentingSomething: Bool {
         lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit || controller.isOffRoute
-            || amenityToConfirm != nil
-            || isShowingWrapUp || isShowingTrackingAlert.wrappedValue
+            || amenityToConfirm != nil || isShowingWrapUp
     }
 
     private func evaluateAmbiguity() {
@@ -520,39 +462,6 @@ public struct VisitView: View {
         case .lowConfidence(let stop):
             lowConfidenceStop = stop
         }
-    }
-
-    /// Re-attaches the wristband binding's provider, which reopens its relay-api stream.
-    /// Closes `WristbandEndedSheet` and opens the pairing flow once the sheet is gone.
-    private func connectWristband() {
-        isPairing = true
-        Task {
-            try? await Task.sleep(for: .milliseconds(400))
-            pairing = WristbandPairing(connector: wristband)
-        }
-    }
-
-    /// After a bind, re-attaching the provider reopens the relay-api position stream.
-    /// Without a session, `WristbandEndedSheet` shows again.
-    private func pairingClosed() {
-        isPairing = false
-        guard wristband.isActive else { return }
-        dismissedHealth = nil
-        Task { await venue.attachBinding() }
-    }
-
-    private func searchAgain() {
-        dismissedHealth = monitor.health
-        Task { await venue.attachBinding() }
-    }
-
-    /// Adds the Welcome Desk as a detour, so the route leads there and then back to the journey.
-    private func routeToDesk() {
-        dismissedHealth = monitor.health
-        guard let desk = VenuePlace.welcomeDesk(in: places) else { return }
-        Task { await controller.detour(to: desk) }
-        mode = .map
-        emit(.detourStarted(desk))
     }
 
     /// Controls inside the map card: toggle and search at the top, compass and floor at the
@@ -774,9 +683,14 @@ private struct VisitCard: View {
         }
     }
 
+    /// The route's level changes.
+    private var markers: [RouteGeometry.Marker] {
+        session.routeRenderer?.geometry?.markers ?? []
+    }
+
     private func levelChangeTitle(stopLevel: Int) -> String {
         GuidanceText.levelChangeTitle(
-            markers: session.routeRenderer?.geometry?.markers ?? [],
+            markers: markers,
             visitorLevel: session.position?.floor?.level,
             stopLevel: stopLevel
         )
@@ -790,11 +704,11 @@ private struct VisitCard: View {
         }
         switch state {
         case .walking:
-            return navigator.guidance.map(GuidanceText.instruction(for:))
+            return navigator.guidance.map { GuidanceText.instruction(for: $0, markers: markers) }
         case .nextStopOnOtherLevel(_, let level):
             // At the level change the instruction repeats the title; the card shows it once.
             guard let guidance = navigator.guidance else { return nil }
-            let text = GuidanceText.instruction(for: guidance)
+            let text = GuidanceText.instruction(for: guidance, markers: markers)
             return text == levelChangeTitle(stopLevel: level) ? nil : text
         default: return nil
         }

@@ -79,7 +79,7 @@ final class VisitController {
     /// `remote_id` of each artwork POI, by POI id. Set once the venue's features are loaded.
     var artworkRemoteIDs: [String: String] = [:]
     /// Artwork geofence shapes, by `remote_id`. Set once the venue's geofences are loaded.
-    var artworkAreas: [String: ArtworkArea] = [:]
+    var artworkAreas: [String: [ArtworkArea]] = [:]
     /// Stops whose move to the next artwork is scheduled.
     private var scheduledDone: Set<String> = []
     /// Time inside the geofence of each open artwork that is not the active stop.
@@ -207,10 +207,10 @@ final class VisitController {
         for stop in navigator.journey.stops
         where stop.kind != .detour && (stop.state == .pending || stop.state == .active || stop.state == .reached) {
             guard let remoteID = artworkRemoteIDs[stop.poiID ?? stop.id],
-                  let area = artworkAreas[remoteID]
+                  let areas = artworkAreas[remoteID]
             else { continue }
             if !VenueLevel.matches(stop.floor?.level, level) { continue }
-            guard area.contains(point) else { continue }
+            guard areas.contains(where: { $0.contains(point) }) else { continue }
             if stop.id == activeID {
                 artworkGeofenceEntered(remoteID: remoteID)
             } else {
@@ -247,6 +247,16 @@ final class VisitController {
             }
             VisitStore.save(self.navigator.journey)
         })
+    }
+
+    /// The shapes of the artwork geofences, by `remote_id`. One artwork can have several geofences:
+    /// on 2026-10-15 each DCT test artwork shares its `remote_id` with the Guggenheim artwork.
+    /// Pure; covered by tests.
+    nonisolated static func artworkAreas(of geofences: [ProximiioGeofence]) -> [String: [ArtworkArea]] {
+        Dictionary(
+            grouping: geofences.filter { $0.isArtwork && !($0.remoteId ?? "").isEmpty },
+            by: { $0.remoteId ?? "" }
+        ).mapValues { $0.map(ArtworkArea.init) }
     }
 
     /// The active artwork stop when its POI has `remoteID`, else `nil`. Pure; covered by tests.

@@ -30,8 +30,7 @@ public enum VisitEvent: Sendable, Equatable {
     case skipUndone(JourneyStop)
     /// The visitor picked an amenity on the map. A card shows it with "Go here".
     case amenitySelected(VenuePlace)
-    /// The amenity is now a detour of the journey: the visitor confirmed "Change your route?", or
-    /// chose the route to the Welcome Desk in a tracking alert.
+    /// The amenity is now a detour of the journey: the visitor confirmed "Change your route?".
     case detourStarted(VenuePlace)
     /// The visitor tapped "Resume your Journey" or "Show the route from here".
     case journeyResumed
@@ -56,6 +55,9 @@ public enum VisitEvent: Sendable, Equatable {
     /// The visitor stayed at an artwork further down the journey. The stop is done and the stops
     /// still ahead are ordered again from the visitor.
     case artworkVisitedOutOfOrder(JourneyStop)
+    /// The wristband's positions stopped or came back (`TrackingHealth`). `VisitView` shows no
+    /// alert: the host app handles the wristband states (PM 2026-10-15).
+    case trackingChanged(TrackingHealth)
     /// An event of the journey navigator: a new leg, a skipped stop, a re-route, a detour, the
     /// journey finished. For artworks use `artworkReached`: the navigator does not report them
     /// reached.

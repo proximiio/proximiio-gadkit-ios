@@ -22,7 +22,7 @@ struct VisitStopList: View {
     @Environment(\.visitEventHandler) private var emit
     let controller: VisitController
     var galleries: [Gallery] = []
-    /// Gallery names by gallery id (`Gallery.names(geofences:)`).
+    /// Gallery names by gallery id (`Gallery.names(places:)`).
     var galleryNames: [String: String] = [:]
     /// False for a curated tour: no section headers.
     var groupsByGallery = true

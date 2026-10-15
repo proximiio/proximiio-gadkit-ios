@@ -78,19 +78,23 @@ struct GalleryTests {
 }
 
 struct GalleryNameTests {
-    private func geofence(_ id: String, name: String?, remoteId: String?, type: String = "gallery") -> ProximiioGeofence {
-        ProximiioGeofence(id: id, name: name, metadata: .object(["geofence_type": .string(type)]), remoteId: remoteId)
+    private func place(_ id: String, _ title: String, remoteID: String?, isArtwork: Bool = false) -> VenuePlace {
+        var place = VenuePlace(id: id, title: title, coordinate: .init(latitude: 24.5, longitude: 54.4), level: 4, remoteID: remoteID)
+        place.isArtwork = isArtwork
+        return place
     }
 
-    /// GAD data 2026-10-15: the artworks of "Gallery 403" (level 4) name it in `metadata.gallery_id`.
-    @Test func galleryGeofencesNameGalleriesByTheirRemoteID() {
-        let names = Gallery.names(geofences: [
-            geofence("a", name: "Gallery 403", remoteId: "e07fe5d7"),
-            geofence("b", name: "Gallery 102", remoteId: ""),
-            geofence("c", name: nil, remoteId: "x"),
-            geofence("d", name: "Untitled", remoteId: "GAD.2010.00033", type: "artwork"),
+    /// GAD data 2026-10-15: the artworks of "G403 Weaving" (level 4) name it in `metadata.gallery_id`,
+    /// and the gallery POI holds that id in `remote_id`.
+    @Test func galleryPOIsNameGalleriesByTheirRemoteID() {
+        let names = Gallery.names(places: [
+            place("a", "G403 Weaving", remoteID: "e07fe5d7"),
+            place("b", "G304 Histories ", remoteID: "24096077"),
+            place("c", "Gallery 102", remoteID: ""),
+            place("d", "Café", remoteID: nil),
+            place("e", "Untitled", remoteID: "GAD.2010.00033", isArtwork: true),
         ])
-        #expect(names == ["e07fe5d7": "Gallery 403"])
+        #expect(names == ["e07fe5d7": "G403 Weaving", "24096077": "G304 Histories"])
     }
 }
 
@@ -105,5 +109,34 @@ struct GalleryOutlineTests {
         #expect(ring[1] == ProximiioCoordinate(latitude: 24.5, longitude: 54.401))
         #expect(Gallery.outerRing(type: "MultiPolygon", coordinates: .array([square]))?.count == 4)
         #expect(Gallery.outerRing(type: "Point", coordinates: square) == nil)
+    }
+}
+
+struct LevelChangerPlaceTests {
+    private func feature(_ id: String, type: String, level: Double, levels: [Double]?, geometry: String = "Point") -> ProximiioFeature {
+        var properties: [String: JSONValue] = ["type": .string(type), "level": .number(level)]
+        if let levels { properties["levels"] = .array(levels.map { .number($0) }) }
+        return ProximiioFeature(
+            id: id,
+            geometry: .init(type: geometry, coordinates: .array([.number(54.399), .number(24.5397)])),
+            properties: .object(properties)
+        )
+    }
+
+    /// GAD data 2026-10-15: the lift is a POI on level 0 with `levels` [1, 2, 3, 4]; the web map
+    /// shows it on levels 1 to 4 as well.
+    @Test func aLevelChangerServesItsFloorAndItsLevels() throws {
+        let changers = LevelChangerPlace.all(in: [
+            feature("lift", type: "elevator", level: 0, levels: [1, 2, 3, 4]),
+            feature("stairs", type: "staircase", level: 1, levels: nil),
+            feature("cafe", type: "poi", level: 0, levels: [1]),
+            feature("outline", type: "elevator", level: 1, levels: nil, geometry: "MultiPolygon"),
+        ])
+        #expect(changers.map(\.id) == ["lift", "stairs"])
+        let lift = try #require(changers.first)
+        #expect(lift.coordinate == ProximiioCoordinate(latitude: 24.5397, longitude: 54.399))
+        #expect([0, 1, 4].allSatisfy { lift.serves($0) })
+        #expect(!lift.serves(5))
+        #expect(changers[1].serves(1) && !changers[1].serves(2))
     }
 }

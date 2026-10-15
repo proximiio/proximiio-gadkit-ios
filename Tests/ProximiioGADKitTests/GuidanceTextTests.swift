@@ -55,9 +55,9 @@ struct AmenityKindTests {
 
     // MARK: Next stop on another floor
 
-    private static func marker(_ type: String, from: Double, to: Double, completed: Bool = false) -> RouteGeometry.Marker {
-        let point = MapCoordinate(latitude: 24.5, longitude: 54.4)
-        return RouteGeometry.Marker(
+    private static func marker(_ type: String, from: Double, to: Double, completed: Bool = false,
+                               at point: MapCoordinate = MapCoordinate(latitude: 24.5, longitude: 54.4)) -> RouteGeometry.Marker {
+        RouteGeometry.Marker(
             featureType: type, coordinate: point, from: FloorKey(level: from), to: FloorKey(level: to),
             departure: point, arrival: point, isCompleted: completed
         )
@@ -68,6 +68,21 @@ struct AmenityKindTests {
         let markers = [Self.marker("staircase", from: 1, to: 3), Self.marker("elevator", from: 3, to: 4)]
         #expect(GuidanceText.levelChangeTitle(markers: markers, visitorLevel: 1, stopLevel: 4) == "Take the stairs to level 3")
         #expect(GuidanceText.levelChangeTitle(markers: markers, visitorLevel: 3, stopLevel: 4) == "Take the lift to level 4")
+    }
+
+    /// Monday 2026-10-15: the SDK router splits one ride into a change per floor with paths at the
+    /// staircase or lift (stairs 1→3, 3→4; the lift 1→2, 2→3, 3→4). The card names the end of the ride.
+    @Test func levelChangesInTheSameStaircaseOrLiftAreOneRide() {
+        let stairs = [Self.marker("staircase", from: 1, to: 3), Self.marker("staircase", from: 3, to: 4)]
+        #expect(GuidanceText.levelChangeTitle(markers: stairs, visitorLevel: 1, stopLevel: 4) == "Take the stairs to level 4")
+        let lift = [Self.marker("elevator", from: 1, to: 2), Self.marker("elevator", from: 2, to: 3), Self.marker("elevator", from: 3, to: 4)]
+        #expect(GuidanceText.levelChangeTitle(markers: lift, visitorLevel: 1, stopLevel: 4) == "Take the lift to level 4")
+        let other = MapCoordinate(latitude: 24.5003, longitude: 54.4)
+        let twoStaircases = [Self.marker("staircase", from: 1, to: 3), Self.marker("staircase", from: 3, to: 4, at: other)]
+        #expect(GuidanceText.levelChangeTitle(markers: twoStaircases, visitorLevel: 1, stopLevel: 4) == "Take the stairs to level 3")
+        let point = MapCoordinate(latitude: 24.5, longitude: 54.4)
+        #expect(GuidanceText.rideEnd(featureType: "staircase", coordinate: point, from: 1, to: 3, markers: stairs) == 4)
+        #expect(GuidanceText.rideEnd(featureType: "staircase", coordinate: point, from: 1, to: 3, markers: []) == 3)
     }
 
     @Test func levelChangeTitleSkipsCompletedChanges() {

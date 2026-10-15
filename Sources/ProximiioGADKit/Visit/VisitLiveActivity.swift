@@ -116,7 +116,7 @@ struct VisitLiveActivityDriver: View {
             card: card,
             journey: navigator.journey,
             activeStopID: navigator.activeStop?.id,
-            instruction: navigator.guidance.map(GuidanceText.instruction(for:))
+            instruction: navigator.guidance.map { GuidanceText.instruction(for: $0, markers: session.routeRenderer?.geometry?.markers ?? []) }
         )
     }
 
