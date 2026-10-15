@@ -43,6 +43,8 @@ public struct VisitView: View {
     @State private var answeredAmbiguity: [String: Date] = [:]
     @State private var isConfirmingExit = false
     @State private var galleries: [Gallery] = []
+    /// Gallery names by gallery id, for the list's headers (`Gallery.names(geofences:)`).
+    @State private var galleryNames: [String: String] = [:]
     /// Galleries the visitor has been in during this visit.
     @State private var visitedGalleries: Set<String> = []
     @State private var mapLayers = JourneyMapLayers()
@@ -107,7 +109,7 @@ public struct VisitView: View {
                         ProximiioMapView(session: controller.session)
                             .clearBackground()
                         if mode == .list {
-                            VisitStopList(controller: controller, galleries: kind.listsGalleries ? galleries : [], places: places, allowsSkip: kind.allowsSkip, onSkip: { stop in
+                            VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, onSkip: { stop in
                                 stopToSkip = stop
                                 emit(.skipRequested(stop))
                             })
@@ -168,14 +170,16 @@ public struct VisitView: View {
             // The journey map shows artworks only as the numbered stop markers. Amenities,
             // galleries and level changers stay (PM review 2026-10-12).
             controller.session.hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id))
+            let geofences = await venue.sdk.geofences()
             controller.artworkAreas = Dictionary(
-                await venue.sdk.geofences().compactMap { geofence in
+                geofences.compactMap { geofence in
                     geofence.isArtwork ? geofence.remoteId.map { ($0, ArtworkArea(geofence)) } : nil
                 },
                 uniquingKeysWith: { first, _ in first }
             )
             galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
-            FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", "))")
+            galleryNames = Gallery.names(geofences: geofences)
+            FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", ")) · \(galleryNames.count) named by id")
             await MapStyle.waitForCanvas(of: controller.session)
             controller.session.journeyStopMarkerStyle = MapStyle.journeyStops
             if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }

@@ -19,7 +19,7 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.11.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.12.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
@@ -210,6 +210,14 @@ A journey list row shows the artist and "AR" and audio badges from the artwork's
 `VenuePlace.artist`, `hasAR` and `hasAudio` hold the values. The GAD venue data on 2026-10-14 has
 none of the three keys.
 
+### Gallery headers
+
+In a personalised journey the list shows a header before the stops of each gallery. The gallery of
+an artwork is its `metadata.gallery_id` (`VenuePlace.galleryID`), named by the gallery geofence
+(`geofence_type` `gallery`) whose `remote_id` is that id. An artwork without one is under the
+gallery outline it lies in, else under its level ("Level 4"). The GAD venue data on 2026-10-15 has
+`gallery_id` on 153 artworks in 15 galleries; 11 of the 15 have a gallery geofence.
+
 ## Accessibility
 
 The host app passes the visitor's accessibility needs to the map and journey screens. Every route
@@ -383,6 +391,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.12.0 | Gallery headers in the journey list from the artwork's `metadata.gallery_id` and the gallery geofence's `remote_id` (`VenuePlace.galleryID`); a stop without a gallery is under its level. The list is one flat list, so its rows follow the journey order after the journey is ordered again. |
 | 0.11.0 | The card names the route's next level change ("Take the stairs to level 3"), and the map marks that lift or stairs in red. The lift animation takes its floor from the route only when the route uses that lift. The amenity detour marker shows the amenity's icon. "Change your route?" is a card on the map. No "Which one are you in?" and no "Pick my stop manually" (`VisitEvent.stopChosen`, `galleryChosen` and `GADSettings.nearbyGalleryMeters` removed). `GADSettings.liftRideDwell`, `liftExitFixes`. A visit closes after its "Journey Complete", exit or wristband sheet is dismissed. |
 | 0.10.0 | `GADSettings`: every time and distance of the screens, in `GADConfiguration.settings` and `VenueService.settings`. |
 | 0.9.2 | Map amenities of a kind the design draws (restrooms, café, help desk, prayer room, shop, stairs, elevator) use the design's 30 pt markers. |

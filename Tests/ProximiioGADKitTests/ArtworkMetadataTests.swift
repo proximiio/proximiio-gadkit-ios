@@ -17,6 +17,11 @@ struct ArtworkMetadataTests {
         return try #require(VenuePlace(feature: feature))
     }
 
+    @Test func readsTheGalleryID() throws {
+        let place = try place(metadata: #"{"artwork_id": "x", "gallery_id": "e07fe5d7"}"#)
+        #expect(place.galleryID == "e07fe5d7")
+    }
+
     @Test func readsArtistAndBadges() throws {
         let place = try place(metadata: #"{"artist_name": "Lucas Samaras", "has_ar": true, "has_audio": "true"}"#)
         #expect(place.artist == "Lucas Samaras")

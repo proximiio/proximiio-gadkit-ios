@@ -29,25 +29,36 @@ public enum VisitPlan {
         )
     }
 
-    struct GalleryGroup {
-        var id: String
-        var gallery: String?
-        var stops: [JourneyStop]
-    }
+    /// A row of the journey list: a section header or a stop.
+    enum ListRow: Identifiable {
+        case header(id: String, title: String)
+        case stop(JourneyStop)
 
-    /// Consecutive stops in the same gallery form one group. A gallery visited twice yields two
-    /// groups, so the list keeps the visit order.
-    static func galleryGroups(_ stops: [JourneyStop], galleryOf: (JourneyStop) -> String?) -> [GalleryGroup] {
-        var groups: [GalleryGroup] = []
-        for stop in stops {
-            let gallery = galleryOf(stop)
-            if let last = groups.last, last.gallery == gallery {
-                groups[groups.count - 1].stops.append(stop)
-            } else {
-                groups.append(GalleryGroup(id: "\(groups.count)-\(gallery ?? "")", gallery: gallery, stops: [stop]))
+        var id: String {
+            switch self {
+            case .header(let id, _): id
+            case .stop(let stop): stop.id
             }
         }
-        return groups
+    }
+
+    /// The journey list in visit order, one flat list: a header before each run of consecutive
+    /// stops with the same section, for example a gallery. A gallery visited twice gets two
+    /// headers, so the list keeps the visit order. A run without a section has no header. A
+    /// header's id follows the first stop of its run, so rows keep their identity when the order
+    /// changes (PM 2026-10-15: the list showed rows of an older order). Pure; covered by tests.
+    static func listRows(_ stops: [JourneyStop], sectionOf: (JourneyStop) -> String?) -> [ListRow] {
+        var rows: [ListRow] = []
+        var current: String?
+        for (index, stop) in stops.enumerated() {
+            let section = sectionOf(stop)
+            if index == 0 || section != current, let section {
+                rows.append(.header(id: "header-\(stop.id)", title: section))
+            }
+            current = section
+            rows.append(.stop(stop))
+        }
+        return rows
     }
 
     /// True when `stop` is the last artwork still to visit (Figma 04.01 "approaching end of tour").

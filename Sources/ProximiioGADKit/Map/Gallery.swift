@@ -43,6 +43,21 @@ public struct Gallery: Identifiable, Equatable, Sendable {
         }
     }
 
+    /// Gallery names by the gallery's id: the `remote_id` of a gallery geofence, which an
+    /// artwork names in `metadata.gallery_id` (`VenuePlace.galleryID`). On 2026-10-15 the GAD data
+    /// names galleries on every floor this way; gallery outlines with a gallery POI exist on
+    /// level 3 only. Pure; covered by tests.
+    static func names(geofences: [ProximiioGeofence]) -> [String: String] {
+        Dictionary(
+            geofences.compactMap { geofence -> (String, String)? in
+                guard geofence.isGallery, let id = geofence.remoteId, !id.isEmpty,
+                      let name = geofence.name, !name.isEmpty else { return nil }
+                return (id, name)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
     /// The gallery outlines among `features`, or the named polygon geofences when there are none.
     public static func load(from sdk: Proximiio, features: [ProximiioFeature], places: [VenuePlace]) async -> [Gallery] {
         let outlines = all(features: features, places: places)

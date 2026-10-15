@@ -53,15 +53,44 @@ struct GalleryTests {
         #expect(stops.map(\.group) == ["g1", nil, nil])
     }
 
-    @Test func consecutiveStopsInOneGalleryFormAGroup() {
-        let places = ["a", "b", "c", "d"].map {
+    @Test func aHeaderPrecedesEachRunOfStopsInOneSection() {
+        let places = ["a", "b", "c", "d", "e"].map {
             VenuePlace(id: $0, title: $0, coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1)
         }
-        let stops = VisitPlan.journey(poiIDs: ["a", "b", "c", "d"], places: places).stops
-        let gallery = ["a": "G1", "b": "G1", "c": "G2", "d": "G1"]
-        let groups = VisitPlan.galleryGroups(stops) { gallery[$0.id] }
-        #expect(groups.map(\.gallery) == ["G1", "G2", "G1"])
-        #expect(groups.map { $0.stops.map(\.id) } == [["a", "b"], ["c"], ["d"]])
+        let stops = VisitPlan.journey(poiIDs: ["a", "b", "c", "d", "e"], places: places).stops
+        let section = ["a": "G1", "b": "G1", "c": "G2", "d": "G1"]
+        let rows = VisitPlan.listRows(stops) { section[$0.id] }
+        #expect(rows.map(\.id) == ["header-a", "a", "b", "header-c", "c", "header-d", "d", "e"])
+        let titles = rows.compactMap { row -> String? in
+            if case .header(_, let title) = row { return title } else { return nil }
+        }
+        #expect(titles == ["G1", "G2", "G1"])
+    }
+
+    @Test func listRowIDsAreUnique() {
+        let places = ["a", "b", "c"].map {
+            VenuePlace(id: $0, title: $0, coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1)
+        }
+        let stops = VisitPlan.journey(poiIDs: ["a", "b", "c"], places: places).stops
+        let rows = VisitPlan.listRows(stops) { _ in "G1" }
+        #expect(Set(rows.map(\.id)).count == rows.count)
+    }
+}
+
+struct GalleryNameTests {
+    private func geofence(_ id: String, name: String?, remoteId: String?, type: String = "gallery") -> ProximiioGeofence {
+        ProximiioGeofence(id: id, name: name, metadata: .object(["geofence_type": .string(type)]), remoteId: remoteId)
+    }
+
+    /// GAD data 2026-10-15: the artworks of "Gallery 403" (level 4) name it in `metadata.gallery_id`.
+    @Test func galleryGeofencesNameGalleriesByTheirRemoteID() {
+        let names = Gallery.names(geofences: [
+            geofence("a", name: "Gallery 403", remoteId: "e07fe5d7"),
+            geofence("b", name: "Gallery 102", remoteId: ""),
+            geofence("c", name: nil, remoteId: "x"),
+            geofence("d", name: "Untitled", remoteId: "GAD.2010.00033", type: "artwork"),
+        ])
+        #expect(names == ["e07fe5d7": "Gallery 403"])
     }
 }
 

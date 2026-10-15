@@ -35,6 +35,9 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
     public var hasAR = false
     /// `metadata.has_audio`: the artwork has audio (a note in the journey list).
     public var hasAudio = false
+    /// `metadata.gallery_id`: the gallery of an artwork. The gallery's geofence holds the same
+    /// value in `remote_id` (`Gallery.names(geofences:)`).
+    public var galleryID: String?
 
     /// Every point POI in `features`, sorted by title.
     public static func all(in features: [ProximiioFeature]) -> [VenuePlace] {
@@ -111,6 +114,7 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
             artist = Self.localized(metadata["artist_name"]) ?? Self.text(metadata["artist_name"])
             hasAR = Self.flag(metadata["has_ar"])
             hasAudio = Self.flag(metadata["has_audio"])
+            galleryID = Self.text(metadata["gallery_id"])
         }
         if case .array(let images)? = properties?["images"], let first = images.first.flatMap(Self.text),
            let url = URL(string: first), url.scheme != nil {

@@ -3,12 +3,15 @@
 //  ProximiioGADKit
 //
 //  The journey as a list (Figma: "Personalized Journey list"). Stops are numbered in
-//  visit order and grouped under the gallery they lie in; visited stops are dimmed; swiping
-//  left offers Skip; a skipped stop is hidden and the list renumbers. "Undo skip" restores
-//  the last skipped stop and reports `VisitEvent.skipUndone`. A curated tour passes no
-//  galleries and no skip: its stops have no gallery names and cannot be skipped. A row shows the
-//  artist and "AR" and audio badges from the artwork's place (`VenuePlace.artist`, `hasAR`,
-//  `hasAudio`), or the level when the place names no artist.
+//  visit order and grouped under their gallery; visited stops are dimmed; swiping left offers
+//  Skip; a skipped stop is hidden and the list renumbers. "Undo skip" restores the last skipped
+//  stop and reports `VisitEvent.skipUndone`. A curated tour has no gallery headers and no skip.
+//  A row shows the artist and "AR" and audio badges from the artwork's place
+//  (`VenuePlace.artist`, `hasAR`, `hasAudio`), or the level when the place names no artist.
+//
+//  The gallery of a stop is the artwork's `metadata.gallery_id` named by the gallery geofence,
+//  else the gallery outline it lies in. A stop with neither is under its level ("Level 4"), so
+//  it does not appear to belong to the gallery above it (PM 2026-10-15).
 //
 import Proximiio
 import ProximiioMap
@@ -19,6 +22,10 @@ struct VisitStopList: View {
     @Environment(\.visitEventHandler) private var emit
     let controller: VisitController
     var galleries: [Gallery] = []
+    /// Gallery names by gallery id (`Gallery.names(geofences:)`).
+    var galleryNames: [String: String] = [:]
+    /// False for a curated tour: no section headers.
+    var groupsByGallery = true
     var places: [VenuePlace] = []
     var allowsSkip = true
     let onSkip: (JourneyStop) -> Void
@@ -27,6 +34,8 @@ struct VisitStopList: View {
         StopList(
             navigator: controller.navigator,
             galleries: galleries,
+            galleryNames: galleryNames,
+            groupsByGallery: groupsByGallery,
             places: Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
             allowsSkip: allowsSkip,
             lastSkippedStopID: controller.lastSkippedStopID,
@@ -42,6 +51,8 @@ struct VisitStopList: View {
 private struct StopList: View {
     @ObservedObject var navigator: JourneyNavigator
     let galleries: [Gallery]
+    let galleryNames: [String: String]
+    let groupsByGallery: Bool
     /// Places by id, for the artist and the badges of a stop.
     let places: [String: VenuePlace]
     let allowsSkip: Bool
@@ -62,31 +73,34 @@ private struct StopList: View {
         let numbers = VisitPlan.numbers(for: navigator.journey)
         ScrollView {
             LazyVStack(spacing: 10) {
-                ForEach(VisitPlan.galleryGroups(visibleStops, galleryOf: gallery(of:)), id: \.id) { group in
-                    if let name = group.gallery {
-                        Text(name)
+                // One flat ForEach: stops did not move between nested ForEach groups, which showed
+                // rows of an older order (two stops numbered 25, PM 2026-10-15).
+                ForEach(VisitPlan.listRows(visibleStops, sectionOf: section(of:))) { listRow in
+                    switch listRow {
+                    case .header(_, let title):
+                        Text(title)
                             .textStyle(.largeBodyBold)
                             .foregroundStyle(Palette.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 10)
                             .accessibilityAddTraits(.isHeader)
-                    }
-                    ForEach(group.stops) { stop in
-                    let canSkip = allowsSkip && (stop.state == .pending || stop.state == .active)
-                    SwipeToSkipRow(
-                        isRevealed: Binding(
-                            get: { revealedStopID == stop.id },
-                            set: { revealedStopID = $0 ? stop.id : nil }
-                        ),
-                        isEnabled: canSkip,
-                        isSwiping: $isSwiping,
-                        onSkip: {
-                            revealedStopID = nil
-                            onSkip(stop)
+                            .accessibilityIdentifier("journeyListHeader")
+                    case .stop(let stop):
+                        let canSkip = allowsSkip && (stop.state == .pending || stop.state == .active)
+                        SwipeToSkipRow(
+                            isRevealed: Binding(
+                                get: { revealedStopID == stop.id },
+                                set: { revealedStopID = $0 ? stop.id : nil }
+                            ),
+                            isEnabled: canSkip,
+                            isSwiping: $isSwiping,
+                            onSkip: {
+                                revealedStopID = nil
+                                onSkip(stop)
+                            }
+                        ) {
+                            row(stop, number: numbers[stop.id] ?? 0, isRevealed: revealedStopID == stop.id)
                         }
-                    ) {
-                        row(stop, number: numbers[stop.id] ?? 0, isRevealed: revealedStopID == stop.id)
-                    }
                     }
                 }
                 if allowsSkip {
@@ -107,9 +121,14 @@ private struct StopList: View {
         .scrollDisabled(isSwiping)
     }
 
-    private func gallery(of stop: JourneyStop) -> String? {
-        Gallery.containing(ProximiioCoordinate(latitude: stop.coordinate.latitude, longitude: stop.coordinate.longitude),
-                           level: stop.floor?.level, in: galleries)?.name
+    /// The section header of a stop: its gallery, else its level.
+    private func section(of stop: JourneyStop) -> String? {
+        guard groupsByGallery else { return nil }
+        if let id = places[stop.poiID ?? stop.id]?.galleryID, let name = galleryNames[id] { return name }
+        if let gallery = Gallery.containing(stop.coordinate.proximiio, level: stop.floor?.level, in: galleries) {
+            return gallery.name
+        }
+        return stop.floor.map { String(localized: "Level \(Int($0.level.rounded()))", bundle: .module) }
     }
 
     /// A stop as a frosted card (Figma journey list): number badge, title, floor.
