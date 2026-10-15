@@ -41,6 +41,13 @@ public enum WristbandCopy {
             }
             let seconds = Int(retryAfter.rounded(.up))
             return String(localized: "Too many attempts. Try again in \(seconds) seconds.", bundle: .module)
+        // A refused swap to a new wristband outside reception. The current session is kept.
+        case .swapBandsApart:
+            return String(localized: "Hold your current wristband next to the new one and scan again.", bundle: .module)
+        case .swapAtReception:
+            return String(localized: "Your wristband isn't reachable. Please swap it at the reception desk.", bundle: .module)
+        case .signingUnavailable:
+            return String(localized: "The museum’s server is busy. Try again in a moment.", bundle: .module)
         case .network:
             return String(localized: "The museum’s server cannot be reached. Check your connection and try again.", bundle: .module)
         case .server, .invalidResponse:

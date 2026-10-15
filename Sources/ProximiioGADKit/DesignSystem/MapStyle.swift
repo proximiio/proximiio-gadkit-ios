@@ -150,14 +150,3 @@ enum MapStyle {
         }
     }
 }
-
-extension ProximiioMapView {
-    /// The map library fills the map with black until MapLibre draws the first frame of the style.
-    /// A clear background shows the screen behind the map instead.
-    func clearBackground() -> ProximiioMapView {
-        proximiioMap { canvas in
-            canvas.backgroundColor = .clear
-            canvas.mapView.backgroundColor = .clear
-        }
-    }
-}

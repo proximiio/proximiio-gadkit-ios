@@ -367,6 +367,26 @@
         }
       }
     },
+    "Hold your current wristband next to the new one and scan again." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "أمسك سوارك الحالي بجانب السوار الجديد وامسح الرمز مجددًا."
+          }
+        }
+      }
+    },
+    "The museum’s server is busy. Try again in a moment." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "خادم المتحف مشغول. حاول مجددًا بعد قليل."
+          }
+        }
+      }
+    },
     "Your position is not shown on this level." : {
       "localizations" : {
         "ar" : {
@@ -1785,6 +1805,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "توقف سوارك عن الاستجابة"
+          }
+        }
+      }
+    },
+    "Your wristband isn't reachable. Please swap it at the reception desk." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "يتعذر الوصول إلى سوارك. يُرجى استبداله في مكتب الاستقبال."
           }
         }
       }

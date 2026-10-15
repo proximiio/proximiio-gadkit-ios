@@ -19,12 +19,12 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.14.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.15.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API. The [Changelog](#changelog) lists every
 change of each version; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
-6.0.0-beta.43 exactly. A host app that also depends on these packages must use the same versions.
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.59 and `proximiio-map-ios-binary`
+6.0.0-beta.44 exactly. A host app that also depends on these packages must use the same versions.
 
 ## Host app setup
 
@@ -392,10 +392,13 @@ passes the SDK's `ProximiioJourney.validate()`. `-listJourneys` prints the curre
   background and when it terminates. Geofence enter and exit events are sent as they happen. Without
   network they wait on the device and go out once the network is back. The client requires no consent
   prompt for it.
+- Every request to `apiBaseURL` carries the headers `X-Visitor-Id` (the visitor id) and
+  `X-Proximiio-SDK` (the SDK version). The API limits the request rate per device by `X-Visitor-Id`. A
+  proxy in front of an on-premises API must pass both headers through.
 - The SDK's privacy manifest declares Precise Location (App Functionality, Analytics) and Device ID
-  (the anonymous visitor id: Analytics; the wristband binding id, sent only to the relay-api: App
-  Functionality), neither linked to the user nor used for tracking. The host app's App Store privacy
-  details declare the same.
+  (App Functionality, Analytics), neither linked to the user nor used for tracking. Device ID is the
+  anonymous visitor id (analytics and the rate limit) and the wristband binding id, which only the
+  relay-api receives. The host app's App Store privacy details declare the same.
 - `VenueService.start` asks for "While Using the App" location only.
 
 ## Tests
@@ -409,6 +412,29 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. `VisitEvent` gets new cases in minor versions: a `switch`
 over `VisitEvent` with a `default` case compiles with every version.
+
+### 0.15.0 (2026-10-15)
+
+Breaking:
+
+- SDK 6.0.0-beta.59 and Map 6.0.0-beta.44. A host app that depends on these packages moves to the
+  same versions.
+- The SDK's `BlueiotBindingError` has the cases `swapBandsApart`, `swapAtReception` and
+  `signingUnavailable(retryAfter:)`. A `switch` over `BlueiotBindingError` without `default` needs the
+  cases.
+- The App Store privacy details declare Device ID for App Functionality as well as Analytics (see
+  "Privacy").
+
+Added:
+
+- `WristbandCopy.message(for:)` has text for the three new binding errors: a refused swap to a new
+  wristband ("Hold your current wristband next to the new one and scan again.", "Your wristband isn't
+  reachable. Please swap it at the reception desk.") and the relay-api's signing outage ("The
+  museum’s server is busy. Try again in a moment.").
+
+Removed:
+
+- The clear map background from 0.4.1. Map 6.0.0-beta.44 draws a clear background by default.
 
 ### 0.14.0 (2026-10-15)
 

@@ -128,6 +128,12 @@ struct WristbandCopyTests {
         #expect(WristbandCopy.message(for: withoutWait) == "Too many attempts. Try again in a moment.")
     }
 
+    @Test func refusedSwapAndSigningOutageHaveTheirOwnText() {
+        #expect(WristbandCopy.message(for: BlueiotBindingError.swapBandsApart(requestID: nil)) == "Hold your current wristband next to the new one and scan again.")
+        #expect(WristbandCopy.message(for: BlueiotBindingError.swapAtReception(requestID: nil)) == "Your wristband isn't reachable. Please swap it at the reception desk.")
+        #expect(WristbandCopy.message(for: BlueiotBindingError.signingUnavailable(retryAfter: 3, requestID: nil)) == "The museum’s server is busy. Try again in a moment.")
+    }
+
     @Test func supersededSessionTellsTheVisitorAnotherPhoneScannedTheBand() {
         #expect(WristbandCopy.notice(for: .superseded).contains("another phone"))
         #expect(WristbandCopy.notice(for: .unknown("NEW_REASON")) == WristbandCopy.notice(for: .userEnded))
