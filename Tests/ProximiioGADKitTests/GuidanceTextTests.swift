@@ -3,6 +3,7 @@
 //  ProximiioGADKitTests
 //
 import Proximiio
+import ProximiioMap
 import Testing
 @testable import ProximiioGADKit
 
@@ -50,5 +51,31 @@ struct AmenityKindTests {
         let places = [place("Café A", level: 3, lat: 0.0001), place("Café B", level: 1, lat: 0.01)]
         #expect(AmenityKind.cafe.nearest(in: places, from: .init(latitude: 0, longitude: 0), level: 1)?.title == "Café B")
         #expect(AmenityKind.cafe.nearest(in: places, from: .init(latitude: 0, longitude: 0), level: 2)?.title == "Café A")
+    }
+
+    // MARK: Next stop on another floor
+
+    private static func marker(_ type: String, from: Double, to: Double, completed: Bool = false) -> RouteGeometry.Marker {
+        let point = MapCoordinate(latitude: 24.5, longitude: 54.4)
+        return RouteGeometry.Marker(
+            featureType: type, coordinate: point, from: FloorKey(level: from), to: FloorKey(level: to),
+            departure: point, arrival: point, isCompleted: completed
+        )
+    }
+
+    /// PM 2026-10-15: the route from level 1 to level 4 takes the stairs to level 3, then the lift.
+    @Test func levelChangeTitleNamesTheRoutesFirstChangeFromTheVisitorsFloor() {
+        let markers = [Self.marker("staircase", from: 1, to: 3), Self.marker("elevator", from: 3, to: 4)]
+        #expect(GuidanceText.levelChangeTitle(markers: markers, visitorLevel: 1, stopLevel: 4) == "Take the stairs to level 3")
+        #expect(GuidanceText.levelChangeTitle(markers: markers, visitorLevel: 3, stopLevel: 4) == "Take the lift to level 4")
+    }
+
+    @Test func levelChangeTitleSkipsCompletedChanges() {
+        let markers = [Self.marker("staircase", from: 1, to: 3, completed: true), Self.marker("elevator", from: 3, to: 4)]
+        #expect(GuidanceText.levelChangeTitle(markers: markers, visitorLevel: nil, stopLevel: 4) == "Take the lift to level 4")
+    }
+
+    @Test func levelChangeTitleWithoutARouteNamesTheStopsFloor() {
+        #expect(GuidanceText.levelChangeTitle(markers: [], visitorLevel: 1, stopLevel: 4) == "Go to level 4")
     }
 }

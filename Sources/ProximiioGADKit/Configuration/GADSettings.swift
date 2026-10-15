@@ -54,13 +54,18 @@ public struct GADSettings: Equatable, Sendable {
     /// Zoom of "Centre on me" and of the first position.
     public var followZoom: Double = 21
 
-    // MARK: "Where are you?"
+    // MARK: Lift
+
+    /// Seconds of fixes inside a lift outline before the visitor counts as riding it ("In the
+    /// lift", "Level up"). A shorter stay is walking past the lift.
+    public var liftRideDwell: TimeInterval = 3
+    /// Consecutive fixes outside the lift outline that end the ride.
+    public var liftExitFixes: Int = 2
+
+    // MARK: "Probably at …"
 
     /// Positions less accurate than this (metres) near the next stop ask "Are you at …?".
     public var uncertainAccuracyMeters: Double = 8
-    /// Outside a gallery, two or more galleries whose centre is within this many metres ask
-    /// "Which one are you in?".
-    public var nearbyGalleryMeters: Double = 20
     /// Seconds a question the visitor answered stays quiet.
     public var locationQuestionQuietPeriod: TimeInterval = 120
 

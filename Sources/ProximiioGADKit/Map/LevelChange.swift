@@ -6,7 +6,7 @@
 //  into two, then an up or down arrow with "Level up" or "Level down". The journey screen and the
 //  museum map show it over the map (`levelChangeAnimation(for:venue:)`):
 //
-//  - while the visitor rides a lift: positions stay inside a lift outline for `LiftDetector.dwell`
+//  - while the visitor rides a lift: positions stay inside a lift outline for `GADSettings.liftRideDwell`
 //    seconds. With a route level change at the lift, the overlay plays the animation towards the
 //    route's floor. Without one, it shows "In the lift" until the floor changes.
 //  - when the position changes floor: the animation towards the new floor, then the map on that
@@ -89,6 +89,17 @@ struct LiftArea {
     func contains(_ coordinate: ProximiioCoordinate) -> Bool {
         outline.contains(coordinate, level: nil)
     }
+
+    /// The floor a ride in this lift goes to: the target of the route's next level change when it
+    /// leaves `from` by this lift. A level change by stairs or by another lift is not this ride
+    /// (PM 2026-10-15: a visitor in a lift saw "Level 3", the target of the route's stairs).
+    /// Pure; covered by tests.
+    func rideTarget(of change: RouteLevelChange?, from: Int) -> Int? {
+        guard let change, change.featureType == "elevator", Int(change.fromLevel.rounded()) == from,
+              contains(ProximiioCoordinate(latitude: change.coordinate.latitude, longitude: change.coordinate.longitude))
+        else { return nil }
+        return Int(change.toLevel.rounded())
+    }
 }
 
 /// Detects a ride: the visitor counts as in the lift after `dwell` seconds of fixes inside a lift
@@ -97,11 +108,16 @@ struct LiftArea {
 struct LiftDetector {
     enum Event: Equatable { case boarded, left }
 
-    var dwell: TimeInterval = 3
-    var exitFixes = 2
+    var dwell: TimeInterval
+    var exitFixes: Int
     private(set) var isRiding = false
     private var insideSince: Date?
     private var outsideFixes = 0
+
+    init(dwell: TimeInterval = GADSettings.standard.liftRideDwell, exitFixes: Int = GADSettings.standard.liftExitFixes) {
+        self.dwell = dwell
+        self.exitFixes = exitFixes
+    }
 
     mutating func update(inLift: Bool, at time: Date) -> Event? {
         if inLift {
@@ -146,11 +162,16 @@ private struct LevelChangeModifier: ViewModifier {
     @State private var floors = LevelChangeDetector()
     @State private var lift = LiftDetector()
     @State private var lifts: [LiftArea] = []
+    /// The lift the last fix was in.
+    @State private var currentLift: LiftArea?
     @State private var card: LevelChangeCard?
 
     func body(content: Content) -> some View {
         content
-            .task { lifts = LiftArea.all(features: await venue.sdk.features()) }
+            .task {
+                lift = LiftDetector(dwell: venue.settings.liftRideDwell, exitFixes: venue.settings.liftExitFixes)
+                lifts = LiftArea.all(features: await venue.sdk.features())
+            }
             .onReceive(session.$position) { position in
                 if let position { update(with: position) }
             }
@@ -166,7 +187,9 @@ private struct LevelChangeModifier: ViewModifier {
 
     private func update(with position: VenuePosition) {
         let coordinate = ProximiioCoordinate(latitude: position.coordinate.latitude, longitude: position.coordinate.longitude)
-        let event = lift.update(inLift: lifts.contains { $0.contains(coordinate) }, at: .now)
+        let area = lifts.first { $0.contains(coordinate) }
+        if let area { currentLift = area }
+        let event = lift.update(inLift: area != nil, at: .now)
         if let change = floors.update(level: position.floor?.level) {
             arrive(change)
             return
@@ -182,11 +205,11 @@ private struct LevelChangeModifier: ViewModifier {
         }
     }
 
-    /// The target floor of the route's next manoeuvre when it is a level change from `from`.
+    /// The target floor of the route's next manoeuvre when it is a level change from `from` by the
+    /// lift the visitor is in.
     private func routeTarget(from: Int) -> Int? {
-        guard case .levelChange(let change)? = session.guidance?.manoeuvre?.kind,
-              Int(change.fromLevel.rounded()) == from else { return nil }
-        return Int(change.toLevel.rounded())
+        guard case .levelChange(let change)? = session.guidance?.manoeuvre?.kind else { return nil }
+        return currentLift?.rideTarget(of: change, from: from)
     }
 
     private func board(_ riding: LevelChangeCard) {

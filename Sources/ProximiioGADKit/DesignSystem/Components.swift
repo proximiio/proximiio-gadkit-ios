@@ -114,7 +114,7 @@ public struct LabeledField<Field: View>: View {
 }
 
 /// The design's icons (`icons-svg`, imported as vector assets).
-enum GADIcon: String {
+enum GADIcon: String, CaseIterable {
     case cafe = "IconCafe"
     case compass = "IconCompass"
     case elevator = "IconElevator"

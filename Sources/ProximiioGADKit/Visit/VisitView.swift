@@ -37,8 +37,6 @@ public struct VisitView: View {
     @State private var selectedAmenity: VenuePlace?
     /// The amenity whose detour waits for "Change your route?".
     @State private var amenityToConfirm: VenuePlace?
-    /// EC04a–c: the full-screen "Where are you?" choice.
-    @State private var locationChoice: LocationChoice?
     /// EC04d: the soft prompt for an uncertain position near the active stop.
     @State private var lowConfidenceStop: JourneyStop?
     /// Prompt kinds the visitor answered, and when; they stay quiet for a while.
@@ -49,6 +47,10 @@ public struct VisitView: View {
     @State private var visitedGalleries: Set<String> = []
     @State private var mapLayers = JourneyMapLayers()
     @State private var isShowingWrapUp = false
+    /// Set by a button in a sheet or cover that leaves the visit: `onClose` runs after that
+    /// presentation is dismissed. Closing the visit while its own sheet is still dismissing can
+    /// leave the screen below without taps (Monday "UI gets stuck", 2026-10-15).
+    @State private var leavesAfterDismiss = false
     /// The pairing flow, opened from `WristbandEndedSheet`: the host app's
     /// `wristbandConnectionScreen`, else `WristbandPairingView`.
     @State private var pairing: WristbandPairing?
@@ -112,6 +114,10 @@ public struct VisitView: View {
                                 .background(Palette.white.opacity(0.92))
                                 .transition(.opacity)
                         }
+                        if amenityToConfirm != nil {
+                            // "Change your route?" fades the map (Figma node 10889:112476).
+                            Palette.white.opacity(0.5).transition(.opacity)
+                        }
                     } overlay: {
                         cardOverlay
                     }
@@ -172,6 +178,7 @@ public struct VisitView: View {
             FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", "))")
             await MapStyle.waitForCanvas(of: controller.session)
             controller.session.journeyStopMarkerStyle = MapStyle.journeyStops
+            if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }
             // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).
             mapLayers.attach(to: controller.session)
             refreshMapLayers()
@@ -243,38 +250,24 @@ public struct VisitView: View {
         .onChange(of: controller.navigator.isFinished) { _, isFinished in
             if isFinished { isShowingWrapUp = true }
         }
-        .fullScreenCover(isPresented: $isShowingWrapUp) {
+        .fullScreenCover(isPresented: $isShowingWrapUp, onDismiss: leaveIfAsked) {
             JourneyCompleteView(venue: venue) {
-                isShowingWrapUp = false
                 controller.end()
-                onClose()
+                leave(dismissing: { isShowingWrapUp = false })
             }
         }
-        .sheet(isPresented: $isConfirmingExit) {
+        .sheet(isPresented: $isConfirmingExit, onDismiss: leaveIfAsked) {
             let stops = controller.navigator.journey.stops.filter { $0.state != .skipped }
             ExitConfirmationSheet(
                 visited: stops.filter { $0.state == .done }.count,
                 total: stops.count,
                 onLeave: {
-                    isConfirmingExit = false
                     emit(.exitConfirmed)
-                    onClose()
+                    leave(dismissing: { isConfirmingExit = false })
                 },
                 onCarryOn: {
                     isConfirmingExit = false
                     emit(.exitCancelled)
-                }
-            )
-        }
-        .fullScreenCover(item: $locationChoice) { choice in
-            LocationChoiceView(
-                choice: choice,
-                level: controller.session.position?.floor.map { String(localized: "Level \(Int($0.level.rounded()))", bundle: .module) },
-                gallery: currentGallery,
-                onPick: { option in pick(option, in: choice) },
-                onClose: {
-                    answeredAmbiguity[choice.kind] = .now
-                    locationChoice = nil
                 }
             )
         }
@@ -285,10 +278,6 @@ public struct VisitView: View {
             } onNotHere: {
                 answeredAmbiguity["low"] = .now
                 lowConfidenceStop = nil
-                Task {
-                    try? await Task.sleep(for: .milliseconds(400))
-                    locationChoice = manualChoice()
-                }
             }
         }
         .onDisappear {
@@ -298,9 +287,9 @@ public struct VisitView: View {
         .onChange(of: monitor.health) { _, health in
             if health == .tracking { dismissedHealth = nil }
         }
-        .sheet(isPresented: isShowingTrackingAlert) {
+        .sheet(isPresented: isShowingTrackingAlert, onDismiss: leaveIfAsked) {
             if let notice = wristband.endNotice {
-                WristbandEndedSheet(notice: notice, onConnect: connectWristband, onBackToHub: onClose)
+                WristbandEndedSheet(notice: notice, onConnect: connectWristband, onBackToHub: { leave(dismissing: {}) })
                     .interactiveDismissDisabled()
                     .onAppear {
                         FieldLog.log("sheet: wristband ended (\(wristband.state.map(WristbandCopy.logLine) ?? "-")), last fix \(monitor.lastFix?.formatted(.iso8601) ?? "-")")
@@ -313,13 +302,6 @@ public struct VisitView: View {
                     canRouteToDesk: VenuePlace.welcomeDesk(in: places) != nil,
                     onSearchAgain: searchAgain,
                     onRouteToDesk: routeToDesk,
-                    onPickStop: {
-                        dismissedHealth = monitor.health
-                        Task {
-                            try? await Task.sleep(for: .milliseconds(400))
-                            locationChoice = manualChoice()
-                        }
-                    },
                     onDismiss: { dismissedHealth = monitor.health }
                 )
                 .interactiveDismissDisabled()
@@ -342,6 +324,7 @@ public struct VisitView: View {
         .onReceive(controller.session.$guidance) { _ in
             Task { @MainActor in
                 refreshConnector()
+                refreshLevelChanger()
                 controller.checkArtworkGeofences()
             }
         }
@@ -357,11 +340,17 @@ public struct VisitView: View {
             checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
         }
         .onChange(of: controller.navigator.journey) { _, journey in VisitStore.save(journey) }
-        .onReceive(controller.navigator.$journey) { _ in Task { @MainActor in refreshMapLayers() } }
+        .onReceive(controller.navigator.$journey) { _ in
+            Task { @MainActor in
+                refreshMapLayers()
+                refreshLevelChanger()
+            }
+        }
         .onReceive(controller.session.$selectedFloor) { _ in
             Task { @MainActor in
                 refreshMapLayers()
                 refreshConnector()
+                refreshLevelChanger()
             }
         }
         .sheet(item: $stopToSkip) { stop in
@@ -372,15 +361,6 @@ public struct VisitView: View {
             } onKeep: {
                 stopToSkip = nil
                 emit(.skipCancelled(stop))
-            }
-        }
-        .sheet(item: $amenityToConfirm) { place in
-            ChangeRouteConfirmation(place: place, nextStop: nextStopName) {
-                amenityToConfirm = nil
-                Task { await controller.detour(to: place) }
-                emit(.detourStarted(place))
-            } onClose: {
-                amenityToConfirm = nil
             }
         }
         .sheet(isPresented: isShowingOffRouteWarning) {
@@ -398,7 +378,7 @@ public struct VisitView: View {
     private var isShowingTrackingAlert: Binding<Bool> {
         Binding(
             get: {
-                guard !isPairing, stopToSkip == nil else { return false }
+                guard !isPairing, !leavesAfterDismiss, stopToSkip == nil else { return false }
                 if wristband.endNotice != nil { return true }
                 return (monitor.health == .lostPlace || monitor.health == .stoppedResponding)
                     && monitor.health != dismissedHealth
@@ -457,6 +437,19 @@ public struct VisitView: View {
         mapLayers.updateConnector(from: position.coordinate.proximiio, to: start.proximiio)
     }
 
+    /// The lift or stairs of the route's next level change from the shown floor (PM 2026-10-15,
+    /// "Level changer highlighting").
+    private func refreshLevelChanger() {
+        let session = controller.session
+        let level = session.selectedFloor.level
+        let next = session.routeRenderer?.geometry?.markers.first {
+            !$0.isCompleted && VenueLevel.same($0.from.level, level)
+        }
+        mapLayers.updateLevelChanger(next.map {
+            .init(coordinate: $0.coordinate.proximiio, level: level, featureType: $0.featureType)
+        })
+    }
+
     /// `recentre` with a field-log line naming the caller.
     private func recentre(withHeading: Bool? = nil, reason: String) {
         FieldLog.log("recentre (\(reason)) · heading \(withHeading.map(String.init) ?? "default") · mode before \(controller.session.cameraMode)")
@@ -469,6 +462,21 @@ public struct VisitView: View {
     private static let showsConnector = false
 
     // MARK: Leaving
+
+    /// Dismisses the sheet or cover the visitor left the visit from; `leaveIfAsked` closes the
+    /// visit after the dismissal.
+    private func leave(dismissing dismiss: () -> Void) {
+        FieldLog.log("visit: leave after dismissal")
+        leavesAfterDismiss = true
+        dismiss()
+    }
+
+    private func leaveIfAsked() {
+        guard leavesAfterDismiss else { return }
+        leavesAfterDismiss = false
+        FieldLog.log("visit: close")
+        onClose()
+    }
 
     /// Back: a visit in progress asks first (03.10); a visit not started or finished closes.
     private func requestClose() {
@@ -485,7 +493,7 @@ public struct VisitView: View {
     // MARK: Ambiguous location (EC04)
 
     private var isPresentingSomething: Bool {
-        locationChoice != nil || lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit || controller.isOffRoute
+        lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit || controller.isOffRoute
             || amenityToConfirm != nil
             || isShowingWrapUp || isShowingTrackingAlert.wrappedValue
     }
@@ -497,9 +505,7 @@ public struct VisitView: View {
             coordinate: coordinate,
             level: monitor.lastLevel,
             horizontalAccuracy: max(0, monitor.lastAccuracy ?? 0),
-            activeStop: navigator.hasArrived ? nil : navigator.activeStop,
-            galleries: LocationAmbiguity.galleries(in: places),
-            currentGallery: currentGallery
+            activeStop: navigator.hasArrived ? nil : navigator.activeStop
         )
         guard let ambiguity = LocationAmbiguity.evaluate(input, settings: settings) else { return }
         if let answered = answeredAmbiguity[ambiguity.kind], Date.now.timeIntervalSince(answered) < settings.locationQuestionQuietPeriod {
@@ -507,45 +513,8 @@ public struct VisitView: View {
         }
         FieldLog.log("ambiguous location: \(ambiguity.kind)")
         switch ambiguity {
-        case .betweenGalleries(let galleries):
-            locationChoice = LocationChoice(
-                kind: ambiguity.kind,
-                questionLight: "You're between galleries.",
-                questionBold: "Which one are you in?",
-                options: galleries.map { .init(id: $0.id, title: $0.title, action: .gallery($0.title)) } + [.somewhereElse]
-            )
         case .lowConfidence(let stop):
             lowConfidenceStop = stop
-        }
-    }
-
-    /// EC04c: the visitor picks the stop they are at.
-    private func manualChoice() -> LocationChoice {
-        let open = controller.navigator.journey.stops.filter { $0.state == .pending || $0.state == .active }
-        return LocationChoice(
-            kind: "manual",
-            questionBold: "Where are you?",
-            caption: "Pick the artwork you are at",
-            options: open.map { stop in
-                .init(id: stop.id, title: stop.title, subtitle: stop.floor.map { String(localized: "Level \(Int($0.level.rounded()))", bundle: .module) },
-                      action: .activateStop(stop.id))
-            } + [.somewhereElse]
-        )
-    }
-
-    private func pick(_ option: LocationChoice.Option, in choice: LocationChoice) {
-        answeredAmbiguity[choice.kind] = .now
-        locationChoice = nil
-        switch option.action {
-        case .activateStop(let id):
-            Task { await controller.activate(stopID: id) }
-            mode = .map
-            if let stop = controller.navigator.journey.stops.first(where: { $0.id == id }) { emit(.stopChosen(stop)) }
-        case .gallery(let name):
-            currentGallery = name
-            emit(.galleryChosen(name))
-        case .somewhereElse:
-            break
         }
     }
 
@@ -626,7 +595,21 @@ public struct VisitView: View {
                         .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .module))
                     }
                 }
-                if let place = selectedAmenity {
+                if let place = amenityToConfirm {
+                    // "Change your route?" (Figma node 10889:112477): a card over the faded map
+                    // with "Go here" and "Close" side by side (PM 2026-10-15).
+                    PlaceInfoCard(
+                        title: String(localized: "Change your route?", bundle: .module),
+                        subtitle: changeRouteText(to: place),
+                        primary: "Go here",
+                        onPrimary: {
+                            amenityToConfirm = nil
+                            Task { await controller.detour(to: place) }
+                            emit(.detourStarted(place))
+                        },
+                        onClose: { amenityToConfirm = nil }
+                    )
+                } else if let place = selectedAmenity {
                     PlaceInfoCard(
                         title: place.title,
                         subtitle: place.cardSubtitle,
@@ -655,6 +638,14 @@ public struct VisitView: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 20)
         .animation(.easeInOut(duration: 0.2), value: isShowingAmenities)
+        .animation(.easeInOut(duration: 0.2), value: amenityToConfirm)
+    }
+
+    private func changeRouteText(to place: VenuePlace) -> String {
+        if let nextStop = nextStopName {
+            return String(localized: "Navigating to \(place.title) adds a stop to your route to \(nextStop). Your journey progress is kept.", bundle: .module)
+        }
+        return String(localized: "Navigating to \(place.title) adds a stop to your route. Your journey progress is kept.", bundle: .module)
     }
 
     /// Shows the nearest place of `kind` on a card. "Go here" and "Change your route?" add it as
@@ -671,32 +662,6 @@ public struct VisitView: View {
         guard let stop = controller.navigator.journey.stops.first(where: { $0.kind != .detour && ($0.state == .active || $0.state == .pending) })
         else { return nil }
         return Gallery.containing(stop.coordinate.proximiio, level: stop.floor?.level, in: galleries)?.name ?? stop.title
-    }
-}
-
-/// "Change your route?" bottom sheet before an amenity becomes a detour (PM review 2026-10-12).
-private struct ChangeRouteConfirmation: View {
-    let place: VenuePlace
-    let nextStop: String?
-    let onGo: () -> Void
-    let onClose: () -> Void
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Text("Change your route?", bundle: .module).textStyle(.h1Bold)
-            Group {
-                if let nextStop {
-                    Text("Navigating to \(place.title) adds a stop to your route to \(nextStop). Your journey progress is kept.", bundle: .module)
-                } else {
-                    Text("Navigating to \(place.title) adds a stop to your route. Your journey progress is kept.", bundle: .module)
-                }
-            }
-            .textStyle(.bodySmallRegular)
-            .padding(.bottom, 20)
-            Button(String(localized: "Go here", bundle: .module), action: onGo).buttonStyle(.primary)
-            Button(String(localized: "Close", bundle: .module), action: onClose).buttonStyle(.textAction)
-        }
-        .overlaySheetStyle()
     }
 }
 
@@ -800,9 +765,17 @@ private struct VisitCard: View {
         case .starting: String(localized: "Your journey", bundle: .module)
         case .walking(let stop): galleryAhead?.name ?? stop
         case .atStop(let stop): stop
-        case .nextStopOnOtherLevel(_, let level): String(localized: "Take the lift to level \(level)", bundle: .module)
+        case .nextStopOnOtherLevel(_, let level): levelChangeTitle(stopLevel: level)
         case .finished: String(localized: "You've walked your route", bundle: .module)
         }
+    }
+
+    private func levelChangeTitle(stopLevel: Int) -> String {
+        GuidanceText.levelChangeTitle(
+            markers: session.routeRenderer?.geometry?.markers ?? [],
+            visitorLevel: session.position?.floor?.level,
+            stopLevel: stopLevel
+        )
     }
 
     private var instruction: String? {
@@ -812,10 +785,13 @@ private struct VisitCard: View {
             return String(localized: "No route to this stop with your accessibility settings.", bundle: .module)
         }
         switch state {
-        case .walking, .nextStopOnOtherLevel:
-            if let guidance = navigator.guidance { return GuidanceText.instruction(for: guidance) }
-            if case .nextStopOnOtherLevel = state { return String(localized: "Go to the lift", bundle: .module) }
-            return nil
+        case .walking:
+            return navigator.guidance.map(GuidanceText.instruction(for:))
+        case .nextStopOnOtherLevel(_, let level):
+            // At the level change the instruction repeats the title; the card shows it once.
+            guard let guidance = navigator.guidance else { return nil }
+            let text = GuidanceText.instruction(for: guidance)
+            return text == levelChangeTitle(stopLevel: level) ? nil : text
         default: return nil
         }
     }

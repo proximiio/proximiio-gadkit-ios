@@ -17,12 +17,10 @@ struct LocationAmbiguityTests {
     private let here = ProximiioCoordinate(latitude: 24.5, longitude: 54.4)
     private let artworks = [Self.place("a", "Artwork A", north: 2), Self.place("b", "Artwork B", north: 4), Self.place("c", "Artwork C", north: 30)]
 
-    private func input(accuracy: Double = 3, stops: [String] = ["a", "b", "c"], active: String? = nil,
-                       galleries: [VenuePlace] = [], currentGallery: String? = nil) -> LocationAmbiguity.Input {
+    private func input(accuracy: Double = 3, stops: [String] = ["a", "b", "c"], active: String? = nil) -> LocationAmbiguity.Input {
         let journey = VisitPlan.journey(poiIDs: stops, places: artworks)
         return .init(coordinate: here, level: 1, horizontalAccuracy: accuracy,
-                     activeStop: active.flatMap { id in journey.stops.first { $0.id == id } },
-                     galleries: galleries, currentGallery: currentGallery)
+                     activeStop: active.flatMap { id in journey.stops.first { $0.id == id } })
     }
 
     @Test func nearbyStopsAreNotAmbiguous() {
@@ -30,21 +28,10 @@ struct LocationAmbiguityTests {
         #expect(LocationAmbiguity.evaluate(input(stops: ["a", "c"])) == nil)
     }
 
-    @Test func betweenGalleriesOnlyOutsideAGalleryGeofence() {
-        let galleries = [Self.place("g1", "Gallery 101", north: 8), Self.place("g2", "Gallery 102", north: -8), Self.place("g3", "Gallery 103", north: 80)]
-        let outside = input(stops: ["c"], galleries: galleries)
-        #expect(LocationAmbiguity.evaluate(outside)?.kind == "galleries")
-        #expect(LocationAmbiguity.evaluate(input(stops: ["c"], galleries: galleries, currentGallery: "Gallery 101")) == nil)
-    }
-
     @Test func uncertainPositionNearTheActiveStopIsASoftPrompt() {
         #expect(LocationAmbiguity.evaluate(input(accuracy: 12, stops: ["c"], active: "c")) == nil)
         #expect(LocationAmbiguity.evaluate(input(accuracy: 40, stops: ["c"], active: "c"))?.kind == "low")
         #expect(LocationAmbiguity.evaluate(input(accuracy: 5, stops: ["c"], active: "c")) == nil)
-    }
-
-    @Test func galleriesAreFoundByTitle() {
-        #expect(LocationAmbiguity.galleries(in: artworks + [Self.place("g", "Gallery 101", north: 0)]).map(\.id) == ["g"])
     }
 }
 

@@ -133,6 +133,16 @@ enum MapStyle {
         return amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }
     }
 
+    /// Registers the design's glyphs under their `GADIcon` raw value, the `iconName` of an amenity
+    /// detour stop (`VisitController.detour(to:)`). The library draws the glyph in the detour's
+    /// label colour, white on the red marker (PM 2026-10-15: the marker had no icon).
+    @MainActor static func registerStopIcons(on canvas: ProximiioMapCanvas) {
+        for icon in GADIcon.allCases where icon.markerImageName != nil {
+            guard let image = UIImage(named: icon.rawValue, in: .module, compatibleWith: nil) else { continue }
+            canvas.floors.register(image.withRenderingMode(.alwaysTemplate), named: icon.rawValue)
+        }
+    }
+
     /// Waits up to 5 s until the map view has created its canvas.
     @MainActor static func waitForCanvas(of session: ProximiioMapSession) async {
         for _ in 0..<50 where session.canvas == nil {

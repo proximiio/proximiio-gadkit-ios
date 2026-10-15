@@ -16,7 +16,6 @@ struct TrackingAlertSheet: View {
     let canRouteToDesk: Bool
     let onSearchAgain: () -> Void
     let onRouteToDesk: () -> Void
-    let onPickStop: () -> Void
     let onDismiss: () -> Void
 
     var body: some View {
@@ -64,8 +63,8 @@ struct TrackingAlertSheet: View {
         Text("We’ve lost your place in the room", bundle: .module).textStyle(.h1Bold)
         Text("Walk a few steps toward the centre of the gallery and we’ll find you again.", bundle: .module)
             .textStyle(.bodySmallRegular)
-        Button(String(localized: "Pick my stop manually", bundle: .module), action: onPickStop).buttonStyle(.primary).padding(.top, 20)
-        Button(String(localized: "Dismiss", bundle: .module), action: onDismiss).buttonStyle(.textAction)
+        // No "Pick my stop manually" (PM 2026-10-15: the view should not exist).
+        Button(String(localized: "Dismiss", bundle: .module), action: onDismiss).buttonStyle(.primary).padding(.top, 20)
     }
 }
 

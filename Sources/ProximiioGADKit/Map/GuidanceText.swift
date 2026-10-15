@@ -32,6 +32,22 @@ enum GuidanceText {
         }
     }
 
+    /// The card title while the next stop is on another floor: the route's first level change
+    /// that leaves the visitor's floor, e.g. "Take the stairs to level 3". A route from level 1 to
+    /// level 4 can take the stairs to level 3 first (PM 2026-10-15). Without a level change on the
+    /// route: "Go to level 4". Pure; covered by tests.
+    static func levelChangeTitle(markers: [RouteGeometry.Marker], visitorLevel: Double?, stopLevel: Int) -> String {
+        let pending = markers.filter { !$0.isCompleted }
+        let fromHere = visitorLevel.flatMap { level in
+            pending.first { Int($0.from.level.rounded()) == Int(level.rounded()) }
+        }
+        guard let change = fromHere ?? pending.first else {
+            return String(localized: "Go to level \(stopLevel)", bundle: .module)
+        }
+        let level = Int(change.to.level.rounded())
+        return String(localized: "Take the \(levelChanger(change.featureType)) to level \(level)", bundle: .module)
+    }
+
     /// Remaining distance and time, e.g. "70 m · <1 min".
     static func remaining(metres: Double) -> String {
         let distance = Int(metres.rounded())

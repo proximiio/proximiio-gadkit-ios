@@ -3,6 +3,8 @@
 //  ProximiioGADKitTests
 //
 import Foundation
+import Proximiio
+import ProximiioMap
 import Testing
 @testable import ProximiioGADKit
 
@@ -82,5 +84,38 @@ struct LevelChangeTests {
         #expect(lift.update(inLift: false, at: Self.start + 6) == nil)
         #expect(lift.update(inLift: false, at: Self.start + 7) == .left)
         #expect(!lift.isRiding)
+    }
+
+    // MARK: Ride target
+
+    private static let lift = LiftArea(outline: Gallery(
+        id: "lift", name: "", level: 0,
+        ring: [(24.0, 54.0), (24.0, 54.001), (24.001, 54.001), (24.001, 54.0)].map { ProximiioCoordinate(latitude: $0.0, longitude: $0.1) }
+    ))
+
+    private static func change(_ type: String, from: Double, to: Double, inLift: Bool = true) -> RouteLevelChange {
+        let point = inLift ? MapCoordinate(latitude: 24.0005, longitude: 54.0005) : MapCoordinate(latitude: 24.01, longitude: 54.01)
+        return RouteLevelChange(featureType: type, fromLevel: from, toLevel: to, coordinate: point)
+    }
+
+    @Test func rideTargetIsTheRoutesLevelChangeByThisLift() {
+        #expect(Self.lift.rideTarget(of: Self.change("elevator", from: 1, to: 4), from: 1) == 4)
+    }
+
+    /// PM 2026-10-15: the route took the stairs to level 3; the visitor rode a lift to level 4 and
+    /// saw "Level 3".
+    @Test func rideTargetIgnoresStairsAnotherLiftAndAnotherFloor() {
+        #expect(Self.lift.rideTarget(of: Self.change("staircase", from: 1, to: 3), from: 1) == nil)
+        #expect(Self.lift.rideTarget(of: Self.change("elevator", from: 1, to: 3, inLift: false), from: 1) == nil)
+        #expect(Self.lift.rideTarget(of: Self.change("elevator", from: 3, to: 4), from: 1) == nil)
+        #expect(Self.lift.rideTarget(of: nil, from: 1) == nil)
+    }
+
+    @Test func liftDetectorTakesTheSettings() {
+        var settings = GADSettings()
+        settings.liftRideDwell = 1
+        var lift = LiftDetector(dwell: settings.liftRideDwell, exitFixes: settings.liftExitFixes)
+        #expect(lift.update(inLift: true, at: Self.start) == nil)
+        #expect(lift.update(inLift: true, at: Self.start + 1) == .boarded)
     }
 }

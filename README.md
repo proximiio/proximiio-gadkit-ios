@@ -19,7 +19,7 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.10.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.11.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.58 and `proximiio-map-ios-binary`
@@ -111,7 +111,8 @@ let configuration = GADConfiguration(
 | `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
-| `uncertainAccuracyMeters`, `nearbyGalleryMeters`, `locationQuestionQuietPeriod` | 8 m, 20 m, 120 s | "Where are you?": an uncertain position near the next stop, galleries close to each other, and how long an answered question stays quiet. |
+| `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before "In the lift" or "Level up", and the fixes outside that end the ride. |
+| `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `liveActivityMinimumInterval` | 5 s | The shortest gap between two Live Activity updates of the instruction. |
 
@@ -258,13 +259,11 @@ VisitView(venue: venue, wristband: wristband, journey: journey) { isVisiting = f
 
 | Event | When |
 |---|---|
-| `modeChanged(VisitMode)` | The Map / List toggle, or "Where are you?", which shows the map. |
+| `modeChanged(VisitMode)` | The Map / List toggle. |
 | `skipRequested(JourneyStop)` | A swipe on a stop in the list, or its "Skip" accessibility action. "Skip artwork?" follows. |
 | `stopSkipped(JourneyStop)` | "Skip artwork" confirmed. |
 | `skipCancelled(JourneyStop)` | "Keep it". |
 | `skipUndone(JourneyStop)` | "Undo skip" in the list. |
-| `stopChosen(JourneyStop)` | The visitor picked the stop they are at in "Where are you?". |
-| `galleryChosen(String)` | The visitor picked the gallery they are in. |
 | `amenitySelected(VenuePlace)` | An amenity picked on the map. A card shows it. |
 | `detourStarted(VenuePlace)` | "Change your route?" confirmed, or the route to the Welcome Desk from a tracking alert. |
 | `journeyResumed` | "Resume your Journey" or "Show the route from here". |
@@ -384,6 +383,7 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 
 | Version | Change |
 |---|---|
+| 0.11.0 | The card names the route's next level change ("Take the stairs to level 3"), and the map marks that lift or stairs in red. The lift animation takes its floor from the route only when the route uses that lift. The amenity detour marker shows the amenity's icon. "Change your route?" is a card on the map. No "Which one are you in?" and no "Pick my stop manually" (`VisitEvent.stopChosen`, `galleryChosen` and `GADSettings.nearbyGalleryMeters` removed). `GADSettings.liftRideDwell`, `liftExitFixes`. A visit closes after its "Journey Complete", exit or wristband sheet is dismissed. |
 | 0.10.0 | `GADSettings`: every time and distance of the screens, in `GADConfiguration.settings` and `VenueService.settings`. |
 | 0.9.2 | Map amenities of a kind the design draws (restrooms, café, help desk, prayer room, shop, stairs, elevator) use the design's 30 pt markers. |
 | 0.9.1 | The journey list scrolls when a drag starts on a row (iOS 18 and later). |

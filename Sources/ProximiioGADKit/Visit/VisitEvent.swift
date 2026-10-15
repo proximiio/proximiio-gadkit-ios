@@ -17,7 +17,7 @@ public enum VisitMode: String, Sendable, Equatable {
 
 /// A visitor action in `VisitView`, or a change of the journey.
 public enum VisitEvent: Sendable, Equatable {
-    /// The presentation changed: the Map / List toggle, or "Where are you?", which shows the map.
+    /// The presentation changed: the Map / List toggle.
     case modeChanged(VisitMode)
     /// The visitor swiped a stop in the list, or used its "Skip" accessibility action.
     /// `VisitView` asks "Skip artwork?".
@@ -28,10 +28,6 @@ public enum VisitEvent: Sendable, Equatable {
     case skipCancelled(JourneyStop)
     /// The visitor tapped "Undo skip". The stop is back in the journey.
     case skipUndone(JourneyStop)
-    /// The visitor picked the stop they are at in "Where are you?". It becomes the active stop.
-    case stopChosen(JourneyStop)
-    /// The visitor picked the gallery they are in, by name, in "Which one are you in?".
-    case galleryChosen(String)
     /// The visitor picked an amenity on the map. A card shows it with "Go here".
     case amenitySelected(VenuePlace)
     /// The amenity is now a detour of the journey: the visitor confirmed "Change your route?", or
