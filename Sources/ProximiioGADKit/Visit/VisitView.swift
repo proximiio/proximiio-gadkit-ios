@@ -51,6 +51,8 @@ public struct VisitView: View {
     /// leave the screen below without taps (Monday "UI gets stuck", 2026-10-15).
     @State private var leavesAfterDismiss = false
     @State private var stopNotifier: StopNearbyNotifier
+    /// The lift or stairs view and the map of a floor without positioning.
+    @State private var floorGuide: FloorWithoutPositioningGuide
     private let venue: VenueService
     private let kind: JourneyKind
     /// `venue.settings` when the view was created.
@@ -74,6 +76,7 @@ public struct VisitView: View {
         _monitor = State(initialValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
         _stopNotifier = State(initialValue: StopNearbyNotifier(nearbyMeters: settings.stopNearbyMeters))
         _liveActivity = State(initialValue: VisitLiveActivity(minimumUpdateInterval: settings.liveActivityMinimumInterval))
+        _floorGuide = State(initialValue: FloorWithoutPositioningGuide(settings: settings))
         let session = MapStyle.session(
             sdk: venue.sdk,
             // The leg keeps its shape until the arrival; the walked part is translucent (PM review
@@ -129,10 +132,16 @@ public struct VisitView: View {
                 // The map ignores the safe area; the card starts below the status bar as in the design.
                 .padding(.top, geometry.safeAreaInsets.top + 8)
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom - 14, 4))
+                if case .changing(let change) = floorGuide.phase {
+                    FloorChangeView(change: change)
+                        .onTapGesture { floorGuide.showFloor() }
+                        .transition(.opacity)
+                }
             }
             .ignoresSafeArea()
         }
         .animation(.default, value: mode)
+        .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
         .onChange(of: mode) { _, mode in emit(.modeChanged(mode)) }
         .onChange(of: accessibility) { _, accessibility in
             Task { await controller.setAccessibility(accessibility) }
@@ -140,6 +149,17 @@ public struct VisitView: View {
         .task {
             controller.onArtworkDone = { [emit] stop, isActiveStop in
                 emit(isActiveStop ? .artworkReached(stop) : .artworkVisitedOutOfOrder(stop))
+            }
+            floorGuide.onEnter = { [emit, controller] change in
+                // Under the Map / List toggle, beside the map buttons, above the stop card.
+                FloorWithoutPositioningGuide.show(change, on: controller.session, padding: UIEdgeInsets(top: 100, left: 40, bottom: 220, right: 90))
+                emit(.floorWithoutPositioningEntered(level: change.level))
+            }
+            floorGuide.onLeave = { [emit, controller] change in
+                controller.session.followMyFloor()
+                FieldLog.log("recentre (floor without positioning left) · heading true")
+                controller.session.recentre(withHeading: true)
+                emit(.floorWithoutPositioningLeft(level: change.level))
             }
             for await event in controller.navigator.events {
                 emit(.journey(event))
@@ -281,12 +301,20 @@ public struct VisitView: View {
         .onChange(of: controller.session.position == nil) { _, hasNoPosition in
             if !hasNoPosition { recentre(reason: "first position") }
         }
-        .followsVisitorFloor(controller.session, venue: venue)
+        .followsVisitorFloor(controller.session, venue: venue, isPaused: floorGuide.isActive)
         .onReceive(controller.session.$guidance) { _ in
             Task { @MainActor in
                 refreshConnector()
                 refreshLevelChanger()
-                controller.checkArtworkGeofences()
+                let session = controller.session
+                let navigator = controller.navigator
+                floorGuide.update(
+                    coordinate: session.position?.coordinate, level: session.position?.floor?.level,
+                    markers: session.routeRenderer?.geometry?.markers ?? [],
+                    destinationID: navigator.detourStop?.id ?? navigator.activeStop?.id
+                )
+                // On a floor without positioning the fixes come from the floor the visitor left.
+                if !floorGuide.isActive { controller.checkArtworkGeofences() }
             }
         }
         // The session updates the guidance after the position on every fix; a fix without guidance
@@ -337,7 +365,7 @@ public struct VisitView: View {
     /// The off-route warning, unless another prompt is up.
     private var isShowingOffRouteWarning: Binding<Bool> {
         Binding(
-            get: { controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil },
+            get: { controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !floorGuide.isActive },
             set: { if !$0 { controller.dismissOffRoute() } }
         )
     }
@@ -441,7 +469,7 @@ public struct VisitView: View {
 
     private var isPresentingSomething: Bool {
         lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit || controller.isOffRoute
-            || amenityToConfirm != nil || isShowingWrapUp
+            || amenityToConfirm != nil || isShowingWrapUp || floorGuide.isActive
     }
 
     private func evaluateAmbiguity() {
@@ -494,6 +522,7 @@ public struct VisitView: View {
                     Spacer()
                     VStack(spacing: 5) {
                         GlassSquareButton(action: {
+                            floorGuide.leave()
                             controller.session.followMyFloor()
                             recentre(reason: "Centre on me")
                             emit(.recentred)
@@ -502,7 +531,10 @@ public struct VisitView: View {
                         }
                         .accessibilityLabel(Text("Centre on me", bundle: .module))
                         AccessibleRoutesButton(isOn: $accessibleRoutes) { emit(.accessibleRoutesChanged($0)) }
-                        GlassSquareButton(action: { controller.session.followMyFloor() }) {
+                        GlassSquareButton(action: {
+                            floorGuide.leave()
+                            controller.session.followMyFloor()
+                        }) {
                             Text(GuidanceText.floorLabel(controller.session.selectedFloor.level)).textStyle(.largeBodyBold)
                         }
                         .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .module))
@@ -540,6 +572,7 @@ public struct VisitView: View {
                         // Without galleries the card names the artwork at once.
                         galleries: kind.guidesToGalleryFirst ? galleries : [],
                         places: places,
+                        isOnFloorWithoutPositioning: floorGuide.isActive,
                         onResume: {
                             Task { await controller.resumeJourney() }
                             emit(.journeyResumed)
@@ -589,6 +622,9 @@ private struct VisitCard: View {
     @ObservedObject var session: ProximiioMapSession
     let galleries: [Gallery]
     let places: [VenuePlace]
+    /// The map shows a floor without positioning: the card names the stop, with no instruction
+    /// from fixes of another floor.
+    var isOnFloorWithoutPositioning = false
     let onResume: () -> Void
     /// The stop whose gallery the visitor has entered.
     @State private var stopWithGalleryReached: String?
@@ -660,6 +696,7 @@ private struct VisitCard: View {
     }
 
     private var caption: LocalizedStringKey {
+        if isOnFloorWithoutPositioning { return "NEXT STOP" }
         switch state {
         case .nextStopOnOtherLevel(let stop, _):
             return "NEXT STOP IS \(galleryAhead?.name ?? stop)"
@@ -674,7 +711,8 @@ private struct VisitCard: View {
     }
 
     private var title: String {
-        switch state {
+        if isOnFloorWithoutPositioning, let stop = navigator.activeStop { return stop.title }
+        return switch state {
         case .starting: String(localized: "Your journey", bundle: .module)
         case .walking(let stop): galleryAhead?.name ?? stop
         case .atStop(let stop): stop
@@ -699,6 +737,9 @@ private struct VisitCard: View {
     private var instruction: String? {
         // The navigator keeps a stop that no route with the visitor's accessibility needs reaches,
         // with no route line. In a personalised journey the visitor can skip it in the list.
+        if isOnFloorWithoutPositioning {
+            return String(localized: "Your position is not shown on this level.", bundle: .module)
+        }
         if let stop = navigator.activeStop, case .noAccessibleRoute = navigator.noRouteReasons[stop.id] {
             return String(localized: "No route to this stop with your accessibility settings.", bundle: .module)
         }
@@ -715,6 +756,7 @@ private struct VisitCard: View {
     }
 
     private var remaining: String? {
+        if isOnFloorWithoutPositioning { return nil }
         switch state {
         case .walking, .nextStopOnOtherLevel:
             guard let guidance = navigator.guidance, !guidance.isOffRoute, !guidance.hasArrived else { return nil }

@@ -62,6 +62,21 @@ public struct GADSettings: Equatable, Sendable {
     /// Consecutive fixes outside the lift outline that end the ride.
     public var liftExitFixes: Int = 2
 
+    // MARK: Floors without positioning
+
+    /// Floors without positioning. A route there leads to the lift or stairs, shows the lift or
+    /// stairs view, then shows that floor with the rest of the route. In stage 1 the GAD level 0
+    /// has no positioning (PM 2026-10-14).
+    public var levelsWithoutPositioning: Set<Int> = [0]
+    /// Metres from the lift or stairs to a floor without positioning at which the visitor counts as
+    /// there.
+    public var levelChangerReachedMeters: Double = 5
+    /// Seconds of the lift or stairs view before the map shows the floor without positioning.
+    public var levelChangeViewSeconds: TimeInterval = 5
+    /// Seconds after which the map follows the visitor again when the destination on a floor
+    /// without positioning did not change.
+    public var floorWithoutPositioningMaximumSeconds: TimeInterval = 1800
+
     // MARK: "Probably at …"
 
     /// Positions less accurate than this (metres) near the next stop ask "Are you at …?".

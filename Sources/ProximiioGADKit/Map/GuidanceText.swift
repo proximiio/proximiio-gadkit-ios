@@ -27,7 +27,7 @@ enum GuidanceText {
         case .turnSlightRight: return String(localized: "Bear right in \(metres) m", bundle: .module)
         case .levelChange(let change):
             let level = rideEnd(featureType: change.featureType, coordinate: change.coordinate, from: change.fromLevel, to: change.toLevel, markers: markers)
-            return String(localized: "Take the \(levelChanger(change.featureType)) to level \(level)", bundle: .module)
+            return rideText(featureType: change.featureType, level: level)
         case .arrive: return String(localized: "Arrive in \(metres) m", bundle: .module)
         default: return String(localized: "Head straight for \(metres) m", bundle: .module)
         }
@@ -46,7 +46,12 @@ enum GuidanceText {
             return String(localized: "Go to level \(stopLevel)", bundle: .module)
         }
         let level = rideEnd(featureType: change.featureType, coordinate: change.coordinate, from: change.from.level, to: change.to.level, markers: pending)
-        return String(localized: "Take the \(levelChanger(change.featureType)) to level \(level)", bundle: .module)
+        return rideText(featureType: change.featureType, level: level)
+    }
+
+    /// "Take the stairs to level 4".
+    static func rideText(featureType: String, level: Int) -> String {
+        String(localized: "Take the \(levelChanger(featureType)) to level \(level)", bundle: .module)
     }
 
     /// The floor a ride in one staircase or lift ends on. The SDK router splits a ride into one

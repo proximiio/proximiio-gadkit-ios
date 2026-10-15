@@ -97,13 +97,17 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
         return allCases.first { $0.matches(text: text) }
     }
 
-    /// The nearest place of this kind. Places on the visitor's level come first; distance is
-    /// straight-line. The route gives the walking distance.
+    /// The nearest place of this kind in the venue of the nearest one (`place_id`). In that venue,
+    /// places on the visitor's level come first; distance is straight-line. The route gives the
+    /// walking distance. The venue comes first because the GAD data has a café on level 1 of the
+    /// DCT office, 11 km away, and the Guggenheim café on level 0 (2026-10-15).
     func nearest(in places: [VenuePlace], from coordinate: ProximiioCoordinate?, level: Double?) -> VenuePlace? {
         let matching = places.filter(matches)
         guard let coordinate else { return matching.first }
-        let sameLevel = level.map { level in matching.filter { VenueLevel.same($0.level, level) } } ?? []
-        return TrackingMonitor.nearest(to: coordinate, level: nil, in: sameLevel.isEmpty ? matching : sameLevel)
+        guard let closest = TrackingMonitor.nearest(to: coordinate, level: nil, in: matching) else { return nil }
+        let venue = matching.filter { $0.placeID == closest.placeID }
+        let sameLevel = level.map { level in venue.filter { VenueLevel.same($0.level, level) } } ?? []
+        return TrackingMonitor.nearest(to: coordinate, level: nil, in: sameLevel.isEmpty ? venue : sameLevel)
     }
 }
 

@@ -53,6 +53,17 @@ struct AmenityKindTests {
         #expect(AmenityKind.cafe.nearest(in: places, from: .init(latitude: 0, longitude: 0), level: 2)?.title == "Café A")
     }
 
+    /// GAD data 2026-10-15: from level 1 of the Guggenheim the café chip chose the DCT office café,
+    /// on level 1 but 11 km away, over the Guggenheim café on level 0.
+    @Test func nearestStaysInTheVenueOfTheNearestPlace() {
+        var guggenheim = place("Café", level: 0, lat: 0.0001)
+        guggenheim.placeID = "guggenheim"
+        var dct = place("DCT Cafe", level: 1, lat: 0.1)
+        dct.placeID = "dct"
+        #expect(AmenityKind.cafe.nearest(in: [dct, guggenheim], from: .init(latitude: 0, longitude: 0), level: 1)?.title == "Café")
+        #expect(AmenityKind.cafe.nearest(in: [dct, guggenheim], from: .init(latitude: 0.1, longitude: 0), level: 0)?.title == "DCT Cafe")
+    }
+
     // MARK: Next stop on another floor
 
     private static func marker(_ type: String, from: Double, to: Double, completed: Bool = false,

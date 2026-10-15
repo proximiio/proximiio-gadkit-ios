@@ -58,6 +58,11 @@ public enum VisitEvent: Sendable, Equatable {
     /// The wristband's positions stopped or came back (`TrackingHealth`). `VisitView` shows no
     /// alert: the host app handles the wristband states (PM 2026-10-15).
     case trackingChanged(TrackingHealth)
+    /// The map shows a floor without positioning (`GADSettings.levelsWithoutPositioning`) after the
+    /// lift or stairs view, and does not follow the visitor.
+    case floorWithoutPositioningEntered(level: Int)
+    /// The map follows the visitor again after a floor without positioning.
+    case floorWithoutPositioningLeft(level: Int)
     /// An event of the journey navigator: a new leg, a skipped stop, a re-route, a detour, the
     /// journey finished. For artworks use `artworkReached`: the navigator does not report them
     /// reached.

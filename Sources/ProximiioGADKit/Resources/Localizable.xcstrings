@@ -367,6 +367,16 @@
         }
       }
     },
+    "Your position is not shown on this level." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لا يظهر موقعك في هذا الطابق."
+          }
+        }
+      }
+    },
     "connected!" : {
       "localizations" : {
         "ar" : {

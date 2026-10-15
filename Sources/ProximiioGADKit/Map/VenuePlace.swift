@@ -35,6 +35,9 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
     public var hasAR = false
     /// `metadata.has_audio`: the artwork has audio (a note in the journey list).
     public var hasAudio = false
+    /// `place_id`: the venue (building) of the POI. The GAD organisation has the Guggenheim and the
+    /// DCT office.
+    var placeID: String?
     /// `metadata.gallery_id`: the gallery of an artwork. The gallery's POI holds the same value in
     /// `remote_id` (`Gallery.names(places:)`).
     public var galleryID: String?
@@ -99,6 +102,7 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
         level = feature.level ?? 0
         amenityID = Self.text(feature.properties?["amenity"])
         remoteID = Self.text(properties?["remote_id"])
+        placeID = Self.text(properties?["place_id"])
         isArtwork = Self.isArtwork(amenityID: amenityID, metadata: properties?["metadata"], remoteID: remoteID)
         if case .object(let metadata)? = properties?["metadata"] {
             artist = Self.localized(metadata["artist_name"]) ?? Self.text(metadata["artist_name"])

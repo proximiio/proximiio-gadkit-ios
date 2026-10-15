@@ -18,6 +18,8 @@ struct GADSettingsTests {
         #expect(configuration.settings == .standard)
         #expect(GADSettings.standard.trackingLostAfter == 110)
         #expect(GADSettings.standard.stopNearbyMeters == 5)
+        #expect(GADSettings.standard.levelsWithoutPositioning == [0])
+        #expect(GADSettings.standard.levelChangeViewSeconds == 5)
     }
 
     @Test func trackingAlertsFollowTheSettings() {

@@ -129,15 +129,16 @@ struct LiftDetector {
 
 extension View {
     /// Moves the map to the visitor's floor when the session's position changes floor, and logs
-    /// lift rides.
-    func followsVisitorFloor(_ session: ProximiioMapSession, venue: VenueService) -> some View {
-        modifier(VisitorFloorModifier(session: session, venue: venue))
+    /// lift rides. While `isPaused` the map keeps its floor (a floor without positioning).
+    func followsVisitorFloor(_ session: ProximiioMapSession, venue: VenueService, isPaused: Bool = false) -> some View {
+        modifier(VisitorFloorModifier(session: session, venue: venue, isPaused: isPaused))
     }
 }
 
 private struct VisitorFloorModifier: ViewModifier {
     let session: ProximiioMapSession
     let venue: VenueService
+    let isPaused: Bool
     @State private var floors = LevelChangeDetector()
     @State private var lift = LiftDetector()
     @State private var lifts: [LiftArea] = []
@@ -161,8 +162,8 @@ private struct VisitorFloorModifier: ViewModifier {
         if let area { currentLift = area }
         let event = lift.update(inLift: area != nil, at: .now)
         if let change = floors.update(level: position.floor?.level) {
-            FieldLog.log("level change: L\(change.from) → L\(change.to)")
-            session.followMyFloor()
+            FieldLog.log("level change: L\(change.from) → L\(change.to)\(isPaused ? " (map keeps its floor)" : "")")
+            if !isPaused { session.followMyFloor() }
             return
         }
         if event == .boarded, let from = floors.level {

@@ -35,12 +35,15 @@ struct MuseumMapView: View {
     @State private var isSearching = false
     /// The lifts, staircases and escalators on every floor they serve.
     @State private var mapLayers = JourneyMapLayers()
+    /// The lift or stairs view and the map of a floor without positioning.
+    @State private var floorGuide: FloorWithoutPositioningGuide
 
     init(venue: VenueService, initialDestination: VenuePlace? = nil, showsLegend: Bool = false) {
         self.venue = venue
         self.initialDestination = initialDestination
         self.showsLegend = showsLegend
         _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.options(followZoom: venue.settings.followZoom)))
+        _floorGuide = State(initialValue: FloorWithoutPositioningGuide(settings: venue.settings))
     }
 
     @State private var isShowingAmenities = false
@@ -53,8 +56,22 @@ struct MuseumMapView: View {
                 .clearBackground()
                 .ignoresSafeArea(edges: .bottom)
             controls
+            if case .changing(let change) = floorGuide.phase {
+                FloorChangeView(change: change)
+                    .onTapGesture { floorGuide.showFloor() }
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
         .task {
+            floorGuide.onEnter = { [session] change in
+                // Under the search button, beside the map buttons, above the route card.
+                FloorWithoutPositioningGuide.show(change, on: session, padding: UIEdgeInsets(top: 90, left: 40, bottom: 230, right: 90))
+            }
+            floorGuide.onLeave = { [session] _ in
+                session.followMyFloor()
+                session.recentre()
+            }
             await MapStyle.waitForCanvas(of: session)
             session.guidanceRules = .venueWalk
             session.onFeatureTap = { identifiers, _ in
@@ -92,7 +109,15 @@ struct MuseumMapView: View {
         }
         // The follow camera keeps the initial venue framing. The first position zooms
         // in to `MapOptions.recentreZoom` on the visitor.
-        .followsVisitorFloor(session, venue: venue)
+        .followsVisitorFloor(session, venue: venue, isPaused: floorGuide.isActive)
+        .onReceive(session.$guidance) { _ in
+            Task { @MainActor in
+                floorGuide.update(
+                    coordinate: session.position?.coordinate, level: session.position?.floor?.level,
+                    markers: session.routeRenderer?.geometry?.markers ?? [], destinationID: destination?.id
+                )
+            }
+        }
         .onReceive(session.$selectedFloor) { floor in
             mapLayers.update(fills: [], level: floor.level)
         }
@@ -151,7 +176,7 @@ struct MuseumMapView: View {
                 }
                 Spacer()
                 VStack(spacing: 5) {
-                    GlassSquareButton(action: { session.followMyFloor(); session.recentre() }) {
+                    GlassSquareButton(action: { floorGuide.leave(); session.followMyFloor(); session.recentre() }) {
                         GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)
                     }
                     .disabled(session.position == nil)
@@ -164,7 +189,7 @@ struct MuseumMapView: View {
                 StopInfoCard(
                     caption: "NEXT STOP",
                     title: destination.title,
-                    instruction: routeError ?? session.guidance.map { GuidanceText.instruction(for: $0, markers: session.routeRenderer?.geometry?.markers ?? []) },
+                    instruction: routeError ?? instruction,
                     remaining: remainingText
                 ) {
                     destinationIcon(for: destination)
@@ -175,7 +200,7 @@ struct MuseumMapView: View {
                     }
                     .accessibilityLabel(Text("End route", bundle: .module))
                 }
-                if session.guidance?.isOffRoute == true && session.guidance?.hasArrived == false {
+                if session.guidance?.isOffRoute == true && session.guidance?.hasArrived == false && !floorGuide.isActive {
                     Button(String(localized: "New route from here", bundle: .module)) { Task { await route(to: destination) } }
                         .buttonStyle(.small)
                 }
@@ -202,7 +227,10 @@ struct MuseumMapView: View {
     /// Floor button ("L1", Bold 18). Lists the venue's floors; picking one pins the map to it.
     private var floorButton: some View {
         Menu {
-            Button(String(localized: "Follow my floor", bundle: .module)) { session.followMyFloor() }
+            Button(String(localized: "Follow my floor", bundle: .module)) {
+                floorGuide.leave()
+                session.followMyFloor()
+            }
                 .disabled(session.position == nil)
             ForEach(session.floors.reversed(), id: \.key) { floor in
                 Button(floor.name ?? GuidanceText.floorLabel(floor.key.level)) { session.select(floor: floor.key) }
@@ -221,8 +249,15 @@ struct MuseumMapView: View {
         AmenityKind.shortcuts.filter { kind in places.contains(where: kind.matches) }
     }
 
+    /// The route's next step. On a floor without positioning the guidance follows fixes from
+    /// another floor, so the card says that the position is not shown.
+    private var instruction: String? {
+        if floorGuide.isActive { return String(localized: "Your position is not shown on this level.", bundle: .module) }
+        return session.guidance.map { GuidanceText.instruction(for: $0, markers: session.routeRenderer?.geometry?.markers ?? []) }
+    }
+
     private var remainingText: String? {
-        guard routeError == nil, let guidance = session.guidance, !guidance.isOffRoute, !guidance.hasArrived else { return nil }
+        guard routeError == nil, !floorGuide.isActive, let guidance = session.guidance, !guidance.isOffRoute, !guidance.hasArrived else { return nil }
         return GuidanceText.remaining(metres: guidance.remainingMeters)
     }
 

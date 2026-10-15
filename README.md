@@ -19,7 +19,7 @@ Map. A host app with its own QR scanner passes the scanned wristband code to
 ## Adding the package
 
 In Xcode: File → Add Package Dependencies → `https://github.com/proximiio/proximiio-gadkit-ios`,
-dependency rule "Up to Next Minor Version" from `0.13.0`. The versions are the git tags of this
+dependency rule "Up to Next Minor Version" from `0.14.0`. The versions are the git tags of this
 repository. Before 1.0, a minor version can change the API. The [Changelog](#changelog) lists every
 change of each version; changes that need a change in the host app are marked **Breaking**.
 
@@ -113,6 +113,10 @@ let configuration = GADConfiguration(
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
 | `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
+| `levelsWithoutPositioning` | [0] | Floors without positioning. See "Floors without positioning". |
+| `levelChangerReachedMeters` | 5 m | Distance from the lift or stairs to a floor without positioning at which the lift or stairs view shows. |
+| `levelChangeViewSeconds` | 5 s | How long the lift or stairs view shows before the map shows the floor without positioning. |
+| `floorWithoutPositioningMaximumSeconds` | 1800 s | After this time on a floor without positioning with the same destination, the map follows the visitor again. |
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `liveActivityMinimumInterval` | 5 s | The shortest gap between two Live Activity updates of the instruction. |
@@ -210,6 +214,24 @@ an artwork is its `metadata.gallery_id` (`VenuePlace.galleryID`), named by the t
 in, else under its level ("Level 4"). The GAD venue data on 2026-10-15 has `gallery_id` on artworks in
 18 galleries; 14 of the 18 have a gallery POI.
 
+## Floors without positioning
+
+A floor in `GADSettings.levelsWithoutPositioning` has no positioning. In stage 1 that is the GAD
+level 0, with the café and the prayer room. A route there, on the journey map and the museum map:
+
+1. leads to the lift or stairs as usual;
+2. within `levelChangerReachedMeters` of the lift or stairs, shows the lift or stairs view ("Take the
+   stairs to level 0", "Your position is not shown on this level.") for `levelChangeViewSeconds`; a tap
+   ends it;
+3. shows that floor with the rest of the route. The map does not follow the visitor there, no
+   off-route warning shows, and the card says that the position is not shown.
+
+The map follows the visitor again when the destination changes ("Resume your Journey", another stop
+or route), on "Centre on me" or "Follow my floor", or after `floorWithoutPositioningMaximumSeconds`.
+`VisitView` reports `VisitEvent.floorWithoutPositioningEntered(level:)` and
+`floorWithoutPositioningLeft(level:)`. The view shows the lift or stairs icon until the animation
+from the design team exists.
+
 ## Accessibility
 
 The host app passes the visitor's accessibility needs to the map and journey screens. Every route
@@ -275,6 +297,8 @@ VisitView(venue: venue, journey: journey) { isVisiting = false }
 | `stopNearby(JourneyStop)` | The active stop is less than 5 m away on the visitor's level. Once per stop per visit. |
 | `artworkReached(JourneyStop)` | The visitor entered the artwork geofence of the active stop, or stands in its area. The stop is done 2 s later, when the event arrives, and the route leads to the next stop. |
 | `artworkVisitedOutOfOrder(JourneyStop)` | The visitor stayed at an artwork further down the journey. The stop is done and the stops ahead are ordered again. |
+| `floorWithoutPositioningEntered(level:)` | The map shows a floor without positioning after the lift or stairs view. |
+| `floorWithoutPositioningLeft(level:)` | The map follows the visitor again. |
 | `trackingChanged(TrackingHealth)` | The wristband's positions stopped (`lostPlace` after `trackingLostAfter`, `stoppedResponding` after `trackingStoppedAfter`) or came back (`tracking`). `VisitView` shows no alert. |
 | `journey(JourneyEvent)` | Every event of the journey navigator: `legChanged`, `stopSkipped`, `rerouted`, `detourStarted`, `stopReached` (detours only), `journeyFinished` and others. The navigator does not report artworks reached: use `artworkReached`. |
 
@@ -385,6 +409,26 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. `VisitEvent` gets new cases in minor versions: a `switch`
 over `VisitEvent` with a `default` case compiles with every version.
+
+### 0.14.0 (2026-10-15)
+
+Breaking:
+
+- New `VisitEvent.floorWithoutPositioningEntered(level:)` and `floorWithoutPositioningLeft(level:)`. A
+  `switch` over `VisitEvent` without `default` needs the cases.
+
+Added:
+
+- Floors without positioning (see the section): the lift or stairs view at the lift or stairs, then
+  the map of that floor with the rest of the route, on the journey map and the museum map.
+  `GADSettings.levelsWithoutPositioning` ([0]), `levelChangerReachedMeters` (5 m),
+  `levelChangeViewSeconds` (5 s) and `floorWithoutPositioningMaximumSeconds` (1800 s).
+
+Fixed:
+
+- An amenity button picks the nearest place in the venue of the nearest one, then prefers the
+  visitor's level. From level 1 of the Guggenheim the café button chose the DCT office café, on level 1
+  but 11 km away, over the Guggenheim café on level 0.
 
 ### 0.13.0 (2026-10-15)
 
