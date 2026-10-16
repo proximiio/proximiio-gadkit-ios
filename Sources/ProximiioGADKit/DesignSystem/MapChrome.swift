@@ -14,7 +14,7 @@
 import SwiftUI
 
 /// Full-screen background image of a design screen.
-public enum ScreenBackground: String {
+@_spi(GADApp) public enum ScreenBackground: String {
     case hub = "BackgroundHub"
     case map = "BackgroundMap"
 

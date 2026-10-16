@@ -8,7 +8,7 @@
 //
 import SwiftUI
 
-public struct AuroraBackground: View {
+@_spi(GADApp) public struct AuroraBackground: View {
     public enum Variant {
         /// Peach top, pastel band along the bottom.
         case standard

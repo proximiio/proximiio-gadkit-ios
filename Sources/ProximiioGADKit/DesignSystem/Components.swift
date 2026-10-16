@@ -64,7 +64,7 @@ struct OutlineBadge: View {
 /// Labelled input field (Figma Input, node 6902:47661, as used on `sign-in`): Body Small
 /// label, 60 pt field on the mint gradient, 12 pt radius, 1.5 pt white stroke and a soft
 /// shadow; error is a #FF8686 stroke with a red label.
-public struct LabeledField<Field: View>: View {
+@_spi(GADApp) public struct LabeledField<Field: View>: View {
     /// Looked up in the host app's main bundle, like `Text(_:)`.
     let label: LocalizedStringKey
     var isError = false

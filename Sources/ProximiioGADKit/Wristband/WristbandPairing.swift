@@ -19,7 +19,7 @@ import ProximiioBlueiot
 /// Binds the phone to a wristband. `WristbandSession` in the app; a fake in tests and in
 /// the Debug pairing demo.
 @MainActor
-public protocol WristbandConnecting: AnyObject {
+@_spi(GADApp) public protocol WristbandConnecting: AnyObject {
     /// What to ask for before a bind, or `nil` when nothing can or needs to be asked.
     func locationAsk() async -> WristbandLocationAsk?
     /// Shows the iOS dialog for `ask` and returns when it is answered.
@@ -36,7 +36,7 @@ extension WristbandConnecting {
     /// it comes first. Returns when the session is active. The session replaces any current one.
     /// - Throws: `BlueiotBindingError`, `.invalidTagID` for an empty code.
     ///   `WristbandCopy.message(for:)` is the text for the visitor.
-    public func connect(code: String) async throws {
+    @_spi(GADApp) public func connect(code: String) async throws {
         let label = code.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !label.isEmpty else { throw BlueiotBindingError.invalidTagID(requestID: nil) }
         if let ask = await locationAsk() {
@@ -48,7 +48,7 @@ extension WristbandConnecting {
 
 @MainActor
 @Observable
-public final class WristbandPairing: Identifiable {
+@_spi(GADApp) public final class WristbandPairing: Identifiable {
     public enum Step: Equatable {
         /// "Connect your wristband" with "Scan QR code" and "Skip for now".
         case intro

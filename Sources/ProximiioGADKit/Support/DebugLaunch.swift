@@ -23,7 +23,7 @@
 #if DEBUG
 import Foundation
 
-public struct DebugLaunch: Equatable, Sendable {
+@_spi(GADApp) public struct DebugLaunch: Equatable, Sendable {
     public var demoPairingSucceeds: Bool?
     public var pairWristband: String?
     public var journeyID: String?
@@ -81,7 +81,7 @@ public struct DebugLaunch: Equatable, Sendable {
 
     /// Runs the SDK-dependent actions after the SDK has started.
     @MainActor
-    public func run(with venue: VenueService, wristband: WristbandSession) async {
+    func run(with venue: VenueService, wristband: WristbandSession) async {
         if listJourneys {
             let titles = VenuePlace.all(in: await venue.sdk.features()).map { "\($0.title) [L\(Int($0.level))]" }
             Self.log("places: \(titles.joined(separator: ", "))")

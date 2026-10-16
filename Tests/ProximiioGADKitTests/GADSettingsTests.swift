@@ -22,6 +22,15 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.levelChangeViewSeconds == 5)
     }
 
+    @Test func theRelayAPICanBeAURL() throws {
+        let api = try #require(URL(string: "https://api.example.com"))
+        let relay = try #require(URL(string: "https://relay.example.com"))
+        let configuration = GADConfiguration(apiBaseURL: api, applicationToken: "token", relayAPIBaseURL: relay, relayAPIAppToken: "relay")
+        #expect(configuration?.relayAPI.baseURL.host() == "relay.example.com")
+        let file = try #require(URL(string: "file:///tmp"))
+        #expect(GADConfiguration(apiBaseURL: api, applicationToken: "token", relayAPIBaseURL: file, relayAPIAppToken: "relay") == nil)
+    }
+
     @Test func trackingAlertsFollowTheSettings() {
         var settings = GADSettings()
         settings.trackingLostAfter = 30

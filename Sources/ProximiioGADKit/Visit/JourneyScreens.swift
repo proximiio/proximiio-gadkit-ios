@@ -13,20 +13,20 @@ import SwiftUI
 
 /// "YOUR PERSONALISED JOURNEY · Light & Perception": title, summary, Start the Journey or
 /// Go to the Museum, Back to Hub.
-public struct JourneyReadyView: View {
+struct JourneyReadyView: View {
     let meta: VisitMeta
     let isAtMuseum: Bool
     let onStart: () -> Void
     let onBack: () -> Void
 
-    public init(meta: VisitMeta, isAtMuseum: Bool, onStart: @escaping () -> Void, onBack: @escaping () -> Void) {
+    init(meta: VisitMeta, isAtMuseum: Bool, onStart: @escaping () -> Void, onBack: @escaping () -> Void) {
         self.meta = meta
         self.isAtMuseum = isAtMuseum
         self.onStart = onStart
         self.onBack = onBack
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack {
             ScreenBackground.hub.view
             VStack(spacing: 0) {
@@ -62,14 +62,14 @@ public struct JourneyReadyView: View {
 }
 
 /// Manage journey (02.11): edit the stops, craft a new journey, or delete the current one.
-public struct ManageJourneySheet: View {
+struct ManageJourneySheet: View {
     let meta: VisitMeta
     let onEdit: () -> Void
     let onCraftNew: () -> Void
     let onDelete: () -> Void
     let onClose: () -> Void
 
-    public init(
+    init(
         meta: VisitMeta,
         onEdit: @escaping () -> Void,
         onCraftNew: @escaping () -> Void,
@@ -85,7 +85,7 @@ public struct ManageJourneySheet: View {
 
     @State private var isConfirmingDelete = false
 
-    public var body: some View {
+    var body: some View {
         VStack(spacing: 10) {
             Text(meta.title).textStyle(.h1Bold)
             if let summary = meta.summary { Text(summary).textStyle(.bodySmallRegular) }

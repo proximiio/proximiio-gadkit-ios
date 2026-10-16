@@ -24,7 +24,7 @@ import ProximiioBlueiot
 #endif
 
 /// What the app asks for before a bind.
-public enum WristbandLocationAsk: Equatable, Sendable {
+@_spi(GADApp) public enum WristbandLocationAsk: Equatable, Sendable {
     /// "While Using the App" authorization. Asked only while it is undetermined.
     case permission
     /// Temporary full accuracy, when the visitor allowed approximate location only.
@@ -33,16 +33,18 @@ public enum WristbandLocationAsk: Equatable, Sendable {
 
 @MainActor
 @Observable
-public final class WristbandSession {
+final class WristbandSession {
     /// The binding client. One per process; `VenueService` attaches its position provider.
-    public let binding: BlueiotWristbandBinding
+    let binding: BlueiotWristbandBinding
 
     /// The latest binding state. `nil` until the first value arrives from `stateChanges()`.
-    public private(set) var state: BlueiotBindingState?
+    private(set) var state: BlueiotBindingState?
 
     @ObservationIgnored private let location = LocationAccess()
+    /// Called after every state change, for `ProximiMap`.
+    @ObservationIgnored var onStateChange: ((BlueiotBindingState) -> Void)?
 
-    public init(configuration backend: GADConfiguration) {
+    init(configuration backend: GADConfiguration) {
         binding = BlueiotWristbandBinding(configuration: Self.configuration(for: backend))
     }
 
@@ -59,10 +61,10 @@ public final class WristbandSession {
     }
 
     /// `true` while a session is active. A bind in progress does not change it.
-    public var isActive: Bool { state?.session != nil }
+    var isActive: Bool { state?.session != nil }
 
     /// The notice for an ended session, or `nil` while none has ended.
-    public var endNotice: String? {
+    var endNotice: String? {
         if case .ended(let reason) = state { return WristbandCopy.notice(for: reason) }
         return nil
     }
@@ -72,7 +74,7 @@ public final class WristbandSession {
     ///
     /// With `FieldLog.isEnabled` it logs each state with the session and the binding
     /// diagnostics, and the diagnostics every 10 s while a session is active.
-    public func run() async {
+    func run() async {
         let binding = binding
         Task { _ = await binding.restore() }
         let diagnosticsLog: Task<Void, Never>? = FieldLog.isEnabled ? Task { [weak self] in
@@ -88,6 +90,7 @@ public final class WristbandSession {
         defer { diagnosticsLog?.cancel() }
         for await state in binding.stateChanges() {
             self.state = state
+            onStateChange?(state)
             if FieldLog.isEnabled {
                 FieldLog.log("wristband: \(WristbandCopy.logLine(for: state))")
                 if let session = BindingLog.session(of: state) { FieldLog.log("wristband session: \(session)") }
@@ -100,7 +103,7 @@ public final class WristbandSession {
     /// Ends the visit on the relay-api. The state becomes `.ended(.userEnded)`.
     /// - Throws: `BlueiotBindingError` when the relay-api cannot be reached; the session
     ///   is kept.
-    public func end() async throws {
+    func end() async throws {
         try await binding.end()
     }
 }
@@ -109,7 +112,7 @@ extension WristbandSession: WristbandConnecting {
     /// What to ask for before a bind, or `nil` when nothing can or needs to be asked. A
     /// denied permission returns `nil`: iOS shows no second dialog, and the bind is sent
     /// without a location.
-    public func locationAsk() async -> WristbandLocationAsk? {
+    func locationAsk() async -> WristbandLocationAsk? {
         switch await binding.locationReadiness() {
         case .permissionNeeded: return location.canAskForPermission ? .permission : nil
         case .preciseLocationNeeded: return .preciseLocation
@@ -119,7 +122,7 @@ extension WristbandSession: WristbandConnecting {
     }
 
     /// Shows the iOS dialog for `ask` and returns when it is answered.
-    public func ask(_ ask: WristbandLocationAsk) async {
+    func ask(_ ask: WristbandLocationAsk) async {
         switch ask {
         case .permission: await location.requestWhenInUse()
         case .preciseLocation: await location.requestFullAccuracy()
@@ -129,7 +132,7 @@ extension WristbandSession: WristbandConnecting {
     /// Binds this phone to the band with `label`, as scanned or typed. The relay-api
     /// resolves every label format. The new session replaces any current one.
     /// - Throws: `BlueiotBindingError`.
-    public func bind(_ label: String) async throws {
+    func bind(_ label: String) async throws {
         _ = try await binding.bind(tagID: label)
     }
 }

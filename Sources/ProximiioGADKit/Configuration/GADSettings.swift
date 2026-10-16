@@ -97,6 +97,13 @@ public struct GADSettings: Equatable, Sendable {
     /// step is sent at once.
     public var liveActivityMinimumInterval: TimeInterval = 5
 
+    // MARK: Notifications
+
+    /// Posts a notification for every geofence enter and exit event, and asks for notification
+    /// authorization once a wristband is connected. `ProximiMap` then sets the delegate of
+    /// `UNUserNotificationCenter`; a host app with its own delegate turns this off.
+    public var postsGeofenceNotifications = true
+
     public init() {}
 
     /// The defaults.

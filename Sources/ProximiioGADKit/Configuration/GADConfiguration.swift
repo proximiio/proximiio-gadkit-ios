@@ -3,8 +3,8 @@
 //  ProximiioGADKit
 //
 //  The backend of the host app's build: the Proximi.io API and the relay-api. The host app
-//  passes it to `WristbandSession` and `VenueService.start`. ProximiioGADKit sets no fallback
-//  host, so it contacts only these two hosts.
+//  passes it to `ProximiMap`. ProximiioGADKit sets no fallback host, so it contacts only these
+//  two hosts.
 //
 import Foundation
 import Proximiio
@@ -23,9 +23,26 @@ public struct GADConfiguration: Equatable, Sendable {
     /// relay-api app token of the site. The SDK sends it on `GET /v1/meta` and
     /// `POST /v1/bindings`.
     public var relayAPIAppToken: String
-    /// Times and distances of the screens. `VenueService.start` copies them to
-    /// `VenueService.settings`.
+    /// Times and distances of the screens.
     public var settings: GADSettings
+
+    /// `nil` when `relayAPIBaseURL` is not an http or https URL with a host.
+    public init?(
+        apiBaseURL: URL,
+        applicationToken: String,
+        relayAPIBaseURL: URL,
+        relayAPIAppToken: String,
+        settings: GADSettings = .standard
+    ) {
+        guard let relayAPI = BlueiotCloudRelayEndpoint(text: relayAPIBaseURL.absoluteString) else { return nil }
+        self.init(
+            apiBaseURL: apiBaseURL,
+            applicationToken: applicationToken,
+            relayAPI: relayAPI,
+            relayAPIAppToken: relayAPIAppToken,
+            settings: settings
+        )
+    }
 
     public init(
         apiBaseURL: URL,

@@ -4,7 +4,7 @@
 //
 import Proximiio
 import Testing
-@testable import ProximiioGADKit
+@_spi(GADApp) @testable import ProximiioGADKit
 
 struct RouteAccessibilityTests {
     @Test func noNeedAvoidsNothing() {

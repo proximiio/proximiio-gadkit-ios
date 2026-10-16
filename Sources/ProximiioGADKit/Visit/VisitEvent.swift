@@ -16,7 +16,7 @@ public enum VisitMode: String, Sendable, Equatable {
 }
 
 /// A visitor action in `VisitView`, or a change of the journey.
-public enum VisitEvent: Sendable, Equatable {
+enum VisitEvent: Sendable, Equatable {
     /// The presentation changed: the Map / List toggle.
     case modeChanged(VisitMode)
     /// The visitor swiped a stop in the list, or used its "Skip" accessibility action.
@@ -83,7 +83,7 @@ extension EnvironmentValues {
 extension View {
     /// Calls `action` with every `VisitEvent` of the `VisitView`s in this view. Handlers of
     /// enclosing views are called first.
-    public func onVisitEvent(_ action: @escaping @MainActor @Sendable (VisitEvent) -> Void) -> some View {
+    func onVisitEvent(_ action: @escaping @MainActor @Sendable (VisitEvent) -> Void) -> some View {
         transformEnvironment(\.visitEventHandler) { handler in
             let enclosing = handler
             handler = { event in

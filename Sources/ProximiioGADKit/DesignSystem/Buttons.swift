@@ -16,7 +16,7 @@
 //
 import SwiftUI
 
-public struct PrimaryButtonStyle: ButtonStyle {
+@_spi(GADApp) public struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     public func makeBody(configuration: Configuration) -> some View {
@@ -31,7 +31,7 @@ public struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
-public struct GhostButtonStyle: ButtonStyle {
+@_spi(GADApp) public struct GhostButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     public func makeBody(configuration: Configuration) -> some View {
@@ -46,7 +46,7 @@ public struct GhostButtonStyle: ButtonStyle {
     }
 }
 
-public struct SmallButtonStyle: ButtonStyle {
+@_spi(GADApp) public struct SmallButtonStyle: ButtonStyle {
     var isSelected = false
     var strength: GlassStrength = .light
 
@@ -66,7 +66,7 @@ public struct SmallButtonStyle: ButtonStyle {
     }
 }
 
-public struct IconGlassButtonStyle: ButtonStyle {
+@_spi(GADApp) public struct IconGlassButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     public func makeBody(configuration: Configuration) -> some View {
@@ -80,7 +80,7 @@ public struct IconGlassButtonStyle: ButtonStyle {
     }
 }
 
-public struct TextActionButtonStyle: ButtonStyle {
+@_spi(GADApp) public struct TextActionButtonStyle: ButtonStyle {
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .textStyle(.bodySmallRegular)
@@ -91,25 +91,25 @@ public struct TextActionButtonStyle: ButtonStyle {
     }
 }
 
-extension ButtonStyle where Self == PrimaryButtonStyle {
-    public static var primary: PrimaryButtonStyle { PrimaryButtonStyle() }
+@_spi(GADApp) extension ButtonStyle where Self == PrimaryButtonStyle {
+    @_spi(GADApp) public static var primary: PrimaryButtonStyle { PrimaryButtonStyle() }
 }
 
-extension ButtonStyle where Self == GhostButtonStyle {
-    public static var ghost: GhostButtonStyle { GhostButtonStyle() }
+@_spi(GADApp) extension ButtonStyle where Self == GhostButtonStyle {
+    @_spi(GADApp) public static var ghost: GhostButtonStyle { GhostButtonStyle() }
 }
 
-extension ButtonStyle where Self == SmallButtonStyle {
-    public static var small: SmallButtonStyle { SmallButtonStyle() }
-    public static func small(selected: Bool, strength: GlassStrength = .light) -> SmallButtonStyle {
+@_spi(GADApp) extension ButtonStyle where Self == SmallButtonStyle {
+    @_spi(GADApp) public static var small: SmallButtonStyle { SmallButtonStyle() }
+    @_spi(GADApp) public static func small(selected: Bool, strength: GlassStrength = .light) -> SmallButtonStyle {
         SmallButtonStyle(isSelected: selected, strength: strength)
     }
 }
 
-extension ButtonStyle where Self == IconGlassButtonStyle {
-    public static var iconGlass: IconGlassButtonStyle { IconGlassButtonStyle() }
+@_spi(GADApp) extension ButtonStyle where Self == IconGlassButtonStyle {
+    @_spi(GADApp) public static var iconGlass: IconGlassButtonStyle { IconGlassButtonStyle() }
 }
 
-extension ButtonStyle where Self == TextActionButtonStyle {
-    public static var textAction: TextActionButtonStyle { TextActionButtonStyle() }
+@_spi(GADApp) extension ButtonStyle where Self == TextActionButtonStyle {
+    @_spi(GADApp) public static var textAction: TextActionButtonStyle { TextActionButtonStyle() }
 }

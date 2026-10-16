@@ -8,7 +8,7 @@ import Proximiio
 import ProximiioBlueiot
 #endif
 import Testing
-@testable import ProximiioGADKit
+@_spi(GADApp) @testable import ProximiioGADKit
 
 @MainActor
 private final class FakeConnector: WristbandConnecting {

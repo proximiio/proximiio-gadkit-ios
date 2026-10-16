@@ -4,7 +4,7 @@
 //
 import Foundation
 import Testing
-@testable import ProximiioGADKit
+@_spi(GADApp) @testable import ProximiioGADKit
 
 struct JourneyKindTests {
     @Test func personalisedShowsGalleriesAndAllowsSkip() {

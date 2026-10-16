@@ -8,7 +8,7 @@
 //
 import SwiftUI
 
-public enum Palette {
+@_spi(GADApp) public enum Palette {
     // MARK: Brand spectrum, in the order the palette shows it.
     public static let lime = Color(hex: 0x65FF2E)
     public static let mint = Color(hex: 0x00FFB2)
@@ -59,7 +59,7 @@ public enum Palette {
 
 extension Color {
     /// A colour from a 24-bit RGB value, e.g. `0x2B2B2B`.
-    public init(hex: UInt32, opacity: Double = 1) {
+    @_spi(GADApp) public init(hex: UInt32, opacity: Double = 1) {
         self.init(
             .sRGB,
             red: Double((hex >> 16) & 0xFF) / 255,

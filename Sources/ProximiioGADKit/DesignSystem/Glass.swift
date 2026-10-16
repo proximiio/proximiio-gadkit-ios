@@ -15,7 +15,7 @@
 //
 import SwiftUI
 
-public enum GlassStrength {
+@_spi(GADApp) public enum GlassStrength {
     /// Buttons, cards and bars over the coloured backgrounds.
     case regular
     /// Button Small and chips: the gradient at 20 %.
@@ -94,12 +94,12 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
 
 extension View {
     /// The design's glass surface in `shape`.
-    public func glassSurface<S: InsettableShape>(_ shape: S, strength: GlassStrength = .regular, shadow: Bool = true) -> some View {
+    @_spi(GADApp) public func glassSurface<S: InsettableShape>(_ shape: S, strength: GlassStrength = .regular, shadow: Bool = true) -> some View {
         modifier(GlassSurface(shape: shape, strength: strength, showsShadow: shadow))
     }
 
     /// The design's glass surface with the standard 12 pt corner radius.
-    public func glassSurface(cornerRadius: CGFloat = 12, strength: GlassStrength = .regular) -> some View {
+    @_spi(GADApp) public func glassSurface(cornerRadius: CGFloat = 12, strength: GlassStrength = .regular) -> some View {
         modifier(GlassSurface(shape: RoundedRectangle(cornerRadius: cornerRadius), strength: strength))
     }
 

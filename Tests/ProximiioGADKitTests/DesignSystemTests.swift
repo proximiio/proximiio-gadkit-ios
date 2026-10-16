@@ -4,7 +4,7 @@
 //
 import Testing
 import UIKit
-@testable import ProximiioGADKit
+@_spi(GADApp) @testable import ProximiioGADKit
 
 @MainActor
 struct DesignSystemTests {

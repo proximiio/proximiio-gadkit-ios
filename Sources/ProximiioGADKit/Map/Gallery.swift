@@ -22,10 +22,10 @@ extension ProximiioGeofence {
     }
 }
 
-public struct Gallery: Identifiable, Equatable, Sendable {
-    public let id: String
-    public let name: String
-    public let level: Double
+struct Gallery: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let level: Double
     /// Outline as (latitude, longitude) pairs.
     let ring: [ProximiioCoordinate]
 
@@ -59,7 +59,7 @@ public struct Gallery: Identifiable, Equatable, Sendable {
     }
 
     /// The gallery outlines among `features`, or the named polygon geofences when there are none.
-    public static func load(from sdk: Proximiio, features: [ProximiioFeature], places: [VenuePlace]) async -> [Gallery] {
+    static func load(from sdk: Proximiio, features: [ProximiioFeature], places: [VenuePlace]) async -> [Gallery] {
         let outlines = all(features: features, places: places)
         guard outlines.isEmpty else { return outlines }
         let levels = Dictionary(await sdk.floors().map { ($0.id, $0.level) }, uniquingKeysWith: { first, _ in first })

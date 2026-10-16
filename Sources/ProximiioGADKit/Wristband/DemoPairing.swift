@@ -10,7 +10,7 @@ import ProximiioBlueiot
 
 /// Debug builds only. The pairing flow with a connector that answers after 2 seconds
 /// (`-demoWristbandPairing`). A failing bind throws `tagAlreadyBound`.
-public enum DemoPairing {
+@_spi(GADApp) public enum DemoPairing {
     @MainActor
     public static func make(succeeds: Bool) -> WristbandPairing {
         WristbandPairing(connector: Connector(succeeds: succeeds))

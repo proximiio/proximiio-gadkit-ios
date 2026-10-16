@@ -14,7 +14,7 @@
 import CoreText
 import SwiftUI
 
-public enum TextStyle: CaseIterable, Sendable {
+@_spi(GADApp) public enum TextStyle: CaseIterable, Sendable {
     case cardTitle
     case h1Regular, h1Bold
     case largeBodyRegular, largeBodyBold
@@ -72,7 +72,7 @@ public enum TextStyle: CaseIterable, Sendable {
 }
 
 /// The Guggenheim Sans Display fonts of the package bundle.
-public enum GADFonts {
+@_spi(GADApp) public enum GADFonts {
     /// Registers the fonts for this process. Later calls do nothing. `TextStyle.font` calls it;
     /// a host app calls it only before it creates a font by name, for example with
     /// `UIFont(name:size:)`.
@@ -95,7 +95,7 @@ public enum GADFonts {
 
 extension View {
     /// Applies a design-system text style.
-    public func textStyle(_ style: TextStyle) -> some View {
+    @_spi(GADApp) public func textStyle(_ style: TextStyle) -> some View {
         font(style.font).tracking(style.tracking)
     }
 }

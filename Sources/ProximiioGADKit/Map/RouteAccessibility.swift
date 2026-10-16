@@ -48,7 +48,7 @@ public struct RouteAccessibility: Codable, Hashable, Sendable {
     )
 
     /// The `UserDefaults` key of the accessible routes button.
-    public static let accessibleRoutesKey = "ProximiioGADKit.accessibleRoutes"
+    static let accessibleRoutesKey = "ProximiioGADKit.accessibleRoutes"
 
     /// `.accessible` while the button is on, else the host app's needs. Pure; covered by tests.
     static func effective(hostNeeds: RouteAccessibility, accessibleRoutes: Bool) -> RouteAccessibility {
@@ -56,7 +56,7 @@ public struct RouteAccessibility: Codable, Hashable, Sendable {
     }
 
     /// The SDK route options: the pedestrian profile with these avoidances.
-    public var routeOptions: RouteOptions {
+    var routeOptions: RouteOptions {
         var avoid: Set<RouteOptions.Avoidance> = []
         if avoidsStairs { avoid.insert(.staircases) }
         if avoidsEscalators { avoid.insert(.escalators) }
@@ -80,7 +80,7 @@ extension EnvironmentValues {
 extension View {
     /// The accessibility needs that `MuseumMapScreen` and `VisitView` in this view use for routes.
     /// A change re-routes the route on screen. Default `RouteAccessibility.none`.
-    public func routeAccessibility(_ accessibility: RouteAccessibility) -> some View {
+    func routeAccessibility(_ accessibility: RouteAccessibility) -> some View {
         environment(\.routeAccessibility, accessibility)
     }
 }

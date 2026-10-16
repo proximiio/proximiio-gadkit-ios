@@ -7,16 +7,16 @@
 //
 import SwiftUI
 
-public struct MuseumMapScreen: View {
+struct MuseumMapScreen: View {
     let venue: VenueService
     let onBack: () -> Void
 
-    public init(venue: VenueService, onBack: @escaping () -> Void) {
+    init(venue: VenueService, onBack: @escaping () -> Void) {
         self.venue = venue
         self.onBack = onBack
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(spacing: 0) {
             header
             MuseumMapView(venue: venue, showsLegend: true)

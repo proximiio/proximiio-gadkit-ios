@@ -7,7 +7,7 @@
 //
 import SwiftUI
 
-public struct WristbandPairingView: View {
+@_spi(GADApp) public struct WristbandPairingView: View {
     @Bindable var pairing: WristbandPairing
     /// "Skip for now", "Back to Hub" and "Continue" all leave the flow.
     let onFinish: () -> Void

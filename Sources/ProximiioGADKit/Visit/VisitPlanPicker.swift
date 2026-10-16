@@ -7,12 +7,12 @@
 //
 import SwiftUI
 
-public struct VisitPlanPicker: View {
+struct VisitPlanPicker: View {
     let places: [VenuePlace]
     let onStart: ([String]) -> Void
     let onCancel: () -> Void
 
-    public init(places: [VenuePlace], onStart: @escaping ([String]) -> Void, onCancel: @escaping () -> Void) {
+    init(places: [VenuePlace], onStart: @escaping ([String]) -> Void, onCancel: @escaping () -> Void) {
         self.places = places
         self.onStart = onStart
         self.onCancel = onCancel
@@ -21,7 +21,7 @@ public struct VisitPlanPicker: View {
     @State private var query = ""
     @State private var picked: [String] = []
 
-    public var body: some View {
+    var body: some View {
         NavigationStack {
             List(VenuePlace.matching(query, in: places)) { place in
                 Button {

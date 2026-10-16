@@ -10,10 +10,10 @@
 import Foundation
 import ProximiioMap
 
-public enum VisitPlan {
+enum VisitPlan {
     /// A journey from POI ids in visit order. Ids that match no place are dropped. Each stop's
     /// `group` is the id of the gallery that contains it, for the floor-then-gallery order.
-    public static func journey(poiIDs: [String], places: [VenuePlace], galleries: [Gallery] = []) -> Journey {
+    static func journey(poiIDs: [String], places: [VenuePlace], galleries: [Gallery] = []) -> Journey {
         let byID = Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return Journey(stops: poiIDs.compactMap { byID[$0] }.map { stop(for: $0, galleries: galleries) })
     }
@@ -67,7 +67,7 @@ public enum VisitPlan {
     }
 
     /// Artworks still to visit: pending, active or reached. A finished journey has none.
-    public static func remainingStopCount(in journey: Journey) -> Int {
+    static func remainingStopCount(in journey: Journey) -> Int {
         openArtworks(in: journey).count
     }
 
@@ -145,37 +145,37 @@ public enum JourneyKind: String, Codable, Sendable, CaseIterable {
     case curated
 
     /// Whether the stop card names the gallery of the next stop first. Pure; covered by tests.
-    public var guidesToGalleryFirst: Bool { self == .personalised }
+    var guidesToGalleryFirst: Bool { self == .personalised }
     /// Whether the list shows gallery names. Pure; covered by tests.
-    public var listsGalleries: Bool { self == .personalised }
+    var listsGalleries: Bool { self == .personalised }
     /// Whether the visitor can skip an artwork. Pure; covered by tests.
-    public var allowsSkip: Bool { self == .personalised }
+    var allowsSkip: Bool { self == .personalised }
     /// Whether the stops keep their order: no ordering from the visitor at the start, after a
     /// detour or after an artwork visited out of order. Pure; covered by tests.
-    public var keepsOrder: Bool { self == .curated }
+    var keepsOrder: Bool { self == .curated }
 }
 
 /// Title, summary and kind of a visit, shown on Journey ready (02.10A) and the Hub card.
-public struct VisitMeta: Codable, Equatable, Sendable {
-    public var title: String
-    public var summary: String?
+struct VisitMeta: Codable, Equatable, Sendable {
+    var title: String
+    var summary: String?
     /// `personalised` for a stored visit from before the kind existed.
-    public var kind: JourneyKind
+    var kind: JourneyKind
 
-    public init(title: String, summary: String? = nil, kind: JourneyKind = .personalised) {
+    init(title: String, summary: String? = nil, kind: JourneyKind = .personalised) {
         self.title = title
         self.summary = summary
         self.kind = kind
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         title = try container.decode(String.self, forKey: .title)
         summary = try container.decodeIfPresent(String.self, forKey: .summary)
         kind = try container.decodeIfPresent(JourneyKind.self, forKey: .kind) ?? .personalised
     }
 
-    public static func standard(stopCount: Int, kind: JourneyKind = .personalised) -> VisitMeta {
+    static func standard(stopCount: Int, kind: JourneyKind = .personalised) -> VisitMeta {
         VisitMeta(title: String(localized: "Your journey", bundle: .module), summary: String(localized: "\(stopCount) stops", bundle: .module), kind: kind)
     }
 }

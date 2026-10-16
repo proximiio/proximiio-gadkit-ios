@@ -377,6 +377,26 @@
         }
       }
     },
+    "I couldn’t get things started. Check your connection and let’s try again." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لم أتمكن من بدء التشغيل. تحقّق من اتصالك ولنحاول مجددًا."
+          }
+        }
+      }
+    },
+    "None of these artworks is on the museum map." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لا يوجد أيٌّ من هذه الأعمال الفنية على خريطة المتحف."
+          }
+        }
+      }
+    },
     "The museum’s server is busy. Try again in a moment." : {
       "localizations" : {
         "ar" : {

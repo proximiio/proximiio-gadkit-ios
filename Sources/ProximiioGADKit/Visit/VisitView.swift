@@ -17,7 +17,7 @@ import Proximiio
 import ProximiioMap
 import SwiftUI
 
-public struct VisitView: View {
+struct VisitView: View {
     @Environment(\.visitEventHandler) private var emit
     @Environment(\.routeAccessibility) private var hostAccessibility
     @AppStorage(RouteAccessibility.accessibleRoutesKey) private var accessibleRoutes = false
@@ -63,7 +63,7 @@ public struct VisitView: View {
         RouteAccessibility.effective(hostNeeds: hostAccessibility, accessibleRoutes: accessibleRoutes)
     }
 
-    public init(
+    init(
         venue: VenueService,
         journey: Journey,
         kind: JourneyKind = .personalised,
@@ -91,7 +91,7 @@ public struct VisitView: View {
         self.onClose = onClose
     }
 
-    public var body: some View {
+    var body: some View {
         GeometryReader { geometry in
             ZStack {
                 ScreenBackground.map.view

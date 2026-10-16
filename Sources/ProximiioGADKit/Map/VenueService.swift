@@ -18,11 +18,11 @@ import ProximiioBlueiot
 #endif
 
 @MainActor
-public final class VenueService {
-    public let sdk: Proximiio
+final class VenueService {
+    let sdk: Proximiio
     /// Times and distances of the screens, from `GADConfiguration.settings`. A screen reads them
     /// when it opens, so a change applies to the next one.
-    public var settings: GADSettings
+    var settings: GADSettings
     /// The binding client whose provider delivers the wristband's positions.
     private let binding: BlueiotWristbandBinding
     /// Name of the attached position provider. Providers are detached by name.
@@ -37,7 +37,7 @@ public final class VenueService {
     }
 
     /// The SDK configuration for `backend`. Separate from `start` so tests can check it.
-    public static func configuration(for backend: GADConfiguration) -> ProximiioConfiguration {
+    static func configuration(for backend: GADConfiguration) -> ProximiioConfiguration {
         var configuration = ProximiioConfiguration.relayOnly(
             token: backend.applicationToken,
             runsInBackground: true
@@ -61,7 +61,7 @@ public final class VenueService {
     ///
     /// The provider is attached once. It follows whichever session `binding` holds, so a
     /// bind, a take-over or an ended visit needs no re-attach.
-    public static func start(configuration backend: GADConfiguration, binding: BlueiotWristbandBinding) async throws -> VenueService {
+    static func start(configuration backend: GADConfiguration, binding: BlueiotWristbandBinding) async throws -> VenueService {
         let sdk = try Proximiio(configuration: configuration(for: backend))
         _ = await sdk.requestPermissions()
         _ = try await sdk.authenticate()
@@ -108,7 +108,7 @@ public final class VenueService {
     /// Attaches the binding's position provider in place of the attached provider. A
     /// re-attach stops and starts the provider, which reopens its relay-api stream. In
     /// Debug builds it also ends journey playback.
-    public func attachBinding() async {
+    func attachBinding() async {
         await detachProvider()
         let provider = binding.positionProvider
         attachedProvider = provider.name
@@ -137,7 +137,7 @@ public final class VenueService {
     /// Debug builds only. Replaces the attached provider with playback of a journey
     /// stored on Proximi.io. Positions are generated on the phone. `attachBinding()`
     /// ends the playback.
-    public func playJourney(id: String, speed: Double, loops: Bool) async throws {
+    func playJourney(id: String, speed: Double, loops: Bool) async throws {
         let journey = try await sdk.fetchJourney(id: id)
         if let failure = journey.validationFailure() {
             throw JourneyNotPlayable(reason: String(describing: failure))

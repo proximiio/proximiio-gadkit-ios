@@ -15,10 +15,10 @@ import Proximiio
 import ProximiioBlueiot
 #endif
 
-public enum WristbandCopy {
+enum WristbandCopy {
 
     /// The message for a failed bind or end.
-    public static func message(for error: Error) -> String {
+    static func message(for error: Error) -> String {
         guard let error = error as? BlueiotBindingError else {
             return error.localizedDescription
         }
@@ -87,7 +87,7 @@ public enum WristbandCopy {
     }
 
     /// The notice shown on the Hub after a session ended.
-    public static func notice(for reason: BlueiotBindingEndReason) -> String {
+    static func notice(for reason: BlueiotBindingEndReason) -> String {
         switch reason {
         case .superseded:
             return String(localized: "Your wristband was scanned by another phone. Connect it again to follow it on this phone.", bundle: .module)

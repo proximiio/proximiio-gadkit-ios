@@ -10,40 +10,40 @@
 import Foundation
 import Proximiio
 
-public struct VenuePlace: Identifiable, Equatable, Sendable {
-    public let id: String
-    public let title: String
+struct VenuePlace: Identifiable, Equatable, Sendable {
+    let id: String
+    let title: String
     /// Feature `description`, if set in Proximi.io Portal.
-    public let details: String?
-    public let coordinate: ProximiioCoordinate
+    let details: String?
+    let coordinate: ProximiioCoordinate
     /// Floor level. `computeRoute` takes it as `toLevel`.
-    public let level: Double
+    let level: Double
     /// Amenity id, `<category>:<amenity>`, or `nil`.
-    public let amenityID: String?
+    let amenityID: String?
     /// The customer's id (`remote_id`): an artwork's collection id such as "GAD.2010.00033".
     /// The artwork's geofence holds the same value.
-    public var remoteID: String?
+    var remoteID: String?
     /// True for an artwork: the artwork amenity, an `artwork_id` in `metadata`, or a collection id
     /// in `remote_id`.
-    public var isArtwork = false
+    var isArtwork = false
     /// First entry of the feature's `images` property, if it is an absolute URL.
-    public var imageURL: URL?
+    var imageURL: URL?
     /// `metadata.artist_name`: the artist shown under an artwork's title. A string, or an i18n
     /// object like `title_i18n`.
-    public var artist: String?
+    var artist: String?
     /// `metadata.has_ar`: the artwork has an AR view ("AR" in the journey list).
-    public var hasAR = false
+    var hasAR = false
     /// `metadata.has_audio`: the artwork has audio (a note in the journey list).
-    public var hasAudio = false
+    var hasAudio = false
     /// `place_id`: the venue (building) of the POI. The GAD organisation has the Guggenheim and the
     /// DCT office.
     var placeID: String?
     /// `metadata.gallery_id`: the gallery of an artwork. The gallery's POI holds the same value in
     /// `remote_id` (`Gallery.names(places:)`).
-    public var galleryID: String?
+    var galleryID: String?
 
     /// Every point POI in `features`, sorted by title.
-    public static func all(in features: [ProximiioFeature]) -> [VenuePlace] {
+    static func all(in features: [ProximiioFeature]) -> [VenuePlace] {
         features
             .compactMap(VenuePlace.init(feature:))
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
@@ -59,7 +59,7 @@ public struct VenuePlace: Identifiable, Equatable, Sendable {
     }
 
     /// Case- and diacritic-insensitive substring match on the title. An empty query matches all.
-    public static func matching(_ query: String, in places: [VenuePlace]) -> [VenuePlace] {
+    static func matching(_ query: String, in places: [VenuePlace]) -> [VenuePlace] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return places }
         return places.filter { $0.title.range(of: needle, options: [.caseInsensitive, .diacriticInsensitive]) != nil }

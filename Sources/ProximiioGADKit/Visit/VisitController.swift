@@ -417,10 +417,10 @@ extension JourneyRules {
 }
 
 /// Persists the visit between launches. Stop states are restored; the leg is recomputed.
-public enum VisitStore {
+enum VisitStore {
     private static let key = "GuggenheimAbuDhabi.visit"
 
-    public static func load(from defaults: UserDefaults = .standard) -> Journey? {
+    static func load(from defaults: UserDefaults = .standard) -> Journey? {
         guard let data = defaults.data(forKey: key),
               let journey = try? JSONDecoder().decode(Journey.self, from: data),
               !journey.stops.isEmpty
@@ -430,11 +430,11 @@ public enum VisitStore {
 
     private static let metaKey = "GuggenheimAbuDhabi.visitMeta"
 
-    public static func loadMeta(from defaults: UserDefaults = .standard) -> VisitMeta? {
+    static func loadMeta(from defaults: UserDefaults = .standard) -> VisitMeta? {
         defaults.data(forKey: metaKey).flatMap { try? JSONDecoder().decode(VisitMeta.self, from: $0) }
     }
 
-    public static func saveMeta(_ meta: VisitMeta?, to defaults: UserDefaults = .standard) {
+    static func saveMeta(_ meta: VisitMeta?, to defaults: UserDefaults = .standard) {
         guard let meta, let data = try? JSONEncoder().encode(meta) else {
             defaults.removeObject(forKey: metaKey)
             return
@@ -443,7 +443,7 @@ public enum VisitStore {
     }
 
     /// `nil` or an empty journey removes the stored visit.
-    public static func save(_ journey: Journey?, to defaults: UserDefaults = .standard) {
+    static func save(_ journey: Journey?, to defaults: UserDefaults = .standard) {
         guard let journey, !journey.stops.isEmpty, let data = try? JSONEncoder().encode(journey) else {
             defaults.removeObject(forKey: key)
             return

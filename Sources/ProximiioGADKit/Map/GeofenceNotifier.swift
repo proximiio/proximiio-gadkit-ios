@@ -18,21 +18,21 @@ import Proximiio
 import UserNotifications
 
 @MainActor
-public final class GeofenceNotifier {
+final class GeofenceNotifier {
     /// The notification center keeps a weak reference to its delegate.
     private static let presenter = ForegroundPresenter()
 
-    public init() {}
+    init() {}
 
     /// Asks for authorization to show alerts. iOS shows its dialog only while the decision is
     /// undetermined.
-    public func requestAuthorization() async {
+    func requestAuthorization() async {
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])
     }
 
     /// Posts a notification for every geofence enter and exit event of `sdk`. Returns when the
     /// stream finishes or the calling task is cancelled.
-    public func run(sdk: Proximiio) async {
+    func run(sdk: Proximiio) async {
         let center = UNUserNotificationCenter.current()
         center.delegate = Self.presenter
         for await event in await sdk.geofenceEvents() {
