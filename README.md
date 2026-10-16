@@ -151,9 +151,9 @@ first. Nothing opens before `start()` has finished.
 |---|---|---|
 | `.museumMap` | The museum map: floors, amenities, the visitor's position, search, a route to a tapped place, the gallery legend. | Back closes it. |
 | `.journeyReady` | Journey ready (02.10A): the journey's title and summary. Needs a stored journey. | "Start the Journey" (at the museum) opens the journey. "Go to Museum" (away from it) and "Back to Hub" close it. |
-| `.journey` | The journey: map and list, the stop card, guidance from stop to stop, detours to amenities, the Live Activity, Journey Complete. Needs a stored journey. | Back asks before it closes. |
+| `.journey` | The journey: map and list, the stop card, guidance from stop to stop, detours to amenities, the Live Activity, Journey Complete. Needs a stored journey. | Back on a journey in progress (a stop visited or skipped, not finished) asks "Leave the tour here" first; otherwise it closes. |
 | `.planJourney` | The stop picker ("Plan your visit"). | "Start" stores a personalised journey and opens Journey ready. |
-| `.manageJourney` | Manage journey (02.11). Needs a stored journey. | "Edit stops" opens the stop picker, or sends `curatedTourChangeRequested` for a curated tour. "Craft a new journey" sends `craftNewJourneyRequested`. "Delete journey" deletes it. |
+| `.manageJourney` | Manage journey (02.11). Needs a stored journey. | "Edit stops" opens the stop picker, or sends `curatedTourChangeRequested` for a curated tour. "Craft a new journey" sends `craftNewJourneyRequested`. "Delete journey", then "Delete this journey", deletes it. |
 
 - The museum map, Journey ready and the journey are full-screen covers. The stop picker and Manage
   journey are sheets.
@@ -233,8 +233,8 @@ do {
 | `journeyChanged(JourneySummary?)` | A new, planned, edited or deleted (`nil`) journey, and the progress after the journey screen closed. |
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
 | `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. |
-| `artworkReached(ProximiStop)` | The visitor entered the artwork geofence of the active stop, or stands in its area. The route leads to the next stop `artworkAdvanceDelay` later. |
-| `artworkVisitedOutOfOrder(ProximiStop)` | The visitor stayed at an artwork further down the journey. It counts as visited; the stops ahead are ordered again. |
+| `artworkReached(ProximiStop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, or stood in its area: the stop is done and the route leads to the next stop. `geofenceEntered` arrives at the enter. |
+| `artworkVisitedOutOfOrder(ProximiStop)` | The visitor stayed at an artwork further down the journey. It counts as visited. In a personalised journey the stops ahead are ordered again; a curated tour keeps its order. |
 | `skipRequested`, `stopSkipped`, `skipCancelled`, `skipUndone` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it", "Undo skip". |
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here". |
 | `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Change your route?" confirmed; the detour reached (`completed`) or left. |
@@ -243,7 +243,9 @@ do {
 | `journeyFinished` | Every stop is visited or skipped. Journey Complete shows. |
 | `floorWithoutPositioningEntered(level:)`, `floorWithoutPositioningLeft(level:)` | See "Floors without positioning". |
 | `modeChanged(VisitMode)`, `recentred`, `accessibleRoutesChanged(Bool)` | The Map / List toggle, "Centre on me", the accessible routes button. |
-| `exitRequested`, `exitConfirmed`, `exitCancelled` | Back during a journey, "Leave", "Carry on". |
+| `exitRequested`, `exitConfirmed`, `exitCancelled` | Back during a journey in progress (a stop visited or skipped, not finished), "Leave the tour", "Carry on". |
+
+The museum map sends only `opened` and `closed`; the other screen events come from the journey screen.
 
 `ProximiStop` has the POI `id`, the `title`, the artwork's collection id `artworkID` (`nil` for an
 amenity) and the `level`.
@@ -282,7 +284,7 @@ let configuration = GADConfiguration(
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `liveActivityMinimumInterval` | 5 s | The shortest gap between two Live Activity updates of the instruction. |
-| `postsGeofenceNotifications` | `true` | A notification for every geofence enter and exit, and the notification authorization request once a wristband is connected. It sets the `UNUserNotificationCenter` delegate, which shows them in the foreground. A host app with its own delegate turns it off. |
+| `postsGeofenceNotifications` | `true` | A notification for every enter and exit of a geofence with a name, and the notification authorization request once a wristband is connected. The "next stop" notification of the journey (`stopNearbyMeters`) does not depend on it. It sets the `UNUserNotificationCenter` delegate, which shows them in the foreground. A host app with its own delegate turns it off. |
 
 ## Artwork details in the list
 
@@ -315,8 +317,8 @@ level 0, with the café and the prayer room. A route there, on the journey map a
    stairs to level 0", "Your position is not shown on this level.") for `levelChangeViewSeconds`; a tap
    ends it;
 3. shows that floor with the rest of the route. The map does not follow the visitor there, no
-   off-route warning shows, artwork geofences are not checked, and the card says that the position is
-   not shown.
+   off-route warning shows, the position is not checked against artwork geofences (their enter events
+   still count), and the card says that the position is not shown.
 
 The map follows the visitor again when the destination changes ("Resume your Journey", another stop
 or route), on "Centre on me" or the floor button, or after `floorWithoutPositioningMaximumSeconds`.
@@ -449,6 +451,19 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.0.1 (2026-10-16)
+
+Fixed (documentation only):
+
+- `artworkReached` arrives `artworkAdvanceDelay` after the arrival, when the stop is done.
+- `artworkVisitedOutOfOrder` orders the stops ahead again in a personalised journey only.
+- Back asks first only on a journey in progress; the button is "Leave the tour".
+- "Delete journey" asks "Delete this journey" first.
+- `postsGeofenceNotifications`: geofences with a name only; the "next stop" notification does not
+  depend on it.
+- On a floor without positioning only the position check against artwork geofences stops.
+- The museum map sends only `opened` and `closed`.
 
 ### 1.0.0 (2026-10-16)
 

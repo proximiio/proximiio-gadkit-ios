@@ -3,19 +3,18 @@
 //  ProximiioGADKit
 //
 //  The times and distances of the map and journey screens. The host app sets them in
-//  `GADConfiguration.settings`, or later in `VenueService.settings`; a screen reads them when it
-//  opens. The defaults are the PM's values as of 2026-10-14.
+//  `GADConfiguration.settings`. The defaults are the PM's values as of 2026-10-14.
 //
 import Foundation
 
 public struct GADSettings: Equatable, Sendable {
-    // MARK: Wristband tracking alerts
+    // MARK: Wristband tracking
 
-    /// Seconds without positioning before "We've lost your place". The SDK reports positioning
-    /// unavailable about 10 s after the last fix, so 110 is about 2 min after it.
+    /// Seconds without positioning before `ProximiMapEvent.trackingChanged(.lostPlace)`. The SDK
+    /// reports positioning unavailable about 10 s after the last fix, so 110 is about 2 min after it.
     public var trackingLostAfter: TimeInterval = 110
-    /// Seconds without positioning before "Your wristband has stopped responding". Must be more
-    /// than `trackingLostAfter`. 170 is about 3 min after the last fix.
+    /// Seconds without positioning before `ProximiMapEvent.trackingChanged(.stoppedResponding)`. Must
+    /// be more than `trackingLostAfter`. 170 is about 3 min after the last fix.
     public var trackingStoppedAfter: TimeInterval = 170
 
     // MARK: Arrival

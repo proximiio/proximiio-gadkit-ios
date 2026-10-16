@@ -136,10 +136,11 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// The active stop is less than `GADSettings.stopNearbyMeters` away on the visitor's level. Once
     /// per stop.
     case stopNearby(ProximiStop)
-    /// The visitor reached the artwork of the active stop. The route leads to the next stop
-    /// `GADSettings.artworkAdvanceDelay` later.
+    /// `GADSettings.artworkAdvanceDelay` after the visitor reached the artwork of the active stop:
+    /// the stop is done and the route leads to the next stop.
     case artworkReached(ProximiStop)
-    /// The visitor stayed at an artwork further down the journey. It counts as visited.
+    /// The visitor stayed at an artwork further down the journey. It counts as visited. A
+    /// personalised journey orders the stops ahead again.
     case artworkVisitedOutOfOrder(ProximiStop)
     /// The visitor swiped a stop in the list. A dialog asks "Skip artwork?".
     case skipRequested(ProximiStop)
@@ -173,7 +174,7 @@ public enum ProximiMapEvent: Equatable, Sendable {
     case recentred
     /// The accessible routes button: on (`true`) or off.
     case accessibleRoutesChanged(Bool)
-    /// Back during a journey. A dialog asks before the journey screen closes.
+    /// Back during a journey in progress. "Leave the tour here" asks before the journey screen closes.
     case exitRequested
     case exitConfirmed
     case exitCancelled
