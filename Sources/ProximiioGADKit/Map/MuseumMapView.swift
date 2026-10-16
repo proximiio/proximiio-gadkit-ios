@@ -85,11 +85,7 @@ struct MuseumMapView: View {
                     }
                 }
             }
-            let features = await venue.sdk.features()
-            places = VenuePlace.all(in: features)
-            let levelChangers = LevelChangerPlace.all(in: features)
-            mapLayers.updateLevelChangers(levelChangers)
-            session.hiddenFeatureIDs = Set(levelChangers.map(\.id))
+            await loadPlaces()
             mapLayers.attach(to: session)
             mapLayers.update(fills: [], level: session.selectedFloor.level)
             if let initialDestination {
@@ -109,6 +105,9 @@ struct MuseumMapView: View {
         // The follow camera keeps the initial venue framing. The first position zooms
         // in to `MapOptions.recentreZoom` on the visitor.
         .followsVisitorFloor(session, venue: venue, isPaused: floorGuide.isActive)
+        .onChange(of: venue.data.version) { _, _ in
+            Task { await loadPlaces() }
+        }
         .onReceive(session.$guidance) { _ in
             Task { @MainActor in
                 floorGuide.update(
@@ -261,6 +260,15 @@ struct MuseumMapView: View {
     }
 
     /// "Amenity · Level 1" or "Level 1".
+    /// Places and level changers, at the start and after a change of the venue data.
+    private func loadPlaces() async {
+        let features = await venue.sdk.features()
+        places = VenuePlace.all(in: features)
+        let levelChangers = LevelChangerPlace.all(in: features)
+        mapLayers.updateLevelChangers(levelChangers)
+        session.hiddenFeatureIDs = Set(levelChangers.map(\.id))
+    }
+
     private func placeSubtitle(_ place: VenuePlace) -> String { place.cardSubtitle }
 
     @ViewBuilder private func destinationIcon(for place: VenuePlace) -> some View {

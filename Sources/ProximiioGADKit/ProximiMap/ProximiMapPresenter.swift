@@ -41,7 +41,7 @@ struct ProximiMapPresenter: ViewModifier {
                 MuseumMapScreen(venue: venue) { map.cover = nil }
             case .ready:
                 if let journey = VisitStore.load() {
-                    JourneyReadyFlow(map: map, venue: venue, journey: journey, meta: storedMeta(for: journey))
+                    JourneyReadyFlow(map: map, venue: venue, meta: storedMeta(for: journey))
                 }
             case .visit:
                 if let journey = VisitStore.load() {
@@ -85,14 +85,13 @@ struct ProximiMapPresenter: ViewModifier {
 private struct JourneyReadyFlow: View {
     let map: ProximiMap
     let venue: VenueService
-    let journey: Journey
     let meta: VisitMeta
 
-    @State private var isVisiting = false
+    @State private var visit: Journey?
 
     var body: some View {
-        if isVisiting {
-            VisitView(venue: venue, journey: journey, kind: meta.kind) { map.cover = nil }
+        if let visit {
+            VisitView(venue: venue, journey: visit, kind: meta.kind) { map.cover = nil }
         } else {
             JourneyReadyView(meta: meta, isAtMuseum: map.isAtMuseum, onStart: {
                 // Away from the museum, "Go to Museum" closes: the host app shows the journey until
@@ -101,7 +100,12 @@ private struct JourneyReadyFlow: View {
                     map.cover = nil
                     return
                 }
-                isVisiting = true
+                // The stored journey: the venue data can change while this screen is open.
+                guard let stored = VisitStore.load() else {
+                    map.cover = nil
+                    return
+                }
+                visit = stored
                 map.visitStarted()
             }, onBack: { map.cover = nil })
         }

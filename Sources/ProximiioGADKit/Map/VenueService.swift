@@ -23,6 +23,8 @@ final class VenueService {
     /// Times and distances of the screens, from `GADConfiguration.settings`. A screen reads them
     /// when it opens, so a change applies to the next one.
     var settings: GADSettings
+    /// Changes of the venue data while the app runs. Screens read the data again on a change.
+    let data: VenueDataRefresh
     /// The binding client whose provider delivers the wristband's positions.
     private let binding: BlueiotWristbandBinding
     /// Name of the attached position provider. Providers are detached by name.
@@ -34,6 +36,7 @@ final class VenueService {
         self.sdk = sdk
         self.settings = settings
         self.binding = binding
+        data = VenueDataRefresh(sdk: sdk)
     }
 
     /// The SDK configuration for `backend`. Separate from `start` so tests can check it.
@@ -70,6 +73,7 @@ final class VenueService {
         let venue = VenueService(sdk: sdk, binding: binding, settings: backend.settings)
         await venue.attachBinding()
         venue.cacheMapStyle()
+        await venue.data.start(interval: backend.settings.venueDataRefreshInterval)
         if FieldLog.isEnabled {
             // The visitor id finds this phone's visitor, positions and events on the backend.
             let consent = await sdk.visitorReportingConsent

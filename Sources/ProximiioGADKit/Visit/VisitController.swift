@@ -315,6 +315,20 @@ final class VisitController {
         VisitStore.save(navigator.journey)
     }
 
+    /// Skips the stops whose POI is no longer a place after a change of the venue data. The
+    /// navigator has no call that removes or changes a stop (map 6.0.0-beta.44). When the journey
+    /// screen closes, the stored journey drops these stops and takes the changed places
+    /// (`VisitPlan.reconciled`).
+    func skipStopsWithoutPlace(places: [VenuePlace]) async {
+        let stops = VisitPlan.stopsWithoutPlace(in: navigator.journey, places: places).filter { $0.state != .skipped }
+        guard !stops.isEmpty else { return }
+        for stop in stops {
+            FieldLog.log("journey: \(stop.title) is no longer a place · skipped")
+            await navigator.skip(stopID: stop.id)
+        }
+        VisitStore.save(navigator.journey)
+    }
+
     func undoSkip() async {
         guard let id = lastSkippedStopID else { return }
         lastSkippedStopID = nil

@@ -154,10 +154,12 @@ public final class ProximiMap {
         do {
             let venue = try await VenueService.start(configuration: configuration, binding: session.binding)
             self.venue = venue
-            let features = await venue.sdk.features()
-            places = VenuePlace.all(in: features)
-            galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
+            await loadPlaces(from: venue)
+            reconcileStoredJourney()
             arrival.check(places: places)
+            venue.data.onChange = { [weak self] in
+                Task { await self?.venueDataChanged() }
+            }
             tasks.append(Task { [weak self] in
                 // One position from the wristband or playback means the visitor is inside.
                 for await _ in await venue.sdk.positions() {
@@ -185,6 +187,19 @@ public final class ProximiMap {
             status = .failed(failure)
             throw failure
         }
+    }
+
+    private func loadPlaces(from venue: VenueService) async {
+        let features = await venue.sdk.features()
+        places = VenuePlace.all(in: features)
+        galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
+    }
+
+    /// The venue data changed on the backend.
+    private func venueDataChanged() async {
+        guard let venue else { return }
+        await loadPlaces(from: venue)
+        reconcileStoredJourney()
     }
 
     /// Follows the wristband session for the life of the object: confirms a session stored by the
@@ -263,6 +278,18 @@ public final class ProximiMap {
     private func store(_ journey: Journey?, meta: VisitMeta?) {
         VisitStore.save(journey)
         VisitStore.saveMeta(meta)
+        refreshJourney()
+    }
+
+    /// Updates the stored journey with the current places (`VisitPlan.reconciled`). While the journey
+    /// screen is open, the screen updates its journey and stores it.
+    private func reconcileStoredJourney() {
+        guard coverScreen != .journey, let stored = VisitStore.load() else { return }
+        let journey = VisitPlan.reconciled(stored, places: places, galleries: galleries)
+        guard journey != stored else { return }
+        FieldLog.log("map: stored journey updated · \(stored.stops.count) → \(journey.stops.count) stops")
+        VisitStore.save(journey)
+        if journey.stops.isEmpty { VisitStore.saveMeta(nil) }
         refreshJourney()
     }
 
@@ -349,6 +376,7 @@ public final class ProximiMap {
     func coverDismissed() {
         if let screen = coverScreen { emit(.closed(screen)) }
         coverScreen = nil
+        reconcileStoredJourney()
         refreshJourney()
         runAfterDismiss()
     }

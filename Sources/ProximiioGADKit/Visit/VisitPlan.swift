@@ -29,6 +29,38 @@ enum VisitPlan {
         )
     }
 
+    /// `journey` after a change of the venue data. Pure; covered by tests.
+    /// - A reached or done stop keeps its stored values.
+    /// - Any other planned stop whose POI is no longer a place is removed.
+    /// - Any other planned stop takes the title, coordinate, floor and gallery of its POI. Its id
+    ///   and state stay.
+    /// - Detour stops stay as they are.
+    static func reconciled(_ journey: Journey, places: [VenuePlace], galleries: [Gallery] = []) -> Journey {
+        let byID = Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return Journey(stops: journey.stops.compactMap { stop in
+            guard followsItsPlace(stop), let poiID = stop.poiID else { return stop }
+            guard let place = byID[poiID] else { return nil }
+            var updated = Self.stop(for: place, galleries: galleries)
+            updated.id = stop.id
+            updated.state = stop.state
+            updated.iconName = stop.iconName
+            return updated
+        })
+    }
+
+    /// The pending, active and skipped planned stops whose POI is no longer a place. Pure; covered
+    /// by tests.
+    static func stopsWithoutPlace(in journey: Journey, places: [VenuePlace]) -> [JourneyStop] {
+        let ids = Set(places.map(\.id))
+        return journey.stops.filter { stop in
+            followsItsPlace(stop) && stop.poiID.map { !ids.contains($0) } == true
+        }
+    }
+
+    private static func followsItsPlace(_ stop: JourneyStop) -> Bool {
+        stop.kind == .planned && stop.state != .reached && stop.state != .done
+    }
+
     /// A row of the journey list: a section header or a stop.
     enum ListRow: Identifiable {
         case header(id: String, title: String)

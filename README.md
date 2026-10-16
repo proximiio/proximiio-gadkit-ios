@@ -193,6 +193,24 @@ A journey the visitor built with the guide is `.personalised`; a tour by the mus
 
 The map and the background are the same for both.
 
+### Venue data changes
+
+The backend changes POIs, paths, lifts and geofences while the app runs. `ProximiMap` downloads the
+venue's features every `GADSettings.venueDataRefreshInterval` (300 s) in the foreground and when the
+app returns to the foreground; the SDK sync brings geofences and floors. After a change:
+
+- Routes use the new paths and level changers.
+- The stop picker, the museum map's search, the journey list, the galleries, the artwork geofences
+  and the lift outlines use the new data.
+- The stored journey follows its POIs. A done stop keeps its title and position. Another stop whose
+  POI was deleted is removed; another stop whose POI changed takes the new title, position, floor and
+  gallery. A journey with no stop left is deleted. `ProximiMapEvent.journeyChanged(_:)` follows.
+- On the open journey screen, a stop whose POI was deleted is skipped. The stored journey removes it
+  when the screen closes. A changed POI moves its stop when the screen closes.
+
+Not yet: an open map keeps the POIs and amenities it has drawn until it opens again. The map library
+reads them once per screen (map 6.0.0-beta.44).
+
 ## Wristband
 
 The host app scans the wristband's QR code, or the visitor types the code printed on it:
@@ -285,6 +303,7 @@ let configuration = GADConfiguration(
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `liveActivityMinimumInterval` | 5 s | The shortest gap between two Live Activity updates of the instruction. |
 | `postsGeofenceNotifications` | `true` | A notification for every enter and exit of a geofence with a name, and the notification authorization request once a wristband is connected. The "next stop" notification of the journey (`stopNearbyMeters`) does not depend on it. It sets the `UNUserNotificationCenter` delegate, which shows them in the foreground. A host app with its own delegate turns it off. |
+| `venueDataRefreshInterval` | 300 s | Time between two downloads of the venue's features in the foreground. 0 turns the downloads off. See "Venue data changes". |
 
 ## Artwork details in the list
 
@@ -451,6 +470,24 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.1.0 (2026-10-16)
+
+Added:
+
+- Venue data changes while the app runs: the features are downloaded every 300 s in the foreground
+  and when the app returns to the foreground; routes, screens and the stored journey follow. See
+  "Venue data changes".
+- `GADSettings.venueDataRefreshInterval` (default 300 s; 0 turns the downloads off).
+
+Changed:
+
+- The stored journey drops a stop whose POI was deleted and moves a stop whose POI moved. Before, it
+  kept the stop as it was when the journey was planned.
+- Journey ready → "Start the Journey" starts the stored journey, not the one shown when the screen
+  opened.
+
+Not breaking. One download of `GET /v7/geo/features` is about 90 KB compressed (450 KB of JSON, GAD data of 2026-10-16).
 
 ### 1.0.1 (2026-10-16)
 

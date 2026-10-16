@@ -169,23 +169,7 @@ struct VisitView: View {
             if DebugLaunch.current.visitList { mode = .list }
             #endif
             monitor.start()
-            let features = await venue.sdk.features()
-            places = VenuePlace.all(in: features)
-            controller.artworkRemoteIDs = Dictionary(
-                places.compactMap { place in place.remoteID.map { (place.id, $0) } },
-                uniquingKeysWith: { first, _ in first }
-            )
-            // The journey map shows artworks only as the numbered stop markers. Amenities,
-            // galleries and level changers stay (PM review 2026-10-12). `mapLayers` draws the
-            // level changers on every floor they serve.
-            let levelChangers = LevelChangerPlace.all(in: features)
-            mapLayers.updateLevelChangers(levelChangers)
-            controller.session.hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
-            let geofences = await venue.sdk.geofences()
-            controller.artworkAreas = VisitController.artworkAreas(of: geofences)
-            galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
-            galleryNames = Gallery.names(places: places)
-            FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", ")) · \(galleryNames.count) named by id")
+            await loadVenueData()
             await MapStyle.waitForCanvas(of: controller.session)
             controller.session.journeyStopMarkerStyle = MapStyle.journeyStops
             if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }
@@ -328,6 +312,13 @@ struct VisitView: View {
             checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
         }
         .onChange(of: controller.navigator.journey) { _, journey in VisitStore.save(journey) }
+        .onChange(of: venue.data.version) { _, _ in
+            Task {
+                await loadVenueData()
+                refreshMapLayers()
+                await controller.skipStopsWithoutPlace(places: places)
+            }
+        }
         .onReceive(controller.navigator.$journey) { _ in
             Task { @MainActor in
                 refreshMapLayers()
@@ -367,6 +358,28 @@ struct VisitView: View {
             get: { controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !floorGuide.isActive },
             set: { if !$0 { controller.dismissOffRoute() } }
         )
+    }
+
+    /// Places, artwork areas, galleries and level changers, at the start and after a change of the
+    /// venue data.
+    private func loadVenueData() async {
+        let features = await venue.sdk.features()
+        places = VenuePlace.all(in: features)
+        controller.artworkRemoteIDs = Dictionary(
+            places.compactMap { place in place.remoteID.map { (place.id, $0) } },
+            uniquingKeysWith: { first, _ in first }
+        )
+        // The journey map shows artworks only as the numbered stop markers. Amenities,
+        // galleries and level changers stay (PM review 2026-10-12). `mapLayers` draws the
+        // level changers on every floor they serve.
+        let levelChangers = LevelChangerPlace.all(in: features)
+        mapLayers.updateLevelChangers(levelChangers)
+        controller.session.hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
+        let geofences = await venue.sdk.geofences()
+        controller.artworkAreas = VisitController.artworkAreas(of: geofences)
+        galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
+        galleryNames = Gallery.names(places: places)
+        FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", ")) · \(galleryNames.count) named by id")
     }
 
     // MARK: Map layers

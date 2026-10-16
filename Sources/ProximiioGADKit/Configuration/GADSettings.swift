@@ -103,6 +103,14 @@ public struct GADSettings: Equatable, Sendable {
     /// `UNUserNotificationCenter`; a host app with its own delegate turns this off.
     public var postsGeofenceNotifications = true
 
+    // MARK: Venue data
+
+    /// Seconds between two downloads of the venue's features (`GET /v7/geo/features`) while the app
+    /// is in the foreground. The features are also downloaded when the app returns to the
+    /// foreground. Changed features update the routes, the screens and the stored journey. 0 turns
+    /// the downloads off.
+    public var venueDataRefreshInterval: TimeInterval = 300
+
     public init() {}
 
     /// The defaults.
