@@ -28,9 +28,13 @@
 //  again while no stop is reached. A restored journey keeps its order. After a detour the stops
 //  still ahead are ordered again from the visitor. A curated tour (`keepsOrder`) is never ordered.
 //
-//  Leaving the route does not re-route the leg (`JourneyDeviationPolicy.askApp`). The visitor
-//  gets a warning (`isOffRoute`) once they are far from the route or off it for too long, and
-//  "Back to my route" re-routes from where they are.
+//  With prompts (`ProximiMapView.Options.prompts`), leaving the route does not re-route the leg
+//  (`JourneyDeviationPolicy.askApp`): the visitor gets a warning (`isOffRoute`) once they are far
+//  from the route or off it for too long, and "Show the route from here" re-routes from where they
+//  are. Without prompts the navigator re-routes from the visitor (`.automatic`).
+//
+//  Without `managesProgress` (`ProximiMapView.Options.progress`) the host app moves the journey on:
+//  no arrival by geofence, no ordering, and `apply(_:)` takes the host app's changes.
 //
 import Foundation
 import Observation
@@ -53,6 +57,13 @@ final class VisitController {
     @ObservationIgnored var onArtworkDone: ((JourneyStop, _ isActiveStop: Bool) -> Void)?
     private var tasks: [Task<Void, Never>] = []
     private var isStarted = false
+    /// `true` once `navigator.start()` has returned.
+    private var isNavigating = false
+    /// The host app's latest journey while `apply` runs.
+    private var pendingTarget: Journey?
+    private var isApplying = false
+    /// Stops whose POI is no longer a place, reported once (`stopsWithoutPlace`).
+    private var reportedWithoutPlace: Set<String> = []
 
     /// Times and distances (`GADSettings`): the move to the next artwork after an arrival, the
     /// wait for a fix before ordering, the out-of-order dwell, the detour arrival, the off-route
@@ -89,8 +100,15 @@ final class VisitController {
     private var markingOutOfOrder: Set<String> = []
 
     /// A curated tour keeps the curators' order: no ordering at the start, after a detour or
-    /// after an artwork visited out of order.
+    /// after an artwork visited out of order. So does a journey whose progress the host app
+    /// manages.
     private let keepsOrder: Bool
+    /// `ProximiMapView.Options.progress`: artwork geofences mark stops visited, the journey is
+    /// ordered, and a stop whose POI is deleted is skipped. Off, only `apply(_:)` changes the stops.
+    private let managesProgress: Bool
+    /// `ProximiMapView.Options.prompts`: the leg stays where the visitor left it until "Show the
+    /// route from here" (`.askApp`). Off, the navigator routes again from the visitor.
+    private let deviationPolicy: JourneyDeviationPolicy
 
     /// Stores the journey after each change; `nil` after Journey Complete. `ProximiMap` writes
     /// `VisitStore`, `ProximiMapView` the host app's journey.
@@ -101,10 +119,14 @@ final class VisitController {
         journey: Journey,
         rules: JourneyRules = .visit,
         keepsOrder: Bool = false,
+        managesProgress: Bool = true,
+        deviationPolicy: JourneyDeviationPolicy = .askApp,
         settings: GADSettings = .standard,
         persist: @escaping @MainActor (Journey?) -> Void = VisitStore.persist
     ) {
-        self.keepsOrder = keepsOrder
+        self.keepsOrder = keepsOrder || !managesProgress
+        self.managesProgress = managesProgress
+        self.deviationPolicy = deviationPolicy
         self.settings = settings
         self.persist = persist
         self.session = session
@@ -128,7 +150,7 @@ final class VisitController {
     func start(accessibility: RouteAccessibility) async {
         guard !isStarted else { return }
         isStarted = true
-        navigator.deviationPolicy = .askApp
+        navigator.deviationPolicy = deviationPolicy
         await navigator.setRouteOptions(accessibility.routeOptions)
         var isOrderedWithoutFix = false
         if !keepsOrder, navigator.journey.stops.allSatisfy({ $0.state == .pending }) {
@@ -139,6 +161,8 @@ final class VisitController {
             }
         }
         await navigator.start()
+        isNavigating = true
+        await applyPendingTarget()
         tasks.append(Task { [weak self] in
             guard let events = self?.navigator.events else { return }
             for await event in events {
@@ -194,7 +218,7 @@ final class VisitController {
     /// `GADSettings.artworkAdvanceDelay`. The geofence of any other artwork is ignored, and every artwork
     /// geofence is ignored during a detour.
     func artworkGeofenceEntered(remoteID: String?) {
-        guard navigator.detourStop == nil, let id = Self.activeStopID(forRemoteID: remoteID, in: navigator.journey, remoteIDs: artworkRemoteIDs) else { return }
+        guard managesProgress, navigator.detourStop == nil, let id = Self.activeStopID(forRemoteID: remoteID, in: navigator.journey, remoteIDs: artworkRemoteIDs) else { return }
         FieldLog.log("artwork geofence arrival: \(id) remote \(remoteID ?? "-")")
         scheduleDone(id)
     }
@@ -205,6 +229,7 @@ final class VisitController {
     /// `GADSettings.outOfOrderDwell`: that artwork is visited out of order. During a detour to an
     /// amenity no artwork counts (PM review 2026-10-12).
     func checkArtworkGeofences() {
+        guard managesProgress else { return }
         guard navigator.detourStop == nil else {
             _ = outOfOrderDwell.update(inside: [], now: .now, dwell: settings.outOfOrderDwell)
             return
@@ -325,18 +350,23 @@ final class VisitController {
         persist(navigator.journey)
     }
 
-    /// Skips the stops whose POI is no longer a place after a change of the venue data. The
-    /// navigator has no call that removes or changes a stop (map 6.0.0-beta.44). When the journey
-    /// screen closes, the stored journey drops these stops and takes the changed places
-    /// (`VisitPlan.reconciled`).
-    func skipStopsWithoutPlace(places: [VenuePlace]) async {
-        let stops = VisitPlan.stopsWithoutPlace(in: navigator.journey, places: places).filter { $0.state != .skipped }
-        guard !stops.isEmpty else { return }
+    /// The stops whose POI is no longer a place after a change of the venue data, each once. With
+    /// `managesProgress` they are skipped: the navigator has no call that removes or changes a stop
+    /// (map 6.0.0-beta.44). When the journey screen of `ProximiMap` closes, the stored journey drops
+    /// these stops and takes the changed places (`VisitPlan.reconciled`). Without `managesProgress`
+    /// the stops stay; the host app decides.
+    func stopsWithoutPlace(places: [VenuePlace]) async -> [JourneyStop] {
+        let stops = VisitPlan.stopsWithoutPlace(in: navigator.journey, places: places)
+            .filter { $0.state != .skipped && !reportedWithoutPlace.contains($0.id) }
+        guard !stops.isEmpty else { return [] }
+        reportedWithoutPlace.formUnion(stops.map(\.id))
+        guard managesProgress else { return stops }
         for stop in stops {
             FieldLog.log("journey: \(stop.title) is no longer a place · skipped")
             await navigator.skip(stopID: stop.id)
         }
         persist(navigator.journey)
+        return stops
     }
 
     func undoSkip() async {
@@ -344,6 +374,68 @@ final class VisitController {
         lastSkippedStopID = nil
         await navigator.reopen(stopID: id)
         persist(navigator.journey)
+    }
+
+    /// Takes the host app's journey on the open screen (`ProximiMapView`): stops added, visited,
+    /// skipped, reopened and moved. The navigator, its route cache and the camera stay. `target`
+    /// holds every stop of the navigator (`HostedJourney.canReplace`). Calls run one after another;
+    /// a call during another keeps only the latest journey, applied after it. Before the navigator
+    /// has started, the latest journey waits for the start.
+    func apply(_ target: Journey) async {
+        pendingTarget = target
+        await applyPendingTarget()
+    }
+
+    /// Applies the latest journey of the host app once the navigator has started.
+    private func applyPendingTarget() async {
+        guard isNavigating, !isApplying else { return }
+        isApplying = true
+        defer { isApplying = false }
+        while let next = pendingTarget {
+            pendingTarget = nil
+            await performApply(next)
+        }
+    }
+
+    /// Adds the new stops, reopens, sets the order in one transition, then closes. Each step calls
+    /// the navigator only for a stop that changes.
+    private func performApply(_ target: Journey) async {
+        let existing = Set(navigator.journey.stops.map(\.id))
+        var added = 0
+        for var stop in target.stops where !existing.contains(stop.id) {
+            stop.state = .pending
+            if await navigator.add(stop) { added += 1 }
+        }
+        let changes = JourneyUpdate.stateChanges(from: navigator.journey, to: target)
+        for change in changes where change.kind == .reopen {
+            await navigator.reopen(stopID: change.stopID)
+        }
+        let closing = changes.filter { $0.kind != .reopen }
+        let current = navigator.reorderableStops.map(\.id)
+        let active = navigator.activeStop?.id
+        let ordered = JourneyUpdate.order(
+            reorderable: current,
+            activeStopID: active,
+            pending: target.stops.filter { $0.state == .pending }.map(\.id),
+            closing: Set(closing.map(\.stopID))
+        )
+        if let ordered {
+            let proposal = JourneyOrderProposal(
+                order: ordered, currentOrder: current, pinnedStopIDs: [],
+                currentSeconds: 0, proposedSeconds: 0, liveStopID: active
+            )
+            await navigator.apply(proposal)
+        }
+        for change in closing {
+            switch change.kind {
+            case .markDone: await navigator.markDone(stopID: change.stopID)
+            case .skip: await navigator.skip(stopID: change.stopID)
+            case .reopen: break
+            }
+        }
+        // "Undo skip" belongs to a skip the host app has since changed.
+        if let id = lastSkippedStopID, stop(id)?.state != .skipped { lastSkippedStopID = nil }
+        FieldLog.log("journey applied · \(added) added · \(changes.count) state changes · order \(ordered == nil ? "kept" : "set")")
     }
 
     /// Makes `stopID` the next stop (EC04a: the visitor picked the artwork they are at).

@@ -11,8 +11,9 @@ The host app uses one of two entry points:
   `.proximiMap(_:)` to a view that stays on screen, opens screens with `open(_:)` and receives every
   change as a `ProximiMapEvent`. It scans the wristband's QR code itself and passes the code to
   `connectWristband(code:)`. The Proximi GAD app uses the package this way.
-- **`ProximiMapView`** is the journey screen alone, on an SDK the host app has started. The host app
-  owns the SDK, the wristband session and the journey. See [ProximiMapView](#proximimapview).
+- **`ProximiMapView`** is the journey map alone, as a UI component on an SDK the host app has
+  started. The host app owns the SDK, the wristband session and the journey, and moves the journey on.
+  See [ProximiMapView](#proximimapview).
 
 | Product | Add to | Content |
 |---|---|---|
@@ -143,10 +144,12 @@ map screen. The package contacts only `apiBaseURL` and the relay-api host.
 
 ## ProximiMapView
 
-`ProximiMapView` is the journey screen of `ProximiMap.Screen.journey` as a SwiftUI view: the Map /
+`ProximiMapView` is the journey map as a UI component on an SDK the host app has started: the Map /
 List toggle, search with the amenity shortcuts, the map with the floor button, "Centre on me", the
-accessible routes button and the stop card, the list, guidance from stop to stop, detours to
-amenities, the Live Activity and Journey Complete. A host app that uses it needs no `ProximiMap`.
+accessible routes button and the stop card, and the list. The host app owns the SDK, the wristband
+session and the journey, and decides when a stop is visited or skipped. The view draws the journey
+it gets, routes to the first stop still to visit and reports what the visitor does. A host app that
+uses it needs no `ProximiMap`.
 
 ```swift
 import Proximiio
@@ -155,43 +158,65 @@ import SwiftUI
 
 struct JourneyMapScreen: View {
     let sdk: Proximiio                      // started by the host app, wristband provider attached
-    @Binding var journey: ProximiJourney    // owned and stored by the host app
-    let onClose: () -> Void
+    @Binding var journey: ProximiJourney    // owned, stored and moved on by the host app
 
     var body: some View {
         ProximiMapView(sdk: sdk, journey: $journey) { event in
-            if case .artworkReached(let stop) = event { print("At \(stop.artworkID ?? stop.title)") }
-        } onClose: {
-            onClose()
+            switch event {
+            case .skipRequested(let stop):  // a swipe on a stop in the list
+                // stop.id is the POI id, stop.artworkID the collection id. The host app asks, then
+                // sets the stop to .skipped.
+                skip(stop)
+            default:
+                break
+            }
         }
     }
 }
 
 // A new journey from the audio guide: every stop pending.
 journey = ProximiJourney(kind: .personalised, artworks: ["GAD.2010.00033", "GAD.2018.00034"])
+// The visitor heard the artwork: the host app marks it visited, the route leads to the next stop.
+journey.stops[0].state = .visited
 ```
 
 | Parameter | |
 |---|---|
 | `sdk` | The host app's `Proximiio`, started, with the position provider of its wristband session attached. |
-| `journey` | `Binding<ProximiJourney>`. The view writes the stop order and the stop states to it. |
+| `journey` | `Binding<ProximiJourney>`. The view applies every change to the open screen. It writes to the binding only with `.progress`. |
+| `options` | `ProximiMapView.Options`, default none. See below. The view reads them when it opens; a change applies to the next view. |
 | `settings` | `GADSettings`, default `.standard`. The view reads them when it opens. `postsGeofenceNotifications` does not apply. |
 | `routeAccessibility` | The visitor's accessibility needs for routes, default `.none`. See "Accessibility". |
 | `mode` | `.map` (default) or `.list` when the view opens. |
 | `onEvent` | `ProximiMapEvent`s of the journey screen, on the main actor. |
-| `onClose` | Back, "Leave the tour", or the close button of Journey Complete. The host app closes the view. |
+| `onClose` | Back on the bottom bar, "Leave the tour" and the close button of Journey Complete. Default `nil`: the bottom bar has no Back, "Leave the tour here" never shows, and the close button of Journey Complete returns to the map. |
 
 The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
 - uses `proximiio-sdk-ios-binary` 6.0.0-beta.59, the version this package pins;
-- presents the view, for example as a full-screen cover, and closes it in `onClose`;
-- stores the journey. The view stores nothing.
+- lays the view out and closes it; draws the background and the bottom bar (for example the audio
+  guide's controls);
+- stores the journey and moves it on. The view stores nothing but the accessible routes button
+  (`UserDefaults`, key `ProximiioGADKit.accessibleRoutes`).
 
 The view installs the route network from the SDK's feature cache when it opens, or downloads it when
 the cache has no path. While it is on screen it downloads the venue's features every
-`GADSettings.venueDataRefreshInterval` (see "Venue data changes"). It requests no permission.
+`GADSettings.venueDataRefreshInterval` (see "Venue data changes"). It requests no permission and posts
+no notification.
+
+### Options
+
+Each option turns on something the view does beyond drawing the journey. `ProximiMap` uses `.all`.
+
+| `ProximiMapView.Options` | With it | Without it (default) |
+|---|---|---|
+| `.bottomBar` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
+| `.background` | The package's background image around the map card. | Transparent. |
+| `.prompts` | "Skip this artwork?" ("Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it), "You've left your route" (the route stays until "Show the route from here"), "Probably at …", "Change your route?", "Leave the tour here" (with `onClose`) and Journey Complete. | No prompt. A swipe reports `skipRequested`; the route follows a visitor who left it and `offRoute` reports it; an uncertain position reports `positionUncertain`; "Go here" on an amenity starts the detour; `journeyFinished` reports the end. |
+| `.progress` | The view moves the journey on and writes it to the binding: an artwork is visited when the visitor enters its geofence (`artworkReached`) or stays at it out of order (`artworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and writes nothing. |
+| `.liveActivity` | The journey's Live Activity. The widget extension needs `ProximiioGADLiveActivity`. | No Live Activity. |
 
 ### ProximiJourney
 
@@ -204,28 +229,42 @@ the cache has no path. While it is on screen it downloads the venue's features e
 | `init(kind:artworks:)` | A journey whose stops are all pending. |
 | `init(kind:stops:)` | A journey with its progress. |
 
-- The view writes the journey after every change of the order or of a stop state. A personalised
-  journey is ordered floor by floor and gallery by gallery from the visitor at the start, so the first
-  write can be the new order.
-- A reached artwork is `.visited` `artworkAdvanceDelay` after the arrival. The stop the route leads to
-  is `.pending`.
-- A stop whose id matches no POI, and a second stop of the same POI, are not on the map. The written
-  journey keeps them, unchanged, after the other stops. With no stop on the map the view shows "None of
-  these artworks is on the museum map." and Back.
-- A stop whose POI is deleted while the view is open becomes `.skipped`.
+- The route leads to the first pending stop in the journey's order.
+- The open screen applies a change of the binding in place: a stop visited, skipped, pending again,
+  added or moved. The map, the camera and the route of an unchanged leg stay. Changes apply one
+  after another; while one applies, only the latest waits.
+- These changes start the screen again (new map session, camera and mode): a removed stop and a new
+  `kind`, because the navigator of the map library cannot remove a stop (map 6.0.0-beta.44), and the
+  first journey on a map without one, because that map has no navigator.
+- A journey without stops, or without a stop on the map, shows the map alone: search, floors and
+  "Centre on me", no Map / List toggle and no stop card, in either `mode`. "Go here" on an amenity
+  draws the route to it.
+- A stop whose POI is deleted on the backend while the view is open is reported as
+  `stopPlaceDeleted`. Without `.progress` it stays on the screen; the next change of the binding
+  starts the screen again without it.
+- A stop whose id matches no POI, and a second stop of the same POI, are not on the map.
 - Detours to amenities are not stops of `ProximiJourney`.
-- A value the view did not write, for example a new journey from the audio guide, starts the journey
-  again from that value.
-- Journey Complete changes nothing: the journey already holds the last states.
+
+With `.progress` the view also writes:
+
+- the journey after every change of the order or of a stop state. A personalised journey is ordered
+  from the visitor at the start, so the first write can be the new order;
+- `.visited` `artworkAdvanceDelay` after the arrival at an artwork. The stop the route leads to is
+  `.pending`;
+- the stops that match no POI unchanged, after the other stops;
+- nothing at Journey Complete: the journey already holds the last states.
 
 ### Events of ProximiMapView
 
 `onEvent` receives the journey screen's events of the [Events](#events) table: `trackingChanged`,
-`nextStop`, `stopNearby`, `artworkReached`, `artworkVisitedOutOfOrder`, the skip events, the amenity
-and detour events, `journeyResumed`, `offRoute`, `backOnRoute`, `journeyFinished`, the floor without
-positioning events, `modeChanged`, `recentred`, `accessibleRoutesChanged` and the exit events. Screen,
-wristband, arrival, geofence and `journeyChanged` events come only from `ProximiMap`; geofence enter
-and exit events are on the host app's SDK (`geofenceEvents()`).
+`nextStop`, `stopNearby`, `positionUncertain`, `stopPlaceDeleted`, `skipRequested`, the amenity and
+detour events, `journeyResumed`, `offRoute`, `backOnRoute`, `journeyFinished`, the floor without
+positioning events, `modeChanged`, `recentred` and `accessibleRoutesChanged`; with `.prompts` also
+`stopSkipped` and `skipCancelled`; with `.prompts` and `.progress` also `skipUndone`; with `.progress`
+also `artworkReached` and `artworkVisitedOutOfOrder`; with `.bottomBar`, `.prompts` and `onClose` also
+the exit events. Screen, wristband,
+arrival, geofence and `journeyChanged` events come only from `ProximiMap`; geofence enter and exit
+events are on the host app's SDK (`geofenceEvents()`).
 
 ## Screens
 
@@ -284,13 +323,16 @@ The backend changes POIs, paths, lifts and geofences while the app runs. `Proxim
 venue's features every `GADSettings.venueDataRefreshInterval` (300 s) in the foreground and when the
 app returns to the foreground; the SDK sync brings geofences and floors. After a change:
 
-- Routes use the new paths and level changers.
+- Routes computed after the change use the new paths and level changers. The leg on screen and the
+  journey overview keep the old ones until the navigator routes again: the next stop, a skip, or a
+  re-route after the visitor left the route (map 6.0.0-beta.44).
 - The stop picker, the museum map's search, the journey list, the galleries, the artwork geofences
   and the lift outlines use the new data.
 - The stored journey follows its POIs. A done stop keeps its title and position. Another stop whose
   POI was deleted is removed; another stop whose POI changed takes the new title, position, floor and
   gallery. A journey with no stop left is deleted. `ProximiMapEvent.journeyChanged(_:)` follows.
-- On the open journey screen, a stop whose POI was deleted is skipped. The stored journey removes it
+- On the open journey screen of `ProximiMap` (and of `ProximiMapView` with `.progress`), a stop whose
+  POI was deleted is skipped and reported as `stopPlaceDeleted`. The stored journey removes it
   when the screen closes. A changed POI moves its stop when the screen closes.
 
 Not yet: an open map keeps the POIs and amenities it has drawn until it opens again. The map library
@@ -335,10 +377,12 @@ do {
 | `geofenceEntered(ProximiGeofence)`, `geofenceExited(ProximiGeofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkID`. |
 | `journeyChanged(JourneySummary?)` | A new, planned, edited or deleted (`nil`) journey, and the progress after the journey screen closed. |
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
-| `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. |
+| `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The package posts no notification for it. |
+| `positionUncertain(ProximiStop)` | `ProximiMapView` without `.prompts`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.prompts` the view asks "Probably at …" instead. |
 | `artworkReached(ProximiStop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, or stood in its area: the stop is done and the route leads to the next stop. `geofenceEntered` arrives at the enter. |
 | `artworkVisitedOutOfOrder(ProximiStop)` | The visitor stayed at an artwork further down the journey. It counts as visited. In a personalised journey the stops ahead are ordered again; a curated tour keeps its order. |
-| `skipRequested`, `stopSkipped`, `skipCancelled`, `skipUndone` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it", "Undo skip". |
+| `skipRequested`, `stopSkipped`, `skipCancelled`, `skipUndone` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it", "Undo skip". `ProximiMapView` without `.prompts` sends only `skipRequested`. |
+| `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here". |
 | `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Change your route?" confirmed; the detour reached (`completed`) or left. |
 | `journeyResumed` | "Resume your Journey" or "Show the route from here". |
@@ -375,7 +419,7 @@ let configuration = GADConfiguration(
 | `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order. |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
-| `stopNearbyMeters` | 5 m | The "next stop is less than … m away" notification. |
+| `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
 | `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
@@ -387,7 +431,7 @@ let configuration = GADConfiguration(
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `liveActivityMinimumInterval` | 5 s | The shortest gap between two Live Activity updates of the instruction. |
-| `postsGeofenceNotifications` | `true` | A notification for every enter and exit of a geofence with a name, and the notification authorization request once a wristband is connected. The "next stop" notification of the journey (`stopNearbyMeters`) does not depend on it. It sets the `UNUserNotificationCenter` delegate, which shows them in the foreground. A host app with its own delegate turns it off. |
+| `postsGeofenceNotifications` | `true` | A notification for every enter and exit of a geofence with a name, and the notification authorization request once a wristband is connected. The package posts no "next stop" notification; a host app can post one for `ProximiMapEvent.stopNearby`. It sets the `UNUserNotificationCenter` delegate, which shows them in the foreground. A host app with its own delegate turns it off. |
 | `venueDataRefreshInterval` | 300 s | Time between two downloads of the venue's features in the foreground. 0 turns the downloads off. See "Venue data changes". |
 
 ## Artwork details in the list
@@ -555,6 +599,35 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.3.0 (2026-10-16)
+
+`ProximiMapView` is a UI component: the host app moves the journey on (2026-10-16: Nagarro handles
+visits, prompts, the bottom bar and the background itself).
+
+Added:
+
+- `ProximiMapView.Options`: `.bottomBar`, `.background`, `.prompts`, `.progress`, `.liveActivity`,
+  `.all`. See "ProximiMapView".
+- The open screen applies a change of the journey binding in place (visited, skipped, pending again,
+  added, moved). 1.2.0 started the screen again.
+- A journey without stops, or without a stop on the map, shows the map alone. 1.2.0 showed "None of
+  these artworks is on the museum map."
+- `ProximiMapEvent.positionUncertain(ProximiStop)` and `stopPlaceDeleted(ProximiStop)`.
+- `onClose` of `ProximiMapView` is optional (default `nil`): without it there is no Back.
+
+Changed:
+
+- `ProximiMapView` has none of the options by default: no bottom bar, no background, no prompts, no
+  journey logic, no Live Activity. 1.2.0 had all of them; `options: .all` gives the 1.2.0 behaviour.
+- Without `.progress` the view writes nothing to the journey binding; the host app marks stops visited
+  and skipped. A swipe in the list reports `skipRequested` only.
+- The package posts no "next stop nearby" notification. `ProximiMapEvent.stopNearby` is unchanged; the
+  Proximi GAD app posts the notification itself.
+
+Not breaking for Nagarro's app: the public API is source compatible, and the changed defaults concern
+only the `ProximiMapView` of 1.2.0, which no host app had integrated. The notification change concerns
+hosts of `ProximiMap`; only the Proximi GAD app is one.
 
 ### 1.2.0 (2026-10-16)
 

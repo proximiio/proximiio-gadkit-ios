@@ -32,10 +32,10 @@ public struct GADSettings: Equatable, Sendable {
     /// …for this many seconds.
     public var amenityArrivalDwell: TimeInterval = 5
 
-    // MARK: Notifications
+    // MARK: Next stop nearby
 
-    /// "The next stop of your journey is less than … m away": the distance along the route, or
-    /// in a straight line without a route.
+    /// `ProximiMapEvent.stopNearby`: the active stop is less than this many metres away, along the
+    /// route, or in a straight line without a route. The package posts no notification for it.
     public var stopNearbyMeters: Double = 5
 
     // MARK: Route

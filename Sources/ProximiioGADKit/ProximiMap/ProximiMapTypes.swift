@@ -134,15 +134,26 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// The route leads to this stop now.
     case nextStop(ProximiStop)
     /// The active stop is less than `GADSettings.stopNearbyMeters` away on the visitor's level. Once
-    /// per stop.
+    /// per stop. The package posts no notification for it.
     case stopNearby(ProximiStop)
+    /// The position is uncertain near the active stop: the accuracy is worse than
+    /// `GADSettings.uncertainAccuracyMeters` and the stop is within it. Sent by `ProximiMapView` without `Options.prompts`,
+    /// which otherwise asks "Probably at …". At most once per
+    /// `GADSettings.locationQuestionQuietPeriod`.
+    case positionUncertain(ProximiStop)
+    /// The stop's POI was deleted on the backend while `ProximiMapView` is open. Once per stop.
+    /// Without `ProximiMapView.Options.progress` the stop stays on the screen until the host app
+    /// changes the journey; that change starts the screen again without it. With `.progress` the
+    /// stop is skipped.
+    case stopPlaceDeleted(ProximiStop)
     /// `GADSettings.artworkAdvanceDelay` after the visitor reached the artwork of the active stop:
     /// the stop is done and the route leads to the next stop.
     case artworkReached(ProximiStop)
     /// The visitor stayed at an artwork further down the journey. It counts as visited. A
     /// personalised journey orders the stops ahead again.
     case artworkVisitedOutOfOrder(ProximiStop)
-    /// The visitor swiped a stop in the list. A dialog asks "Skip artwork?".
+    /// The visitor swiped a stop in the list. With `ProximiMapView.Options.prompts` a dialog asks
+    /// "Skip artwork?"; without them the host app decides.
     case skipRequested(ProximiStop)
     case stopSkipped(ProximiStop)
     case skipCancelled(ProximiStop)
@@ -159,7 +170,8 @@ public enum ProximiMapEvent: Equatable, Sendable {
     case offRoute(duration: TimeInterval)
     /// The visitor is on the route again after `offRoute`.
     case backOnRoute
-    /// Every stop is visited or skipped. "Journey Complete" shows.
+    /// Every stop is visited or skipped. `ProximiMap`, and `ProximiMapView` with
+    /// `Options.prompts`, show Journey Complete.
     case journeyFinished
     /// The map shows a floor without positioning and does not follow the visitor.
     case floorWithoutPositioningEntered(level: Int)

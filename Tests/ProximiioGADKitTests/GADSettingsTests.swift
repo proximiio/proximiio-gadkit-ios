@@ -48,8 +48,8 @@ struct GADSettingsTests {
     @Test func stopNearbyFollowsTheSettings() {
         let stop = ProximiioCoordinate(latitude: 24.5, longitude: 54.4)
         let eightMetresNorth = ProximiioCoordinate(latitude: 24.5 + 8 / 111_320, longitude: 54.4)
-        #expect(!StopNearbyNotifier.isNearby(eightMetresNorth, level: 1, stop: stop, stopLevel: 1))
-        #expect(StopNearbyNotifier.isNearby(eightMetresNorth, level: 1, stop: stop, stopLevel: 1, within: 10))
-        #expect(StopNearbyNotifier.isNearby(eightMetresNorth, level: 1, stop: stop, stopLevel: 1, routeMeters: 9, within: 10))
+        #expect(!StopNearbyDetector.isNearby(eightMetresNorth, level: 1, stop: stop, stopLevel: 1))
+        #expect(StopNearbyDetector.isNearby(eightMetresNorth, level: 1, stop: stop, stopLevel: 1, within: 10))
+        #expect(StopNearbyDetector.isNearby(eightMetresNorth, level: 1, stop: stop, stopLevel: 1, routeMeters: 9, within: 10))
     }
 }

@@ -22,7 +22,8 @@ enum VisitEvent: Sendable, Equatable {
     /// The visitor swiped a stop in the list, or used its "Skip" accessibility action.
     /// `VisitView` asks "Skip artwork?".
     case skipRequested(JourneyStop)
-    /// The visitor confirmed "Skip artwork". The stop is skipped.
+    /// The visitor confirmed "Skip artwork". With `ProximiMapView.Options.progress` the stop is
+    /// skipped; without it the host app skips it.
     case stopSkipped(JourneyStop)
     /// The visitor answered "Keep it". The stop stays in the journey.
     case skipCancelled(JourneyStop)
@@ -45,9 +46,17 @@ enum VisitEvent: Sendable, Equatable {
     case exitConfirmed
     /// The visitor answered "Carry on". The visit continues.
     case exitCancelled
-    /// The active stop is less than 5 m away on the visitor's level. Once per stop for the
-    /// whole visit. Measured like the notification of `StopNearbyNotifier`.
+    /// The active stop is less than `GADSettings.stopNearbyMeters` away on the visitor's level.
+    /// Once per stop for the whole visit (`StopNearbyDetector`).
     case stopNearby(JourneyStop)
+    /// The POI of a stop was deleted on the backend while the screen is open. Once per stop. With
+    /// `ProximiMapView.Options.progress` the stop is skipped; without it the stop stays and the host
+    /// app decides.
+    case stopPlaceDeleted(JourneyStop)
+    /// The position is uncertain near the active stop ("Probably at …"). Without
+    /// `ProximiMapView.Options.prompts` the view reports it instead of asking. At most once per
+    /// `GADSettings.locationQuestionQuietPeriod`.
+    case positionUncertain(JourneyStop)
     /// The visitor reached the artwork of the active stop: they entered its geofence or stand in
     /// its area. The stop is done 2 s later, when this event arrives, and the route leads to the
     /// next stop. The navigator reports no `stopReached` for artworks.

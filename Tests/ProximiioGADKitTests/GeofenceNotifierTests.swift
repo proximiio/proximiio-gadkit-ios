@@ -37,7 +37,7 @@ struct GeofenceNotifierTests {
     }
 }
 
-struct StopNearbyNotifierTests {
+struct StopNearbyDetectorTests {
     private let stop = ProximiioCoordinate(latitude: 24.464, longitude: 54.329)
 
     /// `meters` north of `stop`. One degree of latitude is about 111 km.
@@ -46,33 +46,31 @@ struct StopNearbyNotifierTests {
     }
 
     @Test func nearbyIsLessThanFiveMetresOnTheSameLevel() {
-        #expect(StopNearbyNotifier.isNearby(north(4), level: 1, stop: stop, stopLevel: 1))
-        #expect(!StopNearbyNotifier.isNearby(north(6), level: 1, stop: stop, stopLevel: 1))
-        #expect(!StopNearbyNotifier.isNearby(north(1), level: 2, stop: stop, stopLevel: 1))
+        #expect(StopNearbyDetector.isNearby(north(4), level: 1, stop: stop, stopLevel: 1))
+        #expect(!StopNearbyDetector.isNearby(north(6), level: 1, stop: stop, stopLevel: 1))
+        #expect(!StopNearbyDetector.isNearby(north(1), level: 2, stop: stop, stopLevel: 1))
     }
 
     @Test func anUnknownLevelMatchesAnyLevel() {
-        #expect(StopNearbyNotifier.isNearby(north(1), level: nil, stop: stop, stopLevel: 1))
-        #expect(StopNearbyNotifier.isNearby(north(1), level: 1, stop: stop, stopLevel: nil))
+        #expect(StopNearbyDetector.isNearby(north(1), level: nil, stop: stop, stopLevel: 1))
+        #expect(StopNearbyDetector.isNearby(north(1), level: 1, stop: stop, stopLevel: nil))
     }
 
     @Test func theRouteDistanceWinsOverTheStraightLine() {
         // A stop 2 m away behind a wall, 12 m to walk.
-        #expect(!StopNearbyNotifier.isNearby(north(2), level: 1, stop: stop, stopLevel: 1, routeMeters: 12))
+        #expect(!StopNearbyDetector.isNearby(north(2), level: 1, stop: stop, stopLevel: 1, routeMeters: 12))
         // A stop 3 m away in a straight line, 4 m to walk.
-        #expect(StopNearbyNotifier.isNearby(north(3), level: 1, stop: stop, stopLevel: 1, routeMeters: 4))
-        #expect(!StopNearbyNotifier.isNearby(north(1), level: 2, stop: stop, stopLevel: 1, routeMeters: 1))
+        #expect(StopNearbyDetector.isNearby(north(3), level: 1, stop: stop, stopLevel: 1, routeMeters: 4))
+        #expect(!StopNearbyDetector.isNearby(north(1), level: 2, stop: stop, stopLevel: 1, routeMeters: 1))
     }
 
     /// `VisitView` reports `VisitEvent.stopNearby` with the stop that `update` returns.
     @Test @MainActor func aStopIsReportedOncePerVisit() {
-        var posted: [String] = []
-        let notifier = StopNearbyNotifier { posted.append($0.identifier) }
+        let detector = StopNearbyDetector()
         let artwork = JourneyStop(id: "a", title: "Artwork", coordinate: MapCoordinate(latitude: stop.latitude, longitude: stop.longitude))
         let here = north(1)
         let position = VenuePosition(latitude: here.latitude, longitude: here.longitude, horizontalAccuracy: 2, timestamp: .now)
-        #expect(notifier.update(position: position, stop: artwork, guidance: nil) == artwork)
-        #expect(notifier.update(position: position, stop: artwork, guidance: nil) == nil)
-        #expect(posted == ["stop-nearby-a"])
+        #expect(detector.update(position: position, stop: artwork, guidance: nil) == artwork)
+        #expect(detector.update(position: position, stop: artwork, guidance: nil) == nil)
     }
 }

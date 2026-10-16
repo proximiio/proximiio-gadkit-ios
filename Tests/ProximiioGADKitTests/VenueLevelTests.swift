@@ -28,7 +28,7 @@ struct VenueLevelTests {
 
     @Test func aStopOnAMezzanineIsNotNearbyFromTheLevelAbove() {
         let stop = ProximiioCoordinate(latitude: 24.464, longitude: 54.329)
-        #expect(StopNearbyNotifier.isNearby(stop, level: 1.5, stop: stop, stopLevel: 1.5))
-        #expect(!StopNearbyNotifier.isNearby(stop, level: 2, stop: stop, stopLevel: 1.5))
+        #expect(StopNearbyDetector.isNearby(stop, level: 1.5, stop: stop, stopLevel: 1.5))
+        #expect(!StopNearbyDetector.isNearby(stop, level: 2, stop: stop, stopLevel: 1.5))
     }
 }

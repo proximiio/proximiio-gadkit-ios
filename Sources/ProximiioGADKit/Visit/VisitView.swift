@@ -12,6 +12,10 @@
 //  A personalised and a curated journey differ in the stop card, the list, skipping and the
 //  background (`JourneyKind`).
 //
+//  `ProximiMapView.Options` turns the bottom bar, the background, the prompts, the journey logic
+//  (`VisitController.managesProgress`) and the Live Activity on. `ProximiMap` uses all of them;
+//  `ProximiMapView` none by default. A journey without stops shows the map alone.
+//
 import CoreLocation
 import Proximiio
 import ProximiioMap
@@ -50,37 +54,52 @@ struct VisitView: View {
     /// presentation is dismissed. Closing the visit while its own sheet is still dismissing can
     /// leave the screen below without taps (Monday "UI gets stuck", 2026-10-15).
     @State private var leavesAfterDismiss = false
-    @State private var stopNotifier: StopNearbyNotifier
+    @State private var stopNearby: StopNearbyDetector
     /// The lift or stairs view and the map of a floor without positioning.
     @State private var floorGuide: FloorWithoutPositioningGuide
     private let venue: VenueService
     private let kind: JourneyKind
+    private let options: ProximiMapView.Options
+    /// The host app's journey after a change, applied to the open screen (`VisitController.apply`).
+    private let incoming: IncomingJourney?
+    /// The amenity routed to from search on a map without a journey (no navigator).
+    @State private var routedAmenity: VenuePlace?
+    @State private var amenityRouteError: String?
     /// `venue.settings` when the view was created.
     private let settings: GADSettings
-    let onClose: () -> Void
+    /// Back, "Leave the tour" and the close button of Journey Complete. `nil`: no Back and no "Leave
+    /// the tour here"; Journey Complete's close button returns to the map.
+    let onClose: (() -> Void)?
 
     private var accessibility: RouteAccessibility {
         RouteAccessibility.effective(hostNeeds: hostAccessibility, accessibleRoutes: accessibleRoutes)
     }
 
     /// - Parameters:
+    ///   - options: What the screen does beyond drawing the journey.
     ///   - mode: Map or List when the screen opens.
+    ///   - incoming: The host app's journey after a change (`ProximiMapView`).
+    ///   - onClose: See `onClose`.
     ///   - persist: Stores the journey after each change (`VisitController.persist`).
     init(
         venue: VenueService,
         journey: Journey,
         kind: JourneyKind = .personalised,
+        options: ProximiMapView.Options = .all,
         mode: VisitMode = .map,
+        incoming: IncomingJourney? = nil,
         persist: @escaping @MainActor (Journey?) -> Void = VisitStore.persist,
-        onClose: @escaping () -> Void
+        onClose: (() -> Void)?
     ) {
         self.venue = venue
         self.kind = kind
+        self.options = options
+        self.incoming = incoming
         _mode = State(initialValue: mode)
         let settings = venue.settings
         self.settings = settings
         _monitor = State(initialValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
-        _stopNotifier = State(initialValue: StopNearbyNotifier(nearbyMeters: settings.stopNearbyMeters))
+        _stopNearby = State(initialValue: StopNearbyDetector(nearbyMeters: settings.stopNearbyMeters))
         _liveActivity = State(initialValue: VisitLiveActivity(minimumUpdateInterval: settings.liveActivityMinimumInterval))
         _floorGuide = State(initialValue: FloorWithoutPositioningGuide(settings: settings))
         let session = MapStyle.session(
@@ -93,23 +112,27 @@ struct VisitView: View {
         #if DEBUG
         if DebugLaunch.current.visitAutoAdvance { rules.advance = .onDeparture(meters: 5) }
         #endif
-        _controller = State(initialValue: VisitController(session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder, settings: settings, persist: persist))
+        _controller = State(initialValue: VisitController(
+            session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder,
+            managesProgress: options.contains(.progress),
+            deviationPolicy: options.contains(.prompts) ? .askApp : .automatic,
+            settings: settings, persist: persist
+        ))
         self.onClose = onClose
     }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                ScreenBackground.map.view
-                VisitLiveActivityDriver(navigator: controller.navigator, session: controller.session, liveActivity: liveActivity)
+                if options.contains(.background) { ScreenBackground.map.view }
+                if options.contains(.liveActivity) && hasStops {
+                    VisitLiveActivityDriver(navigator: controller.navigator, session: controller.session, liveActivity: liveActivity)
+                }
                 VStack(spacing: 10) {
                     MapGlassFrame {
                         ProximiioMapView(session: controller.session)
-                        if mode == .list {
-                            VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, onSkip: { stop in
-                                stopToSkip = stop
-                                emit(.skipRequested(stop))
-                            })
+                        if showsList {
+                            VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, onSkip: requestSkip)
                                 .background(Palette.white.opacity(0.92))
                                 .transition(.opacity)
                         }
@@ -120,18 +143,24 @@ struct VisitView: View {
                     } overlay: {
                         cardOverlay
                     }
-                    BottomGlassBar {
-                        Button(action: requestClose) {
-                            Image(systemName: "chevron.backward").font(.system(size: 18, weight: .medium))
+                    if options.contains(.bottomBar) {
+                        BottomGlassBar {
+                            if onClose != nil {
+                                Button(action: requestClose) {
+                                    Image(systemName: "chevron.backward").font(.system(size: 18, weight: .medium))
+                                }
+                                .buttonStyle(RoundGlassButtonStyle())
+                                .accessibilityLabel(Text("Back", bundle: .module))
+                            }
+                        } trailing: {
+                            if hasStops {
+                                Button { withAnimation { mode = showsList ? .map : .list } } label: {
+                                    Image(systemName: showsList ? "map" : "list.bullet").font(.system(size: 18, weight: .medium))
+                                }
+                                .buttonStyle(RoundGlassButtonStyle())
+                                .accessibilityLabel(showsList ? Text("Map", bundle: .module) : Text("List", bundle: .module))
+                            }
                         }
-                        .buttonStyle(RoundGlassButtonStyle())
-                        .accessibilityLabel(Text("Back", bundle: .module))
-                    } trailing: {
-                        Button { withAnimation { mode = mode == .map ? .list : .map } } label: {
-                            Image(systemName: mode == .map ? "list.bullet" : "map").font(.system(size: 18, weight: .medium))
-                        }
-                        .buttonStyle(RoundGlassButtonStyle())
-                        .accessibilityLabel(mode == .map ? Text("List", bundle: .module) : Text("Map", bundle: .module))
                     }
                 }
                 // The map ignores the safe area; the card starts below the status bar as in the design.
@@ -182,7 +211,8 @@ struct VisitView: View {
             // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).
             mapLayers.attach(to: controller.session)
             refreshMapLayers()
-            await controller.start(accessibility: accessibility)
+            // A journey without stops shows the map alone; the navigator would report it finished.
+            if hasStops { await controller.start(accessibility: accessibility) }
             // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
             // map did not turn until "Centre on me").
             if controller.session.position != nil { recentre(withHeading: true, reason: "journey started") }
@@ -248,7 +278,11 @@ struct VisitView: View {
             }
         }
         .onChange(of: controller.navigator.isFinished) { _, isFinished in
-            if isFinished { isShowingWrapUp = true }
+            if isFinished && options.contains(.prompts) { isShowingWrapUp = true }
+        }
+        .onChange(of: incoming) { _, incoming in
+            guard let incoming else { return }
+            Task { await controller.apply(incoming.journey) }
         }
         .fullScreenCover(isPresented: $isShowingWrapUp, onDismiss: leaveIfAsked) {
             JourneyCompleteView(venue: venue) {
@@ -322,7 +356,9 @@ struct VisitView: View {
             Task {
                 await loadVenueData()
                 refreshMapLayers()
-                await controller.skipStopsWithoutPlace(places: places)
+                for stop in await controller.stopsWithoutPlace(places: places) {
+                    emit(.stopPlaceDeleted(stop))
+                }
             }
         }
         .onReceive(controller.navigator.$journey) { _ in
@@ -341,7 +377,8 @@ struct VisitView: View {
         .sheet(item: $stopToSkip) { stop in
             SkipConfirmation(stop: stop) {
                 stopToSkip = nil
-                Task { await controller.skip(stopID: stop.id) }
+                // Without `.progress` the host app skips the stop.
+                if options.contains(.progress) { Task { await controller.skip(stopID: stop.id) } }
                 emit(.stopSkipped(stop))
             } onKeep: {
                 stopToSkip = nil
@@ -361,7 +398,7 @@ struct VisitView: View {
     /// The off-route warning, unless another prompt is up.
     private var isShowingOffRouteWarning: Binding<Bool> {
         Binding(
-            get: { controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !floorGuide.isActive },
+            get: { options.contains(.prompts) && controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !floorGuide.isActive },
             set: { if !$0 { controller.dismissOffRoute() } }
         )
     }
@@ -390,9 +427,9 @@ struct VisitView: View {
 
     // MARK: Map layers
 
-    /// Posts the "next stop nearby" notification and reports `stopNearby` once per stop.
+    /// Reports `stopNearby` once per stop.
     private func checkStopNearby(position: VenuePosition?, guidance: RouteGuidance?) {
-        if let stop = stopNotifier.update(position: position, stop: controller.navigator.activeStop, guidance: guidance) {
+        if let stop = stopNearby.update(position: position, stop: controller.navigator.activeStop, guidance: guidance) {
             emit(.stopNearby(stop))
         }
     }
@@ -468,25 +505,39 @@ struct VisitView: View {
         guard leavesAfterDismiss else { return }
         leavesAfterDismiss = false
         FieldLog.log("visit: close")
-        onClose()
+        onClose?()
     }
 
-    /// Back: a visit in progress asks first (03.10); a visit not started or finished closes.
+    /// Whether the journey has a stop. Without one the screen shows the map alone.
+    private var hasStops: Bool { !controller.navigator.journey.stops.isEmpty }
+
+    /// List mode with a journey. Without stops the map shows, whatever `mode` is.
+    private var showsList: Bool { mode == .list && hasStops }
+
+    /// A swipe on a stop in the list: "Skip this artwork?" with `prompts`, else only the event.
+    private func requestSkip(_ stop: JourneyStop) {
+        if options.contains(.prompts) { stopToSkip = stop }
+        emit(.skipRequested(stop))
+    }
+
+    /// Back: a visit in progress asks first (03.10) with `prompts`; otherwise Back closes.
     private func requestClose() {
         let journey = controller.navigator.journey
         let started = journey.stops.contains { $0.state == .done || $0.state == .skipped }
-        if started && !controller.navigator.isFinished {
+        if options.contains(.prompts) && started && !controller.navigator.isFinished {
             isConfirmingExit = true
             emit(.exitRequested)
         } else {
-            onClose()
+            onClose?()
         }
     }
 
     // MARK: Ambiguous location (EC04)
 
     private var isPresentingSomething: Bool {
-        lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit || controller.isOffRoute
+        // Without prompts the off-route state shows nothing and does not hold the report back.
+        lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit
+            || (options.contains(.prompts) && controller.isOffRoute)
             || amenityToConfirm != nil || isShowingWrapUp || floorGuide.isActive
     }
 
@@ -506,7 +557,13 @@ struct VisitView: View {
         FieldLog.log("ambiguous location: \(ambiguity.kind)")
         switch ambiguity {
         case .lowConfidence(let stop):
-            lowConfidenceStop = stop
+            if options.contains(.prompts) {
+                lowConfidenceStop = stop
+            } else {
+                // Reported once per quiet period, as an answered prompt.
+                answeredAmbiguity[ambiguity.kind] = .now
+                emit(.positionUncertain(stop))
+            }
         }
     }
 
@@ -515,10 +572,12 @@ struct VisitView: View {
     private var cardOverlay: some View {
         VStack(spacing: 10) {
             HStack(alignment: .top) {
-                MapListToggle(showsList: Binding(get: { mode == .list }, set: { mode = $0 ? .list : .map }))
+                if hasStops {
+                    MapListToggle(showsList: Binding(get: { mode == .list }, set: { mode = $0 ? .list : .map }))
+                }
                 Spacer()
                 // In List mode the design hides search.
-                if mode == .map {
+                if !showsList {
                 VStack(alignment: .trailing, spacing: 10) {
                     GlassSquareButton(isSelected: isShowingAmenities, action: { withAnimation { isShowingAmenities.toggle() } }) {
                         GADIcon.search.image.resizable().scaledToFit().frame(width: 24, height: 24)
@@ -535,7 +594,7 @@ struct VisitView: View {
             }
             .padding(.top, 22)
             Spacer()
-            if mode == .map {
+            if !showsList {
                 HStack {
                     Spacer()
                     VStack(spacing: 5) {
@@ -579,11 +638,25 @@ struct VisitView: View {
                         primary: "Go here",
                         onPrimary: {
                             selectedAmenity = nil
-                            amenityToConfirm = place
+                            if !hasStops {
+                                Task { await route(to: place) }
+                            } else if options.contains(.prompts) {
+                                amenityToConfirm = place
+                            } else {
+                                Task { await controller.detour(to: place) }
+                                emit(.detourStarted(place))
+                            }
                         },
                         onClose: { selectedAmenity = nil }
                     )
-                } else {
+                } else if let place = routedAmenity {
+                    PlaceInfoCard(
+                        title: place.title,
+                        subtitle: amenityRouteError ?? place.cardSubtitle,
+                        primary: "Close",
+                        onPrimary: endAmenityRoute
+                    )
+                } else if hasStops {
                     VisitCard(
                         navigator: controller.navigator,
                         session: controller.session,
@@ -603,6 +676,43 @@ struct VisitView: View {
         .padding(.bottom, 20)
         .animation(.easeInOut(duration: 0.2), value: isShowingAmenities)
         .animation(.easeInOut(duration: 0.2), value: amenityToConfirm)
+    }
+
+    /// "Go here" on a map without a journey: the route from the visitor to `place`, as on the museum
+    /// map. There is no navigator to add a detour to.
+    private func route(to place: VenuePlace) async {
+        routedAmenity = place
+        guard let here = controller.session.position else {
+            amenityRouteError = String(localized: "Waiting for your position.", bundle: .module)
+            controller.session.clearRoute()
+            return
+        }
+        do {
+            let route = try await venue.sdk.computeRoute(
+                from: here.coordinate.proximiio,
+                fromLevel: here.floor?.level ?? 0,
+                to: place.coordinate,
+                toLevel: place.level,
+                options: accessibility.routeOptions
+            )
+            guard routedAmenity?.id == place.id else { return }
+            controller.session.setRoute(route)
+            amenityRouteError = nil
+        } catch {
+            FieldLog.log("route to \(place.title) failed: \(error)")
+            controller.session.clearRoute()
+            if case WayfindingRoutingError.noRoute(.noAccessibleRoute) = error {
+                amenityRouteError = String(localized: "No route from here with your accessibility settings.", bundle: .module)
+            } else {
+                amenityRouteError = String(localized: "No route from here.", bundle: .module)
+            }
+        }
+    }
+
+    private func endAmenityRoute() {
+        routedAmenity = nil
+        amenityRouteError = nil
+        controller.session.clearRoute()
     }
 
     private func changeRouteText(to place: VenuePlace) -> String {

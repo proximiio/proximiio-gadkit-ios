@@ -455,14 +455,16 @@ public final class ProximiMap {
         let launch = DebugLaunch.current
         await launch.run(with: venue, wristband: session)
         if launch.openMap { open(.museumMap) }
-        guard !launch.visitStops.isEmpty else { return }
         let ids = launch.visitStops.compactMap { VenuePlace.matching($0, in: places).first?.id }
-        DebugLaunch.log("visit: \(ids.count) stops")
         if launch.hostedMap {
+            // Without `-visit` the view shows the map alone.
+            DebugLaunch.log("hosted map: \(ids.count) stops")
             hostedJourney = ProximiJourney(kind: launch.visitKind, artworks: ids)
             cover = .hosted
             return
         }
+        guard !ids.isEmpty else { return }
+        DebugLaunch.log("visit: \(ids.count) stops")
         let journey = VisitPlan.journey(poiIDs: ids, places: places, galleries: galleries)
         store(journey, meta: .standard(stopCount: journey.stops.count, kind: launch.visitKind))
         open(.journey)
@@ -557,6 +559,8 @@ extension ProximiMap {
         case .exitConfirmed: return .exitConfirmed
         case .exitCancelled: return .exitCancelled
         case .stopNearby(let s): return .stopNearby(stop(s))
+        case .positionUncertain(let s): return .positionUncertain(stop(s))
+        case .stopPlaceDeleted(let s): return .stopPlaceDeleted(stop(s))
         case .artworkReached(let s): return .artworkReached(stop(s))
         case .artworkVisitedOutOfOrder(let s): return .artworkVisitedOutOfOrder(stop(s))
         case .trackingChanged(let health): return .trackingChanged(health)

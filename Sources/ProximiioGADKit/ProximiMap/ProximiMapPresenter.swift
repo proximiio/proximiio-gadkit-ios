@@ -117,8 +117,10 @@ private struct JourneyReadyFlow: View {
 }
 
 #if DEBUG
-/// `-hostedMap`: `ProximiMapView` on the app's SDK. The line at the top counts the stop states of
-/// the journey the view writes, for UI tests.
+/// `-hostedMap`: `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses
+/// it. This view is the host app: it skips a stop the visitor swiped, and "Visited" marks the first
+/// pending stop visited. The line at the top counts the stop states of its journey,
+/// for UI tests.
 private struct HostedMapCheck: View {
     @Bindable var map: ProximiMap
     let sdk: Proximiio
@@ -126,14 +128,24 @@ private struct HostedMapCheck: View {
     var body: some View {
         ProximiMapView(sdk: sdk, journey: $map.hostedJourney, routeAccessibility: map.routeAccessibility) { event in
             FieldLog.log("hosted map → host app: \(event)")
-        } onClose: {
-            map.cover = nil
+            if case .skipRequested(let stop) = event { set(stop.id, to: .skipped) }
         }
         .overlay(alignment: .top) {
-            Text(Self.states(of: map.hostedJourney))
-                .font(.caption2)
-                .accessibilityIdentifier("hostedJourneyStates")
+            HStack {
+                Text(Self.states(of: map.hostedJourney))
+                    .font(.caption2)
+                    .accessibilityIdentifier("hostedJourneyStates")
+                if let first = map.hostedJourney.stops.first(where: { $0.state == .pending }) {
+                    Button("Visited") { set(first.id, to: .visited) }.font(.caption2)
+                }
+                Button("Close map") { map.cover = nil }.font(.caption2)
+            }
         }
+    }
+
+    private func set(_ poiID: String, to state: ProximiJourney.State) {
+        guard let index = map.hostedJourney.stops.firstIndex(where: { $0.id == poiID }) else { return }
+        map.hostedJourney.stops[index].state = state
     }
 
     /// For example "pending 3 · visited 0 · skipped 1".
