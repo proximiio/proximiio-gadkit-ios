@@ -10,6 +10,9 @@
 //  difference: the API host comes from `GADConfiguration`, so a production build reaches
 //  only the client's on-prem install.
 //
+//  `hosted(sdk:settings:)` uses an SDK the host app has started (`ProximiMapView`). The host
+//  app attaches the position provider; the service attaches none.
+//
 import Foundation
 import Proximiio
 import ProximiioMap
@@ -25,14 +28,15 @@ final class VenueService {
     var settings: GADSettings
     /// Changes of the venue data while the app runs. Screens read the data again on a change.
     let data: VenueDataRefresh
-    /// The binding client whose provider delivers the wristband's positions.
-    private let binding: BlueiotWristbandBinding
+    /// The binding client whose provider delivers the wristband's positions. `nil` on the host
+    /// app's SDK.
+    private let binding: BlueiotWristbandBinding?
     /// Name of the attached position provider. Providers are detached by name.
     private var attachedProvider: String?
     /// Writes the attached binding provider's samples to `FieldLog`.
     private var sampleLog: Task<Void, Never>?
 
-    private init(sdk: Proximiio, binding: BlueiotWristbandBinding, settings: GADSettings) {
+    private init(sdk: Proximiio, binding: BlueiotWristbandBinding?, settings: GADSettings) {
         self.sdk = sdk
         self.settings = settings
         self.binding = binding
@@ -94,6 +98,27 @@ final class VenueService {
         return venue
     }
 
+    /// A venue on the host app's started SDK. Installs the route network from the SDK's feature
+    /// cache, or downloads it when the cache has no path. Requests no permission and attaches no
+    /// position provider. Call `stop()` when the screen closes.
+    static func hosted(sdk: Proximiio, settings: GADSettings) async -> VenueService {
+        if await sdk.loadCachedRouteNetwork() == 0 {
+            do {
+                _ = try await sdk.loadRouteNetwork()
+            } catch {
+                FieldLog.log("hosted map: route network not loaded: \(error.localizedDescription)")
+            }
+        }
+        let venue = VenueService(sdk: sdk, binding: nil, settings: settings)
+        await venue.data.start(interval: settings.venueDataRefreshInterval)
+        return venue
+    }
+
+    /// Ends the venue data downloads.
+    func stop() {
+        data.stop()
+    }
+
     /// Fetches the organisation's map style in the background. The map library writes it to
     /// Caches, and a map screen opened later starts on it instead of an empty style. Without it,
     /// the first map screen after an install fetches the style while it is on screen.
@@ -113,6 +138,7 @@ final class VenueService {
     /// re-attach stops and starts the provider, which reopens its relay-api stream. In
     /// Debug builds it also ends journey playback.
     func attachBinding() async {
+        guard let binding else { return }
         await detachProvider()
         let provider = binding.positionProvider
         attachedProvider = provider.name

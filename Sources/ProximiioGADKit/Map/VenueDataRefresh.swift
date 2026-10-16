@@ -52,7 +52,7 @@ final class VenueDataRefresh {
         tasks.append(Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(interval))
-                guard let self else { return }
+                guard !Task.isCancelled, let self else { return }
                 if UIApplication.shared.applicationState != .background {
                     await self.download(reason: "interval")
                 }
@@ -66,6 +66,14 @@ final class VenueDataRefresh {
                 Task { await self.download(reason: "foreground") }
             }
         }
+    }
+
+    /// Ends the downloads and the sync follow-up. `ProximiMapView` calls it when it closes.
+    func stop() {
+        tasks.forEach { $0.cancel() }
+        tasks = []
+        if let foregroundObserver { NotificationCenter.default.removeObserver(foregroundObserver) }
+        foregroundObserver = nil
     }
 
     private func download(reason: String) async {

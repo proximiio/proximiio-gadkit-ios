@@ -52,6 +52,7 @@ final class VisitController {
     /// `artworkVisitedOutOfOrder`.
     @ObservationIgnored var onArtworkDone: ((JourneyStop, _ isActiveStop: Bool) -> Void)?
     private var tasks: [Task<Void, Never>] = []
+    private var isStarted = false
 
     /// Times and distances (`GADSettings`): the move to the next artwork after an arrival, the
     /// wait for a fix before ordering, the out-of-order dwell, the detour arrival, the off-route
@@ -91,15 +92,21 @@ final class VisitController {
     /// after an artwork visited out of order.
     private let keepsOrder: Bool
 
+    /// Stores the journey after each change; `nil` after Journey Complete. `ProximiMap` writes
+    /// `VisitStore`, `ProximiMapView` the host app's journey.
+    @ObservationIgnored let persist: @MainActor (Journey?) -> Void
+
     init(
         session: ProximiioMapSession,
         journey: Journey,
         rules: JourneyRules = .visit,
         keepsOrder: Bool = false,
-        settings: GADSettings = .standard
+        settings: GADSettings = .standard,
+        persist: @escaping @MainActor (Journey?) -> Void = VisitStore.persist
     ) {
         self.keepsOrder = keepsOrder
         self.settings = settings
+        self.persist = persist
         self.session = session
         self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules, guidanceRules: Self.artworkGuidanceRules)
         var deviation = navigator.deviationRules
@@ -117,7 +124,10 @@ final class VisitController {
         await navigator.setRouteOptions(accessibility.routeOptions)
     }
 
+    /// Starts the journey once. A screen over the journey screen can end and restart its tasks.
     func start(accessibility: RouteAccessibility) async {
+        guard !isStarted else { return }
+        isStarted = true
         navigator.deviationPolicy = .askApp
         await navigator.setRouteOptions(accessibility.routeOptions)
         var isOrderedWithoutFix = false
@@ -162,7 +172,7 @@ final class VisitController {
     private func apply(_ proposal: JourneyOrderProposal) async {
         let applied = await navigator.apply(proposal)
         FieldLog.log("journey order: \(applied ? "applied" : "stale") · \(proposal.order.joined(separator: ", "))")
-        VisitStore.save(navigator.journey)
+        persist(navigator.journey)
     }
 
     private func handle(_ event: JourneyEvent) {
@@ -245,7 +255,7 @@ final class VisitController {
                 self.isOffRoute = false
                 await self.navigator.resumeJourney()
             }
-            VisitStore.save(self.navigator.journey)
+            self.persist(self.navigator.journey)
         })
     }
 
@@ -279,7 +289,7 @@ final class VisitController {
             self.scheduledDone.remove(stopID)
             guard !Task.isCancelled, self.navigator.activeStop?.id == stopID else { return }
             let changed = await self.navigator.markDone(stopID: stopID)
-            VisitStore.save(self.navigator.journey)
+            self.persist(self.navigator.journey)
             if changed, let stop = self.stop(stopID) { self.onArtworkDone?(stop, true) }
         })
     }
@@ -306,13 +316,13 @@ final class VisitController {
 
     func advance() async {
         await navigator.advance()
-        VisitStore.save(navigator.journey)
+        persist(navigator.journey)
     }
 
     func skip(stopID: String) async {
         guard await navigator.skip(stopID: stopID) else { return }
         lastSkippedStopID = stopID
-        VisitStore.save(navigator.journey)
+        persist(navigator.journey)
     }
 
     /// Skips the stops whose POI is no longer a place after a change of the venue data. The
@@ -326,21 +336,21 @@ final class VisitController {
             FieldLog.log("journey: \(stop.title) is no longer a place · skipped")
             await navigator.skip(stopID: stop.id)
         }
-        VisitStore.save(navigator.journey)
+        persist(navigator.journey)
     }
 
     func undoSkip() async {
         guard let id = lastSkippedStopID else { return }
         lastSkippedStopID = nil
         await navigator.reopen(stopID: id)
-        VisitStore.save(navigator.journey)
+        persist(navigator.journey)
     }
 
     /// Makes `stopID` the next stop (EC04a: the visitor picked the artwork they are at).
     func activate(stopID: String) async {
         guard navigator.activeStop?.id != stopID else { return }
         await navigator.activate(stopID: stopID)
-        VisitStore.save(navigator.journey)
+        persist(navigator.journey)
     }
 
     /// Inserts `place` as a detour before the active stop. The journey continues after it.
@@ -365,7 +375,7 @@ final class VisitController {
         let hadDetour = navigator.detourStop != nil
         await navigator.resumeJourney()
         if hadDetour { await orderRemaining() }
-        VisitStore.save(navigator.journey)
+        persist(navigator.journey)
     }
 
     /// Closes the off-route warning without re-routing. It opens again on the next episode.
@@ -377,8 +387,7 @@ final class VisitController {
         tasks.forEach { $0.cancel() }
         tasks = []
         navigator.end()
-        VisitStore.save(nil)
-        VisitStore.saveMeta(nil)
+        persist(nil)
     }
 }
 
@@ -454,6 +463,12 @@ enum VisitStore {
             return
         }
         defaults.set(data, forKey: metaKey)
+    }
+
+    /// Saves `journey`; `nil` removes the stored visit and its title.
+    @MainActor static func persist(_ journey: Journey?) {
+        save(journey)
+        if journey == nil { saveMeta(nil) }
     }
 
     /// `nil` or an empty journey removes the stored visit.

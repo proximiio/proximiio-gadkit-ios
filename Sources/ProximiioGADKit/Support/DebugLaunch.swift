@@ -16,6 +16,7 @@
 //    -visitList                           with -visit: open the journey in List mode
 //    -visitKind personalised|curated      with -visit: the kind of journey, default personalised
 //    -visitAutoAdvance                    with -visit: advance 5 m after leaving a stop
+//    -hostedMap                           with -visit: open the visit in ProximiMapView on the app's SDK
 //    -routeTo <title>                     with -openMap: route to the first place whose title matches
 //    -routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths   accessibility needs for routes
 //    -visit "<title>,<title>,…"            start a visit through the first place matching each title
@@ -38,6 +39,8 @@ import Foundation
     public var visitStops: [String] = []
     public var visitAutoAdvance = false
     public var visitList = false
+    /// `-hostedMap`: `ProximiMap` opens the visit in `ProximiMapView` instead of its journey screen.
+    public var hostedMap = false
     /// `-visitKind`. The host app passes it to `VisitView`.
     public var visitKind = JourneyKind.personalised
 
@@ -69,6 +72,7 @@ import Foundation
         )
         visitAutoAdvance = arguments.contains("-visitAutoAdvance")
         visitList = arguments.contains("-visitList")
+        hostedMap = arguments.contains("-hostedMap")
         visitKind = value(after: "-visitKind").flatMap(JourneyKind.init(rawValue:)) ?? .personalised
         visitStops = value(after: "-visit")?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
     }

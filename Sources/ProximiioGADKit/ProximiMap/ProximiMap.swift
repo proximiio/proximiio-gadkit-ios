@@ -2,8 +2,9 @@
 //  ProximiMap.swift
 //  ProximiioGADKit
 //
-//  The package's one entry point for the host app (Nagarro, 2026-10-16: "a single exposed wrapper
-//  component that encapsulates all internal UI components and logic").
+//  The package's entry point for a host app that leaves the SDK to the package (Nagarro, 2026-10-16:
+//  "a single exposed wrapper component that encapsulates all internal UI components and logic").
+//  `ProximiMapView` is the journey screen alone, on the host app's SDK.
 //
 //  The host app creates one `ProximiMap`, starts it, attaches `.proximiMap(_:)` to a view that is
 //  on screen, opens screens with `open(_:)` and receives `events`. `ProximiMap` owns the SDK, the
@@ -69,6 +70,10 @@ public final class ProximiMap {
 
     enum Cover: String, Identifiable {
         case museumMap, ready, visit
+        #if DEBUG
+        /// `-hostedMap`: the visit in `ProximiMapView`.
+        case hosted
+        #endif
         var id: String { rawValue }
     }
 
@@ -97,6 +102,10 @@ public final class ProximiMap {
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private let notifier = GeofenceNotifier()
     @ObservationIgnored private var lastWristband: WristbandStatus?
+    #if DEBUG
+    /// `-hostedMap`: the journey of the `ProximiMapView` the debug launch opens.
+    var hostedJourney = ProximiJourney(stops: [])
+    #endif
 
     public init(configuration: GADConfiguration) {
         self.configuration = configuration
@@ -449,6 +458,11 @@ public final class ProximiMap {
         guard !launch.visitStops.isEmpty else { return }
         let ids = launch.visitStops.compactMap { VenuePlace.matching($0, in: places).first?.id }
         DebugLaunch.log("visit: \(ids.count) stops")
+        if launch.hostedMap {
+            hostedJourney = ProximiJourney(kind: launch.visitKind, artworks: ids)
+            cover = .hosted
+            return
+        }
         let journey = VisitPlan.journey(poiIDs: ids, places: places, galleries: galleries)
         store(journey, meta: .standard(stopCount: journey.stops.count, kind: launch.visitKind))
         open(.journey)

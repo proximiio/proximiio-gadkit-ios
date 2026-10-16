@@ -63,14 +63,20 @@ struct VisitView: View {
         RouteAccessibility.effective(hostNeeds: hostAccessibility, accessibleRoutes: accessibleRoutes)
     }
 
+    /// - Parameters:
+    ///   - mode: Map or List when the screen opens.
+    ///   - persist: Stores the journey after each change (`VisitController.persist`).
     init(
         venue: VenueService,
         journey: Journey,
         kind: JourneyKind = .personalised,
+        mode: VisitMode = .map,
+        persist: @escaping @MainActor (Journey?) -> Void = VisitStore.persist,
         onClose: @escaping () -> Void
     ) {
         self.venue = venue
         self.kind = kind
+        _mode = State(initialValue: mode)
         let settings = venue.settings
         self.settings = settings
         _monitor = State(initialValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
@@ -87,7 +93,7 @@ struct VisitView: View {
         #if DEBUG
         if DebugLaunch.current.visitAutoAdvance { rules.advance = .onDeparture(meters: 5) }
         #endif
-        _controller = State(initialValue: VisitController(session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder, settings: settings))
+        _controller = State(initialValue: VisitController(session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder, settings: settings, persist: persist))
         self.onClose = onClose
     }
 
@@ -311,7 +317,7 @@ struct VisitView: View {
         .onChange(of: controller.navigator.activeStop?.id) { _, _ in
             checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
         }
-        .onChange(of: controller.navigator.journey) { _, journey in VisitStore.save(journey) }
+        .onChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
         .onChange(of: venue.data.version) { _, _ in
             Task {
                 await loadVenueData()

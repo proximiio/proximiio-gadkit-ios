@@ -4,20 +4,19 @@ ProximiioGADKit is a Swift package with the museum map, the journey (map and lis
 and Manage journey of the Proximi GAD app (Guggenheim Abu Dhabi), and the wristband binding. It is
 built on the Proximi.io iOS SDK and Map.
 
-The host app uses one entry point, `ProximiMap`:
+The host app uses one of two entry points:
 
-- it creates one `ProximiMap` and starts it;
-- it attaches `.proximiMap(_:)` to a view that stays on screen;
-- it opens screens with `open(_:)`;
-- it receives every change as a `ProximiMapEvent`.
-
-`ProximiMap` owns the SDK, the wristband session, the stored journey, the notifications and every
-screen and sheet of the package. The host app scans the wristband's QR code itself and passes the
-code to `connectWristband(code:)`. The Proximi GAD app uses the package the same way.
+- **`ProximiMap`** owns the SDK, the wristband session, the stored journey, the notifications and every
+  screen and sheet of the package. The host app creates one `ProximiMap` and starts it, attaches
+  `.proximiMap(_:)` to a view that stays on screen, opens screens with `open(_:)` and receives every
+  change as a `ProximiMapEvent`. It scans the wristband's QR code itself and passes the code to
+  `connectWristband(code:)`. The Proximi GAD app uses the package this way.
+- **`ProximiMapView`** is the journey screen alone, on an SDK the host app has started. The host app
+  owns the SDK, the wristband session and the journey. See [ProximiMapView](#proximimapview).
 
 | Product | Add to | Content |
 |---|---|---|
-| `ProximiioGADKit` | The app target | `ProximiMap` and its types, `GADConfiguration`, `GADSettings`, `FieldLog`. |
+| `ProximiioGADKit` | The app target | `ProximiMap`, `ProximiMapView` and their types, `GADConfiguration`, `GADSettings`, `FieldLog`. |
 | `ProximiioGADLiveActivity` | The widget extension | `VisitActivityAttributes` and `VisitActivityWidget`. |
 
 ## Requirements
@@ -141,6 +140,92 @@ them.
 starts positioning, loads the route network and attaches the wristband's position provider. Visitor
 reporting is on. Call it at launch: the map style and the venue data are then loaded before the first
 map screen. The package contacts only `apiBaseURL` and the relay-api host.
+
+## ProximiMapView
+
+`ProximiMapView` is the journey screen of `ProximiMap.Screen.journey` as a SwiftUI view: the Map /
+List toggle, search with the amenity shortcuts, the map with the floor button, "Centre on me", the
+accessible routes button and the stop card, the list, guidance from stop to stop, detours to
+amenities, the Live Activity and Journey Complete. A host app that uses it needs no `ProximiMap`.
+
+```swift
+import Proximiio
+import ProximiioGADKit
+import SwiftUI
+
+struct JourneyMapScreen: View {
+    let sdk: Proximiio                      // started by the host app, wristband provider attached
+    @Binding var journey: ProximiJourney    // owned and stored by the host app
+    let onClose: () -> Void
+
+    var body: some View {
+        ProximiMapView(sdk: sdk, journey: $journey) { event in
+            if case .artworkReached(let stop) = event { print("At \(stop.artworkID ?? stop.title)") }
+        } onClose: {
+            onClose()
+        }
+    }
+}
+
+// A new journey from the audio guide: every stop pending.
+journey = ProximiJourney(kind: .personalised, artworks: ["GAD.2010.00033", "GAD.2018.00034"])
+```
+
+| Parameter | |
+|---|---|
+| `sdk` | The host app's `Proximiio`, started, with the position provider of its wristband session attached. |
+| `journey` | `Binding<ProximiJourney>`. The view writes the stop order and the stop states to it. |
+| `settings` | `GADSettings`, default `.standard`. The view reads them when it opens. `postsGeofenceNotifications` does not apply. |
+| `routeAccessibility` | The visitor's accessibility needs for routes, default `.none`. See "Accessibility". |
+| `mode` | `.map` (default) or `.list` when the view opens. |
+| `onEvent` | `ProximiMapEvent`s of the journey screen, on the main actor. |
+| `onClose` | Back, "Leave the tour", or the close button of Journey Complete. The host app closes the view. |
+
+The host app:
+
+- creates and starts the SDK and attaches the wristband's position provider. The view does not start,
+  stop or configure the SDK and does not change the wristband session;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.59, the version this package pins;
+- presents the view, for example as a full-screen cover, and closes it in `onClose`;
+- stores the journey. The view stores nothing.
+
+The view installs the route network from the SDK's feature cache when it opens, or downloads it when
+the cache has no path. While it is on screen it downloads the venue's features every
+`GADSettings.venueDataRefreshInterval` (see "Venue data changes"). It requests no permission.
+
+### ProximiJourney
+
+`ProximiJourney` is `Codable`: the host app can store it as JSON.
+
+| Member | |
+|---|---|
+| `kind` | `.personalised` or `.curated`. See "Journeys". |
+| `stops` | `[ProximiJourney.Stop]` in visit order. A stop has the `id` the host app gave (a collection id `remote_id` or a Proximi.io POI id) and a `state`: `.pending`, `.visited` or `.skipped`. |
+| `init(kind:artworks:)` | A journey whose stops are all pending. |
+| `init(kind:stops:)` | A journey with its progress. |
+
+- The view writes the journey after every change of the order or of a stop state. A personalised
+  journey is ordered floor by floor and gallery by gallery from the visitor at the start, so the first
+  write can be the new order.
+- A reached artwork is `.visited` `artworkAdvanceDelay` after the arrival. The stop the route leads to
+  is `.pending`.
+- A stop whose id matches no POI, and a second stop of the same POI, are not on the map. The written
+  journey keeps them, unchanged, after the other stops. With no stop on the map the view shows "None of
+  these artworks is on the museum map." and Back.
+- A stop whose POI is deleted while the view is open becomes `.skipped`.
+- Detours to amenities are not stops of `ProximiJourney`.
+- A value the view did not write, for example a new journey from the audio guide, starts the journey
+  again from that value.
+- Journey Complete changes nothing: the journey already holds the last states.
+
+### Events of ProximiMapView
+
+`onEvent` receives the journey screen's events of the [Events](#events) table: `trackingChanged`,
+`nextStop`, `stopNearby`, `artworkReached`, `artworkVisitedOutOfOrder`, the skip events, the amenity
+and detour events, `journeyResumed`, `offRoute`, `backOnRoute`, `journeyFinished`, the floor without
+positioning events, `modeChanged`, `recentred`, `accessibleRoutesChanged` and the exit events. Screen,
+wristband, arrival, geofence and `journeyChanged` events come only from `ProximiMap`; geofence enter
+and exit events are on the host app's SDK (`geofenceEvents()`).
 
 ## Screens
 
@@ -470,6 +555,22 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.2.0 (2026-10-16)
+
+Added:
+
+- `ProximiMapView`: the journey screen on the host app's SDK, with the journey in a binding (Nagarro,
+  2026-10-16: "one UI component for the map view … that plugs into our existing SDK session and event
+  setup"). See "ProximiMapView".
+- `ProximiJourney`: the journey and its progress for `ProximiMapView`.
+
+Fixed:
+
+- The journey screen starts its journey once. Before, its start ran again when the screen appeared
+  again after a full-screen cover over it closed.
+
+Not breaking. `ProximiMap` is unchanged.
 
 ### 1.1.0 (2026-10-16)
 

@@ -47,6 +47,10 @@ struct ProximiMapPresenter: ViewModifier {
                 if let journey = VisitStore.load() {
                     VisitView(venue: venue, journey: journey, kind: storedMeta(for: journey).kind) { map.cover = nil }
                 }
+            #if DEBUG
+            case .hosted:
+                HostedMapCheck(map: map, sdk: venue.sdk)
+            #endif
             }
         }
     }
@@ -111,3 +115,31 @@ private struct JourneyReadyFlow: View {
         }
     }
 }
+
+#if DEBUG
+/// `-hostedMap`: `ProximiMapView` on the app's SDK. The line at the top counts the stop states of
+/// the journey the view writes, for UI tests.
+private struct HostedMapCheck: View {
+    @Bindable var map: ProximiMap
+    let sdk: Proximiio
+
+    var body: some View {
+        ProximiMapView(sdk: sdk, journey: $map.hostedJourney, routeAccessibility: map.routeAccessibility) { event in
+            FieldLog.log("hosted map → host app: \(event)")
+        } onClose: {
+            map.cover = nil
+        }
+        .overlay(alignment: .top) {
+            Text(Self.states(of: map.hostedJourney))
+                .font(.caption2)
+                .accessibilityIdentifier("hostedJourneyStates")
+        }
+    }
+
+    /// For example "pending 3 · visited 0 · skipped 1".
+    static func states(of journey: ProximiJourney) -> String {
+        func count(_ state: ProximiJourney.State) -> Int { journey.stops.filter { $0.state == state }.count }
+        return "pending \(count(.pending)) · visited \(count(.visited)) · skipped \(count(.skipped))"
+    }
+}
+#endif
