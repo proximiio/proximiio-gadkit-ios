@@ -219,7 +219,6 @@ struct VisitView: View {
         }
         .task {
             for await event in await venue.sdk.geofenceEvents() {
-                FieldLog.log("geofence: \(event)")
                 // Artwork geofences lie inside the gallery geofences, so only galleries set the
                 // current gallery.
                 switch event {

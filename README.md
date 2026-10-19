@@ -518,16 +518,17 @@ struct Widgets: WidgetBundle {
 
 ## Field log
 
-`FieldLog` writes positions, tracking health, geofence, journey, binding and `ProximiMap` events to
-`Documents/gad-debug.log`. It is off by default. Turn it on at launch, before `start()`, in test
-builds only:
+`FieldLog` writes relay positions, positions during a visit, tracking health, artwork arrivals, journey,
+binding and `ProximiMap` events to `Documents/gad-debug.log`. It does not write the SDK's geofence
+events. It is off by default. Turn it on at launch, before `start()`, in test builds only:
 
 ```swift
 FieldLog.isEnabled = true
 FieldLog.logLaunch()
 ```
 
-`FieldLogShareButton()` opens the share sheet with the file.
+`FieldLogShareButton()` opens the share sheet with the file. A line is `[GAD] <time stamp> <message>`;
+the time stamp is ISO 8601 in UTC with the date and milliseconds (`FieldLog.timeStamp`).
 
 ## Debug builds
 
@@ -599,6 +600,14 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.4.2 (2026-10-19)
+
+- `FieldLog` time stamps have the date: `2026-10-19T12:52:10.123Z` instead of `12:52:10.123Z`.
+  `FieldLog.timeStamp` is their format.
+- `FieldLog` no longer writes the SDK's geofence events during a visit. The Proximi GAD app writes every
+  geofence and privacy zone event itself.
+- `ProximiMap.sdk` is `@_spi(GADApp)`: the Proximi GAD app logs the SDK's events from it.
 
 ### 1.4.1 (2026-10-19)
 

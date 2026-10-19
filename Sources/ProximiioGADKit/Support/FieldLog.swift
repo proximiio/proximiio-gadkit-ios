@@ -7,6 +7,10 @@
 //  (TestFlight) builds. The file is `Documents/gad-debug.log`; `FieldLogShareButton` hands it
 //  to the share sheet.
 //
+//  A line is `[GAD] <time stamp> <message>`. The time stamp is ISO 8601 in UTC with the date and
+//  milliseconds, for example `2026-10-19T12:52:10.123Z`. A message with line breaks continues on
+//  lines without the prefix.
+//
 //  The file is cut to its last `keepBytes` when it grows past `maxBytes`.
 //
 import Foundation
@@ -22,6 +26,9 @@ public enum FieldLog {
     public static let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         .appendingPathComponent("gad-debug.log")
 
+    /// The time stamp of a line: ISO 8601 in UTC with the date and milliseconds.
+    public static let timeStamp = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+
     private static let queue = DispatchQueue(label: "io.proximi.gad.fieldlog")
     private static let enabled = OSAllocatedUnfairLock(initialState: false)
 
@@ -36,7 +43,7 @@ public enum FieldLog {
     /// Does nothing, and does not evaluate `message`, while `isEnabled` is `false`.
     public static func log(_ message: @autoclosure () -> String) {
         guard isEnabled else { return }
-        let line = "[GAD] \(Date().formatted(.iso8601.time(includingFractionalSeconds: true))) \(message())\n"
+        let line = "[GAD] \(Date().formatted(timeStamp)) \(message())\n"
         FileHandle.standardError.write(Data(line.utf8))
         queue.async { append(Data(line.utf8)) }
     }

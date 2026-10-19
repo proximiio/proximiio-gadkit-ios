@@ -594,4 +594,8 @@ extension ProximiMap {
     @_spi(GADApp) public func wristbandBindingStates() -> AsyncStream<BlueiotBindingState> {
         session.binding.stateChanges()
     }
+
+    /// The started SDK. `nil` until `start()` succeeds. The GAD app logs the SDK's events from it in
+    /// Debug and Staging builds.
+    @_spi(GADApp) public var sdk: Proximiio? { venue?.sdk }
 }
