@@ -229,7 +229,8 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `init(kind:artworks:)` | A journey whose stops are all pending. |
 | `init(kind:stops:)` | A journey with its progress. |
 
-- The route leads to the first pending stop in the journey's order.
+- The route leads to the first pending stop in the journey's order. In a `.personalised` journey it
+  leads to the stop's gallery first (see "Gallery first").
 - The open screen applies a change of the binding in place: a stop visited, skipped, pending again,
   added or moved. The map, the camera and the route of an unchanged leg stay. Changes apply one
   after another; while one applies, only the latest waits.
@@ -372,6 +373,10 @@ do {
 - A wristband that another phone follows is taken over when the relay-api allows it. The other phone's
   session ends; its `wristband` becomes `.notConnected(notice:)` with "Your wristband was scanned by
   another phone. Connect it again to follow it on this phone."
+- A session that the relay-api gives no verdict on ends with `.sessionLost`: the
+  `wristband` becomes `.notConnected(notice:)` with "The connection to your wristband was lost. Connect
+  it again." The SDK does not bind again on its own (since SDK 6.0.0-beta.60); the visitor scans the
+  wristband again.
 - Positions arrive only while `wristband` is `.connected`. A session stored by the SDK is confirmed
   with the relay-api after `start()`.
 - The package shows no wristband alerts. `ProximiMapEvent.wristbandChanged(_:)` and
@@ -398,7 +403,7 @@ do {
 | `artworkVisitedOutOfOrder(ProximiStop)` | The visitor stayed at an artwork further down the journey. It counts as visited. In a personalised journey the stops ahead are ordered again; a curated tour keeps its order. |
 | `skipRequested`, `stopSkipped`, `skipCancelled`, `skipUndone` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it", "Undo skip". `ProximiMapView` without `.prompts` sends only `skipRequested`. |
 | `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
-| `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here". |
+| `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
 | `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Change your route?" confirmed; the detour reached (`completed`) or left. |
 | `journeyResumed` | "Resume your Journey" or "Show the route from here". |
 | `offRoute(duration:)`, `backOnRoute` | The visitor has been off the route for `offRouteSeconds`; the visitor is on the route again. |
@@ -617,6 +622,11 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.5.1 (2026-10-19)
+
+Documentation only: the README describes `.sessionLost` in "Wristband" (since 1.4.0), the gallery first
+route in "ProximiJourney" and the amenity marker in the `amenitySelected` event (since 1.5.0).
 
 ### 1.5.0 (2026-10-19)
 
