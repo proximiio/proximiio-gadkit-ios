@@ -91,7 +91,7 @@ struct HostedJourney: Equatable {
 
     /// Whether the open screen, which shows `shown`, can take this journey in place: the same kind,
     /// a stop on the map in both, and every stop of `shown` still in this one. The navigator cannot
-    /// remove a stop (map 6.0.0-beta.44), and a screen without stops has no started navigator to add
+    /// remove a stop (map 6.0.0-beta.45), and a screen without stops has no started navigator to add
     /// them to. Pure; covered by tests.
     func canReplace(_ shown: HostedJourney, kind: JourneyKind, shownKind: JourneyKind) -> Bool {
         kind == shownKind && !shown.journey.stops.isEmpty && !journey.stops.isEmpty

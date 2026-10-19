@@ -352,7 +352,7 @@ final class VisitController {
 
     /// The stops whose POI is no longer a place after a change of the venue data, each once. With
     /// `managesProgress` they are skipped: the navigator has no call that removes or changes a stop
-    /// (map 6.0.0-beta.44). When the journey screen of `ProximiMap` closes, the stored journey drops
+    /// (map 6.0.0-beta.45). When the journey screen of `ProximiMap` closes, the stored journey drops
     /// these stops and takes the changed places (`VisitPlan.reconciled`). Without `managesProgress`
     /// the stops stay; the host app decides.
     func stopsWithoutPlace(places: [VenuePlace]) async -> [JourneyStop] {

@@ -15,7 +15,7 @@
 //    the sync rebuilds the route network from the store.
 //
 //  The open map keeps the POIs it has drawn: the map library reads the features once per session
-//  (map 6.0.0-beta.44).
+//  (map 6.0.0-beta.45).
 //
 import Foundation
 import Observation

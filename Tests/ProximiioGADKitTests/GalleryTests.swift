@@ -113,9 +113,9 @@ struct GalleryOutlineTests {
 }
 
 struct LevelChangerPlaceTests {
-    private func feature(_ id: String, type: String, level: Double, levels: [Double]?, geometry: String = "Point") -> ProximiioFeature {
+    private func feature(_ id: String, type: String, level: Double, levels: JSONValue?, geometry: String = "Point") -> ProximiioFeature {
         var properties: [String: JSONValue] = ["type": .string(type), "level": .number(level)]
-        if let levels { properties["levels"] = .array(levels.map { .number($0) }) }
+        if let levels { properties["levels"] = levels }
         return ProximiioFeature(
             id: id,
             geometry: .init(type: geometry, coordinates: .array([.number(54.399), .number(24.5397)])),
@@ -123,20 +123,35 @@ struct LevelChangerPlaceTests {
         )
     }
 
-    /// GAD data 2026-10-15: the lift is a POI on level 0 with `levels` [1, 2, 3, 4]; the web map
-    /// shows it on levels 1 to 4 as well.
-    @Test func aLevelChangerServesItsFloorAndItsLevels() throws {
+    private func numbers(_ levels: [Double]) -> JSONValue {
+        .array(levels.map { .number($0) })
+    }
+
+    /// GAD data 2026-10-15: lift 9f411e5a is a POI on level 0 with `levels` [1, 2, 3, 4]. The SDK
+    /// router (6.0.0-beta.60) does not use it on level 0, so it is drawn on levels 1 to 4 only.
+    @Test func aLevelChangerServesTheFloorsOfItsLevels() throws {
         let changers = LevelChangerPlace.all(in: [
-            feature("lift", type: "elevator", level: 0, levels: [1, 2, 3, 4]),
+            feature("lift", type: "elevator", level: 0, levels: numbers([1, 2, 3, 4])),
             feature("stairs", type: "staircase", level: 1, levels: nil),
-            feature("cafe", type: "poi", level: 0, levels: [1]),
+            feature("cafe", type: "poi", level: 0, levels: numbers([1])),
             feature("outline", type: "elevator", level: 1, levels: nil, geometry: "MultiPolygon"),
         ])
         #expect(changers.map(\.id) == ["lift", "stairs"])
         let lift = try #require(changers.first)
         #expect(lift.coordinate == ProximiioCoordinate(latitude: 24.5397, longitude: 54.399))
-        #expect([0, 1, 4].allSatisfy { lift.serves($0) })
-        #expect(!lift.serves(5))
+        #expect([1, 2, 4].allSatisfy { lift.serves($0) })
+        #expect(!lift.serves(0) && !lift.serves(5))
         #expect(changers[1].serves(1) && !changers[1].serves(2))
+    }
+
+    /// Same reading of `properties.levels` as the SDK's `LevelChangerExtractor.levels(from:)`.
+    @Test func levelsAreNumbersOrNumericStrings() {
+        let changers = LevelChangerPlace.all(in: [
+            feature("strings", type: "elevator", level: 0, levels: .array([.string("1"), .string(" 2 "), .string("x"), .bool(true)])),
+            feature("single", type: "staircase", level: 0, levels: .number(3)),
+            feature("empty", type: "escalator", level: 2, levels: .array([])),
+            feature("unreadable", type: "elevator", level: 1, levels: .array([.string("ground")])),
+        ])
+        #expect(changers.map(\.levels) == [[1, 2], [3], [2], [1]])
     }
 }

@@ -35,8 +35,8 @@ repository. From 1.0.0 a minor or patch version does not break the public API. N
 cases come in minor versions; a `switch` with `default` keeps compiling. The [Changelog](#changelog)
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.59 and `proximiio-map-ios-binary`
-6.0.0-beta.44 exactly. The host app needs no dependency on them. A host app that also depends on
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.60 and `proximiio-map-ios-binary`
+6.0.0-beta.45 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 ## Host app setup
@@ -195,7 +195,7 @@ The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
-- uses `proximiio-sdk-ios-binary` 6.0.0-beta.59, the version this package pins;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.60, the version this package pins;
 - lays the view out and closes it; draws the background and the bottom bar (for example the audio
   guide's controls);
 - stores the journey and moves it on. The view stores nothing but the accessible routes button
@@ -234,7 +234,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
   added or moved. The map, the camera and the route of an unchanged leg stay. Changes apply one
   after another; while one applies, only the latest waits.
 - These changes start the screen again (new map session, camera and mode): a removed stop and a new
-  `kind`, because the navigator of the map library cannot remove a stop (map 6.0.0-beta.44), and the
+  `kind`, because the navigator of the map library cannot remove a stop (map 6.0.0-beta.45), and the
   first journey on a map without one, because that map has no navigator.
 - A journey without stops, or without a stop on the map, shows the map alone: search, floors and
   "Centre on me", no Map / List toggle and no stop card, in either `mode`. "Go here" on an amenity
@@ -325,7 +325,7 @@ app returns to the foreground; the SDK sync brings geofences and floors. After a
 
 - Routes computed after the change use the new paths and level changers. The leg on screen and the
   journey overview keep the old ones until the navigator routes again: the next stop, a skip, or a
-  re-route after the visitor left the route (map 6.0.0-beta.44).
+  re-route after the visitor left the route (map 6.0.0-beta.45).
 - The stop picker, the museum map's search, the journey list, the galleries, the artwork geofences
   and the lift outlines use the new data.
 - The stored journey follows its POIs. A done stop keeps its title and position. Another stop whose
@@ -336,7 +336,7 @@ app returns to the foreground; the SDK sync brings geofences and floors. After a
   when the screen closes. A changed POI moves its stop when the screen closes.
 
 Not yet: an open map keeps the POIs and amenities it has drawn until it opens again. The map library
-reads them once per screen (map 6.0.0-beta.44).
+reads them once per screen (map 6.0.0-beta.45).
 
 ## Wristband
 
@@ -599,6 +599,31 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.4.0 (2026-10-19)
+
+Breaking:
+
+- SDK 6.0.0-beta.60 and Map 6.0.0-beta.45. A host app that depends on these packages moves to the
+  same versions.
+
+Changed:
+
+- A lift, staircase or escalator is drawn on the floors in its `properties.levels` only, the floors the
+  SDK router connects it to since 6.0.0-beta.60. Its own floor is used only when `levels` is missing,
+  empty or unreadable. 1.3.0 also drew it on its own floor: in the GAD data lift 9f411e5a and stairs
+  488d5bd3 (level 0, `levels` [1, 2, 3, 4]) showed on level 0.
+
+From SDK 6.0.0-beta.60 and Map 6.0.0-beta.45, without a change in this package:
+
+- A level changer with `properties.levels` connects exactly those floors. Routes in a venue whose
+  changers carry `levels` can change. A place without a route shows "No route from here." on the
+  museum map; a journey stop without a route has no route line.
+- A ride over several floors is one level change. The map draws one floor-change marker for it and
+  nothing on the floors in between.
+- A wristband session that the relay-api gives no verdict on ends with `.sessionLost`, where the SDK
+  used to bind again. `ProximiMap.wristband` becomes `.notConnected(notice:)` with "The connection to
+  your wristband was lost. Connect it again." The visitor scans the wristband again.
 
 ### 1.3.0 (2026-10-16)
 
