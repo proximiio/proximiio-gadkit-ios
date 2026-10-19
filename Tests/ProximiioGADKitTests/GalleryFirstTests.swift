@@ -3,6 +3,7 @@
 //  ProximiioGADKitTests
 //
 import Foundation
+import os
 import Proximiio
 import ProximiioMap
 import Testing
@@ -66,6 +67,77 @@ struct GalleryFirstRoutingTests {
         let image = try #require(JourneyMapLayers.galleryLabel("G303"))
         #expect(image.size.height == 28)
         #expect(image.size.width > 40)
+    }
+
+    /// Field test 2026-10-19: test copies of artworks named galleries in another building.
+    @Test func aGalleryWithoutARouteIsLeftForTheArtwork() async {
+        let inner = RecordingRouting()
+        let routing = GalleryFirstRouting(inner: inner)
+        routing.update(isEnabled: true, galleries: [GalleryFirstRouting.Key(artwork): destination])
+        let origin = MapCoordinate(latitude: outside.latitude, longitude: outside.longitude)
+        _ = await routing.route(origin: origin, originFloor: FloorKey(level: 3), destination: artwork,
+                                destinationFloor: FloorKey(level: 3), options: RouteOptions())
+        #expect(inner.destinations == [MapCoordinate(latitude: 0.9, longitude: 0.9), artwork])
+        #expect(routing.gallery(of: artwork) == nil)
+        // Later legs go to the artwork at once.
+        _ = await routing.route(origin: origin, originFloor: FloorKey(level: 3), destination: artwork,
+                                destinationFloor: FloorKey(level: 3), options: RouteOptions())
+        #expect(inner.destinations.count == 3)
+    }
+
+    @Test func anArtworkLeadsToItsGalleryOnlyWhenItIsInIt() {
+        func artwork(latitude: Double, level: Double = 3) -> VenuePlace {
+            VenuePlace(id: "a", title: "Tongari-kun", coordinate: ProximiioCoordinate(latitude: latitude, longitude: 0.5), level: level)
+        }
+        #expect(GalleryFirstRouting.isInGallery(artwork(latitude: 0.5), destination, marginMeters: 5))
+        // 0.00002° of latitude is about 2.2 m north of the outline.
+        #expect(GalleryFirstRouting.isInGallery(artwork(latitude: 1.00002), destination, marginMeters: 5))
+        #expect(!GalleryFirstRouting.isInGallery(artwork(latitude: 1.0001), destination, marginMeters: 5))
+        #expect(!GalleryFirstRouting.isInGallery(artwork(latitude: 0.5, level: 1), destination, marginMeters: 5))
+    }
+}
+
+/// Answers every leg with no route and records where each leg ends.
+private final class RecordingRouting: JourneyRouting {
+    private let recorded = OSAllocatedUnfairLock(initialState: [MapCoordinate]())
+    var destinations: [MapCoordinate] { recorded.withLock { $0 } }
+
+    func route(origin: MapCoordinate, originFloor: FloorKey, destination: MapCoordinate, destinationFloor: FloorKey) async -> ComputedRoute? {
+        nil
+    }
+
+    func route(origin: MapCoordinate, originFloor: FloorKey, destination: MapCoordinate, destinationFloor: FloorKey, options: RouteOptions) async -> RouteResult {
+        recorded.withLock { $0.append(destination) }
+        return .noRoute(.disconnected)
+    }
+
+    func durations(from origins: [JourneyRoutePoint], to destinations: [JourneyRoutePoint]) async -> [[TimeInterval?]] { [] }
+
+    func durations(from origins: [JourneyRoutePoint], to destinations: [JourneyRoutePoint], options: RouteOptions) async -> [[TimeInterval?]] { [] }
+}
+
+struct GalleryDistanceTests {
+    private let square = Gallery(id: "g", name: "G", level: 1, ring: [
+        ProximiioCoordinate(latitude: 0, longitude: 0), ProximiioCoordinate(latitude: 0, longitude: 0.001),
+        ProximiioCoordinate(latitude: 0.001, longitude: 0.001), ProximiioCoordinate(latitude: 0.001, longitude: 0),
+    ])
+
+    @Test func insideIsZeroAndOutsideIsTheDistanceToTheNearestEdge() {
+        #expect(square.distance(to: ProximiioCoordinate(latitude: 0.0005, longitude: 0.0005)) == 0)
+        // 0.0001° of latitude is about 11.06 m.
+        let north = square.distance(to: ProximiioCoordinate(latitude: 0.0011, longitude: 0.0005))
+        #expect(abs(north - 11.06) < 0.1)
+        // Beyond a corner: the distance to the corner.
+        let corner = square.distance(to: ProximiioCoordinate(latitude: 0.0011, longitude: 0.0011))
+        #expect(abs(corner - 11.06 * 2.0.squareRoot()) < 0.2)
+    }
+}
+
+struct ArtworkAreaTests {
+    @Test func keepsTheGeofenceID() {
+        let geofence = ProximiioGeofence(id: "50c36aad", name: "DCT the broken 5", polygon: [[54, 24], [54.1, 24], [54.1, 24.1]],
+                                         metadata: .object(["geofence_type": .string("artwork")]), remoteId: "GAD.2020.00112")
+        #expect(ArtworkArea(geofence).id == "50c36aad")
     }
 }
 

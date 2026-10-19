@@ -161,6 +161,29 @@ struct Gallery: Identifiable, Equatable, Sendable {
         return inside
     }
 
+    /// Metres from `coordinate` to the outline, 0 inside it. Measured on a flat projection around
+    /// `coordinate`, which is exact enough within a building.
+    func distance(to coordinate: ProximiioCoordinate) -> Double {
+        if contains(coordinate, level: nil) { return 0 }
+        let metersPerLongitude = GeoMath.metersPerDegreeLongitude(atLatitude: coordinate.latitude)
+        func meters(_ point: ProximiioCoordinate) -> (x: Double, y: Double) {
+            ((point.longitude - coordinate.longitude) * metersPerLongitude,
+             (point.latitude - coordinate.latitude) * GeoMath.metersPerDegreeLatitude)
+        }
+        var nearest = Double.infinity
+        var j = ring.count - 1
+        for i in ring.indices {
+            let a = meters(ring[j]), b = meters(ring[i])
+            let dx = b.x - a.x, dy = b.y - a.y
+            let lengthSquared = dx * dx + dy * dy
+            // The point of the edge nearest the origin, `coordinate`.
+            let t = lengthSquared > 0 ? min(max(-(a.x * dx + a.y * dy) / lengthSquared, 0), 1) : 0
+            nearest = min(nearest, hypot(a.x + t * dx, a.y + t * dy))
+            j = i
+        }
+        return nearest
+    }
+
     static func containing(_ coordinate: ProximiioCoordinate, level: Double?, in galleries: [Gallery]) -> Gallery? {
         galleries.first { $0.contains(coordinate, level: level) }
     }

@@ -215,13 +215,26 @@ struct VisitView: View {
             mapLayers.attach(to: controller.session)
             refreshMapLayers()
             // A journey without stops shows the map alone; the navigator would report it finished.
-            if hasStops { await controller.start(accessibility: accessibility) }
+            if hasStops {
+                await controller.start(accessibility: accessibility)
+                // A visitor who opens the journey inside the first artwork's geofence.
+                checkArrival()
+            }
             // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
             // map did not turn until "Centre on me").
             if controller.session.position != nil { recentre(withHeading: true, reason: "journey started") }
         }
         .task {
-            for await event in await venue.sdk.geofenceEvents() {
+            let events = await venue.sdk.geofenceEvents()
+            // The stream does not repeat the geofences entered before it started.
+            controller.enteredGeofenceIDs = await venue.sdk.enteredGeofenceIds
+            checkArrival()
+            for await event in events {
+                switch event {
+                case .entered(let geofence): controller.enteredGeofenceIDs.insert(geofence.id)
+                case .exited(let geofence, _): controller.enteredGeofenceIDs.remove(geofence.id)
+                default: break
+                }
                 // Artwork geofences lie inside the gallery geofences, so only galleries set the
                 // current gallery.
                 switch event {
@@ -339,23 +352,22 @@ struct VisitView: View {
                     markers: session.routeRenderer?.geometry?.markers ?? [],
                     destinationID: navigator.detourStop?.id ?? navigator.activeStop?.id
                 )
-                // On a floor without positioning the fixes come from the floor the visitor left.
-                if !floorGuide.isActive {
-                    controller.checkArtworkGeofences()
-                    controller.checkGalleryFirst()
-                }
             }
         }
         // The session updates the guidance after the position on every fix; a fix without guidance
-        // is checked on the position.
+        // is checked on the position. The map publishes guidance only on a leg with a route, so the
+        // arrival is checked on the position (field test 2026-10-19).
         .onReceive(controller.session.$position) { position in
             checkStopNearby(position: position, guidance: controller.navigator.guidance)
+            // `$position` publishes before the session stores the fix.
+            Task { @MainActor in checkArrival() }
         }
         .onReceive(controller.navigator.$guidance) { guidance in
             checkStopNearby(position: controller.session.position, guidance: guidance)
         }
         .onChange(of: controller.navigator.activeStop?.id) { _, _ in
             checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
+            checkArrival()
         }
         .onChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
         .onChange(of: venue.data.version) { _, _ in
@@ -408,6 +420,14 @@ struct VisitView: View {
             get: { options.contains(.prompts) && controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !floorGuide.isActive },
             set: { if !$0 { controller.dismissOffRoute() } }
         )
+    }
+
+    /// Arrival at an artwork, out of order and gallery first. On a floor without positioning the
+    /// fixes come from the floor the visitor left, so nothing is checked.
+    private func checkArrival() {
+        guard !floorGuide.isActive else { return }
+        controller.checkArtworkGeofences()
+        controller.checkGalleryFirst()
     }
 
     /// Places, artwork areas, galleries and level changers, at the start and after a change of the

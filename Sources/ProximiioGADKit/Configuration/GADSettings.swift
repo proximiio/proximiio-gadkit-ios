@@ -92,6 +92,11 @@ public struct GADSettings: Equatable, Sendable {
     public var firstFixWait: TimeInterval = 5
     /// Seconds after the start in which the first fix orders a journey that was ordered without one.
     public var lateOrderWindow: TimeInterval = 60
+    /// Gallery first: a leg leads to an artwork's gallery only when the artwork lies in the gallery's
+    /// geofence on the same floor, or at most this many metres outside it. Otherwise the leg ends at
+    /// the artwork. In the GAD data of 2026-10-19, 34 artworks lie 5–29 m outside their gallery's
+    /// geofence.
+    public var galleryFirstMarginMeters: Double = 50
 
     // MARK: Live Activity
 

@@ -9,7 +9,10 @@
 //  Nagarro's audio guide reacts to the same enter event, so the map and the guide name the same
 //  artwork at the same time. The geofence and the artwork POI share `remote_id`. A visitor already
 //  inside the geofence when the leg starts gets no enter event, so every fix is also checked
-//  against the artwork geofences (`checkArtworkGeofences`). The journey moves to the next
+//  against the artwork geofences (`checkArtworkGeofences`). A geofence the SDK counts the visitor
+//  inside (`enteredGeofenceIDs`) counts too: the SDK exits a geofence only beyond 1.2 × its radius,
+//  and its event stream does not repeat the geofences entered before the screen opened (field test
+//  2026-10-19). The journey moves to the next
 //  artwork `GADSettings.artworkAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
 //  the visitor walks past without entering its geofence stays unvisited until it is skipped.
 //  Out of order: a visitor inside the geofence of another open artwork for
@@ -19,7 +22,8 @@
 //  and the journey continues only after "Resume your Journey" (`JourneyRules.visit`).
 //
 //  Skip, undo and "choose this stop" edit the running navigator. Its route cache, event streams
-//  and deviation state are kept.
+//  and deviation state are kept. The arrival, out of order, gallery first and "Resume your Journey"
+//  each read the journey before they change it, so they run one after another (`serially`).
 //
 //  Every leg uses the visitor's accessibility needs (`RouteAccessibility`). A new journey is ordered
 //  floor by floor and gallery by gallery (`JourneyOrderStrategy.floorThenGallery`): the stop
@@ -101,6 +105,11 @@ final class VisitController {
     var artworkRemoteIDs: [String: String] = [:]
     /// Artwork geofence shapes, by `remote_id`. Set once the venue's geofences are loaded.
     var artworkAreas: [String: [ArtworkArea]] = [:]
+    /// The geofences the SDK counts the visitor inside (`Proximiio.enteredGeofenceIds`), kept up
+    /// to date from the geofence events.
+    var enteredGeofenceIDs: Set<String> = []
+    /// The last of the journey changes that run one after another (`serially`).
+    private var journeyEdit: Task<Void, Never>?
     /// Stops whose move to the next artwork is scheduled.
     private var scheduledDone: Set<String> = []
     /// Time inside the geofence of each open artwork that is not the active stop.
@@ -216,7 +225,9 @@ final class VisitController {
         case .stopReached(let stop) where stop.kind != .detour:
             scheduleDone(stop.id)
         case .detourEnded(_, completed: true):
-            tasks.append(Task { [weak self] in await self?.orderRemaining() })
+            tasks.append(Task { [weak self] in
+                await self?.serially { [weak self] in await self?.orderRemaining() }
+            })
         case .farFromRoute, .offRouteTooLong:
             isOffRoute = true
         case .returnedToRoute:
@@ -235,13 +246,15 @@ final class VisitController {
         scheduleDone(id)
     }
 
-    /// Checks the fix against the geofences of the open artworks on the visitor's floor. Inside
+    /// Checks the fix against the geofences of the open artworks on the visitor's floor, and
+    /// against `enteredGeofenceIDs`. Inside
     /// the active artwork's geofence: the arrival, which also covers a leg that starts inside it,
     /// where the SDK sends no enter event. Inside another open artwork's geofence for
     /// `GADSettings.outOfOrderDwell`: that artwork is visited out of order. During a detour to an
     /// amenity no artwork counts (PM review 2026-10-12).
     func checkArtworkGeofences() {
-        guard managesProgress else { return }
+        // Before the start the journey is still being ordered.
+        guard managesProgress, isNavigating else { return }
         guard navigator.detourStop == nil else {
             _ = outOfOrderDwell.update(inside: [], now: .now, dwell: settings.outOfOrderDwell)
             return
@@ -257,7 +270,7 @@ final class VisitController {
                   let areas = artworkAreas[remoteID]
             else { continue }
             if !VenueLevel.matches(stop.floor?.level, level) { continue }
-            guard areas.contains(where: { $0.contains(point) }) else { continue }
+            guard areas.contains(where: { enteredGeofenceIDs.contains($0.id) || $0.contains(point) }) else { continue }
             if stop.id == activeID {
                 artworkGeofenceEntered(remoteID: remoteID)
             } else {
@@ -270,12 +283,21 @@ final class VisitController {
     }
 
     /// Sets the gallery of each artwork among `places` for gallery first, from `metadata.gallery_id`
-    /// (`GalleryDestination`). Off with `isEnabled` false.
+    /// (`GalleryDestination`). An artwork outside its gallery (`GADSettings.galleryFirstMarginMeters`)
+    /// has none. Off with `isEnabled` false.
     func setGalleryFirst(isEnabled: Bool, places: [VenuePlace], destinations: [String: GalleryDestination]) {
         var galleries: [GalleryFirstRouting.Key: GalleryDestination] = [:]
+        var outside: [String] = []
         for place in places where place.isArtwork {
             guard let id = place.galleryID, let destination = destinations[id] else { continue }
+            guard GalleryFirstRouting.isInGallery(place, destination, marginMeters: settings.galleryFirstMarginMeters) else {
+                outside.append(place.title)
+                continue
+            }
             galleries[GalleryFirstRouting.Key(MapCoordinate(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude))] = destination
+        }
+        if !outside.isEmpty {
+            FieldLog.log("gallery first: \(outside.count) artworks outside their gallery, routes end at the artwork: \(outside.sorted().joined(separator: ", "))")
         }
         galleryRouting.update(isEnabled: isEnabled, galleries: galleries)
         refreshGalleryAhead()
@@ -292,10 +314,25 @@ final class VisitController {
         galleryRouting.markReached(stop.coordinate)
         FieldLog.log("gallery first: in \(gallery.gallery.name) · leg to \(stop.title)")
         tasks.append(Task { [weak self] in
-            guard let self else { return }
-            self.isOffRoute = false
-            await self.navigator.resumeJourney()
+            await self?.serially { [weak self] in
+                guard let self else { return }
+                self.isOffRoute = false
+                await self.navigator.resumeJourney()
+            }
         })
+    }
+
+    /// Runs `edit` after the journey changes started before it. Out of order once proposed an order
+    /// before it marked an artwork visited, and that order made the artwork active again (field
+    /// test 2026-10-19). `edit` must not call `serially`.
+    private func serially(_ edit: @escaping @MainActor () async -> Void) async {
+        let previous = journeyEdit
+        let current = Task { @MainActor in
+            await previous?.value
+            await edit()
+        }
+        journeyEdit = current
+        await current.value
     }
 
     private func refreshGalleryAhead() {
@@ -310,23 +347,25 @@ final class VisitController {
     private func markOutOfOrder(_ stopID: String) {
         guard markingOutOfOrder.insert(stopID).inserted else { return }
         tasks.append(Task { [weak self] in
-            guard let self else { return }
-            defer { self.markingOutOfOrder.remove(stopID) }
-            guard !Task.isCancelled,
-                  self.navigator.journey.stops.first(where: { $0.id == stopID })?.state == .pending
-            else { return }
-            FieldLog.log("artwork visited out of order: \(stopID)")
-            let activeStopID = self.navigator.activeStop?.id
-            if await self.navigator.markDone(stopID: stopID), let stop = self.stop(stopID) {
-                self.onArtworkDone?(stop, false)
+            await self?.serially { [weak self] in
+                guard let self else { return }
+                defer { self.markingOutOfOrder.remove(stopID) }
+                guard !Task.isCancelled,
+                      self.navigator.journey.stops.first(where: { $0.id == stopID })?.state == .pending
+                else { return }
+                FieldLog.log("artwork visited out of order: \(stopID)")
+                let activeStopID = self.navigator.activeStop?.id
+                if await self.navigator.markDone(stopID: stopID), let stop = self.stop(stopID) {
+                    self.onArtworkDone?(stop, false)
+                }
+                await self.orderRemaining()
+                if let activeStopID, self.navigator.activeStop?.id == activeStopID {
+                    FieldLog.log("leg to \(activeStopID) drawn again from the visitor")
+                    self.isOffRoute = false
+                    await self.navigator.resumeJourney()
+                }
+                self.persist(self.navigator.journey)
             }
-            await self.orderRemaining()
-            if let activeStopID, self.navigator.activeStop?.id == activeStopID {
-                FieldLog.log("leg to \(activeStopID) drawn again from the visitor")
-                self.isOffRoute = false
-                await self.navigator.resumeJourney()
-            }
-            self.persist(self.navigator.journey)
         })
     }
 
@@ -356,12 +395,14 @@ final class VisitController {
         let delay = settings.artworkAdvanceDelay
         tasks.append(Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
-            guard let self else { return }
-            self.scheduledDone.remove(stopID)
-            guard !Task.isCancelled, self.navigator.activeStop?.id == stopID else { return }
-            let changed = await self.navigator.markDone(stopID: stopID)
-            self.persist(self.navigator.journey)
-            if changed, let stop = self.stop(stopID) { self.onArtworkDone?(stop, true) }
+            await self?.serially { [weak self] in
+                guard let self else { return }
+                self.scheduledDone.remove(stopID)
+                guard !Task.isCancelled, self.navigator.activeStop?.id == stopID else { return }
+                let changed = await self.navigator.markDone(stopID: stopID)
+                self.persist(self.navigator.journey)
+                if changed, let stop = self.stop(stopID) { self.onArtworkDone?(stop, true) }
+            }
         })
     }
 
@@ -510,10 +551,13 @@ final class VisitController {
     /// stops still ahead are ordered again from the visitor. The leg is drawn from here.
     func resumeJourney() async {
         isOffRoute = false
-        let hadDetour = navigator.detourStop != nil
-        await navigator.resumeJourney()
-        if hadDetour { await orderRemaining() }
-        persist(navigator.journey)
+        await serially { [weak self] in
+            guard let self else { return }
+            let hadDetour = self.navigator.detourStop != nil
+            await self.navigator.resumeJourney()
+            if hadDetour { await self.orderRemaining() }
+            self.persist(self.navigator.journey)
+        }
     }
 
     /// Closes the off-route warning without re-routing. It opens again on the next episode.
@@ -544,19 +588,22 @@ struct GeofenceDwell: Equatable {
 
 /// The shape of an artwork geofence: a polygon, or a circle around `center`.
 struct ArtworkArea: Equatable, Sendable {
+    /// The geofence's id.
+    var id: String
     var center: ProximiioCoordinate?
     var radius: Double
     /// `[longitude, latitude]` pairs.
     var polygon: [[Double]]?
 
-    init(center: ProximiioCoordinate?, radius: Double, polygon: [[Double]]? = nil) {
+    init(id: String = "", center: ProximiioCoordinate?, radius: Double, polygon: [[Double]]? = nil) {
+        self.id = id
         self.center = center
         self.radius = radius
         self.polygon = polygon
     }
 
     init(_ geofence: ProximiioGeofence) {
-        self.init(center: geofence.area, radius: geofence.radius, polygon: geofence.polygon)
+        self.init(id: geofence.id, center: geofence.area, radius: geofence.radius, polygon: geofence.polygon)
     }
 
     /// Same containment as the SDK's geofence engine on enter: the polygon when it has three

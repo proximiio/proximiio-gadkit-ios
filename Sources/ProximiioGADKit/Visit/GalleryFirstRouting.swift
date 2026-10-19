@@ -8,6 +8,11 @@
 //  reached and routes the leg again, to the artwork. A leg that starts in the artwork's gallery ends
 //  at the artwork.
 //
+//  A leg ends at the artwork also when the gallery has no route from the visitor. The artwork then
+//  keeps that ending for the rest of the visit. An artwork far from its gallery
+//  (`GADSettings.galleryFirstMarginMeters`) has no gallery (field test 2026-10-19: test copies of
+//  artworks named galleries in another building).
+//
 //  The navigator's legs come from this router (`JourneyRouting`). The walking times that order the
 //  journey come from the SDK's router unchanged.
 //
@@ -23,6 +28,13 @@ final class GalleryFirstRouting: JourneyRouting {
         var galleries: [Key: GalleryDestination] = [:]
         /// Artworks whose gallery the visitor entered on the way to them.
         var reached: Set<Key> = []
+        /// Artworks whose gallery had no route.
+        var withoutRoute: Set<Key> = []
+
+        /// The gallery a leg to the artwork at `key` leads to first, or `nil` when it ends at the artwork.
+        func gallery(of key: Key) -> GalleryDestination? {
+            isEnabled && !reached.contains(key) && !withoutRoute.contains(key) ? galleries[key] : nil
+        }
     }
 
     /// An artwork's coordinate to about 1 cm. A journey stop has its POI's coordinate.
@@ -53,10 +65,7 @@ final class GalleryFirstRouting: JourneyRouting {
 
     /// The gallery that a leg to `artwork` leads to first while the visitor is outside it, or `nil`.
     func gallery(of artwork: MapCoordinate) -> GalleryDestination? {
-        state.withLock { state in
-            let key = Key(artwork)
-            return state.isEnabled && !state.reached.contains(key) ? state.galleries[key] : nil
-        }
+        state.withLock { $0.gallery(of: Key(artwork)) }
     }
 
     /// The visitor entered the gallery of `artwork`: legs to it end at the artwork from now on.
@@ -67,10 +76,15 @@ final class GalleryFirstRouting: JourneyRouting {
     /// The gallery where a leg from `origin` to `destination` ends instead of the artwork, or `nil`.
     /// Pure; covered by tests.
     static func gallery(origin: ProximiioCoordinate, originLevel: Double, destination: MapCoordinate, state: State) -> GalleryDestination? {
-        let key = Key(destination)
-        guard state.isEnabled, !state.reached.contains(key), let gallery = state.galleries[key],
-              !gallery.gallery.contains(origin, level: originLevel) else { return nil }
+        guard let gallery = state.gallery(of: Key(destination)), !gallery.gallery.contains(origin, level: originLevel) else { return nil }
         return gallery
+    }
+
+    /// `true` when `artwork` lies in the outline of its gallery on the same floor, or at most
+    /// `marginMeters` outside it. Pure; covered by tests.
+    static func isInGallery(_ artwork: VenuePlace, _ destination: GalleryDestination, marginMeters: Double) -> Bool {
+        VenueLevel.same(artwork.level, destination.gallery.level)
+            && destination.gallery.distance(to: artwork.coordinate) <= marginMeters
     }
 
     // MARK: JourneyRouting
@@ -88,13 +102,16 @@ final class GalleryFirstRouting: JourneyRouting {
     ) async -> RouteResult {
         let start = ProximiioCoordinate(latitude: origin.latitude, longitude: origin.longitude)
         if let gallery = state.withLock({ Self.gallery(origin: start, originLevel: originFloor.level, destination: destination, state: $0) }) {
-            return await inner.route(
+            let result = await inner.route(
                 origin: origin,
                 originFloor: originFloor,
                 destination: MapCoordinate(latitude: gallery.entry.latitude, longitude: gallery.entry.longitude),
                 destinationFloor: FloorKey(level: gallery.gallery.level),
                 options: options
             )
+            guard case .noRoute(let reason) = result else { return result }
+            _ = state.withLock { $0.withoutRoute.insert(Key(destination)) }
+            FieldLog.log("gallery first: no route to \(gallery.gallery.name) (\(reason)) · route ends at the artwork")
         }
         return await inner.route(origin: origin, originFloor: originFloor, destination: destination, destinationFloor: destinationFloor, options: options)
     }

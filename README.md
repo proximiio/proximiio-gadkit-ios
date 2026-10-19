@@ -333,6 +333,11 @@ leg that starts in the artwork's gallery ends at the artwork. An artwork without
 whose gallery has no geofence polygon or no POI, is routed to directly. The GAD venue data on
 2026-10-19 has 14 such galleries.
 
+An artwork on another floor than its gallery, or more than `GADSettings.galleryFirstMarginMeters` (50 m)
+outside the gallery's geofence, is routed to directly. In the GAD data of 2026-10-19, 34 artworks lie
+5–29 m outside their gallery's geofence. When the gallery has no route from the visitor, the leg ends at
+the artwork, and so do the later legs to that artwork. The field log names both cases ("gallery first:").
+
 ### Venue data changes
 
 The backend changes POIs, paths, lifts and geofences while the app runs. `ProximiMap` downloads the
@@ -399,7 +404,7 @@ do {
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
 | `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The package posts no notification for it. |
 | `positionUncertain(ProximiStop)` | `ProximiMapView` without `.prompts`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.prompts` the view asks "Probably at …" instead. |
-| `artworkReached(ProximiStop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, or stood in its area: the stop is done and the route leads to the next stop. `geofenceEntered` arrives at the enter. |
+| `artworkReached(ProximiStop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, or a fix lies in it, or the SDK counts the visitor inside it (`enteredGeofenceIds`, also for a journey opened inside it): the stop is done and the route leads to the next stop. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
 | `artworkVisitedOutOfOrder(ProximiStop)` | The visitor stayed at an artwork further down the journey. It counts as visited. In a personalised journey the stops ahead are ordered again; a curated tour keeps its order. |
 | `skipRequested`, `stopSkipped`, `skipCancelled`, `skipUndone` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it", "Undo skip". `ProximiMapView` without `.prompts` sends only `skipRequested`. |
 | `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
@@ -444,6 +449,7 @@ let configuration = GADConfiguration(
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
+| `galleryFirstMarginMeters` | 50 m | Gallery first: an artwork farther than this outside its gallery's geofence, or on another floor, is routed to directly. |
 | `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
 | `levelsWithoutPositioning` | [0] | Floors without positioning. See "Floors without positioning". |
 | `levelChangerReachedMeters` | 5 m | Distance from the lift or stairs to a floor without positioning at which the lift or stairs view shows. |
@@ -622,6 +628,29 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.6.0 (2026-10-19)
+
+No change for host apps' code. Fixes from the GAD field test of 2026-10-19 in the DCT test area.
+
+Added:
+
+- `GADSettings.galleryFirstMarginMeters` (50 m).
+
+Changed:
+
+- The arrival at an artwork and out of order are checked on every fix. Before, they were checked only
+  when the map updated its guidance, which it does only on a leg with a route: on a leg without a route
+  a visitor inside an artwork's geofence was not marked.
+- A geofence that the SDK counts the visitor inside (`Proximiio.enteredGeofenceIds`) counts as inside.
+  The SDK leaves a geofence only beyond 1.2 × its radius, and its events do not repeat a geofence
+  entered before the journey opened. A journey opened inside the first artwork's geofence now marks the
+  arrival.
+- Gallery first: a leg ends at the artwork when its gallery has no route from the visitor, or when the
+  artwork lies on another floor or more than `galleryFirstMarginMeters` outside the gallery's geofence.
+- The arrival, out of order, gallery first and "Resume your Journey" change the journey one after
+  another. Before, an order proposed before an artwork visited out of order was marked could make it
+  active again for a moment.
 
 ### 1.5.1 (2026-10-19)
 
