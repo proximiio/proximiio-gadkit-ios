@@ -600,6 +600,11 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.4.1 (2026-10-19)
+
+No change for host apps. `ProximiMap.wristbandBindingStates()` is `@_spi(GADApp)`: the Proximi GAD app
+reads the relay signal of the wristband from it for a test notification.
+
 ### 1.4.0 (2026-10-19)
 
 Breaking:

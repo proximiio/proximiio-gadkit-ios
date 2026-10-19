@@ -588,4 +588,10 @@ extension ProximiMap {
         runSession()
         return WristbandPairing(connector: session)
     }
+
+    /// The wristband binding's state now, then every change. The GAD app reads the relay signal from
+    /// it for a test notification in Debug and Staging builds.
+    @_spi(GADApp) public func wristbandBindingStates() -> AsyncStream<BlueiotBindingState> {
+        session.binding.stateChanges()
+    }
 }

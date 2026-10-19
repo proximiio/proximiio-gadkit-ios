@@ -267,16 +267,6 @@
         }
       }
     },
-    "CURATED" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "منسقة"
-          }
-        }
-      }
-    },
     "Café" : {
       "localizations" : {
         "ar" : {
@@ -367,56 +357,6 @@
         }
       }
     },
-    "Hold your current wristband next to the new one and scan again." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "أمسك سوارك الحالي بجانب السوار الجديد وامسح الرمز مجددًا."
-          }
-        }
-      }
-    },
-    "I couldn’t get things started. Check your connection and let’s try again." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "لم أتمكن من بدء التشغيل. تحقّق من اتصالك ولنحاول مجددًا."
-          }
-        }
-      }
-    },
-    "None of these artworks is on the museum map." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "لا يوجد أيٌّ من هذه الأعمال الفنية على خريطة المتحف."
-          }
-        }
-      }
-    },
-    "The museum’s server is busy. Try again in a moment." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "خادم المتحف مشغول. حاول مجددًا بعد قليل."
-          }
-        }
-      }
-    },
-    "Your position is not shown on this level." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "لا يظهر موقعك في هذا الطابق."
-          }
-        }
-      }
-    },
     "connected!" : {
       "localizations" : {
         "ar" : {
@@ -443,6 +383,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "صمّم رحلة جديدة"
+          }
+        }
+      }
+    },
+    "CURATED" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "منسقة"
           }
         }
       }
@@ -478,6 +428,7 @@
       }
     },
     "Dismiss" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -665,6 +616,26 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "ضع رمز QR الموجود على ظهر سوارك داخل الإطار"
+          }
+        }
+      }
+    },
+    "Hold your current wristband next to the new one and scan again." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "أمسك سوارك الحالي بجانب السوار الجديد وامسح الرمز مجددًا."
+          }
+        }
+      }
+    },
+    "I couldn’t get things started. Check your connection and let’s try again." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لم أتمكن من بدء التشغيل. تحقّق من اتصالك ولنحاول مجددًا."
           }
         }
       }
@@ -917,6 +888,16 @@
         }
       }
     },
+    "No route from here with your accessibility settings." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لا يوجد مسار من هنا يناسب إعدادات إمكانية الوصول لديك."
+          }
+        }
+      }
+    },
     "No route from here." : {
       "localizations" : {
         "ar" : {
@@ -937,12 +918,12 @@
         }
       }
     },
-    "No route from here with your accessibility settings." : {
+    "None of these artworks is on the museum map." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "لا يوجد مسار من هنا يناسب إعدادات إمكانية الوصول لديك."
+            "value" : "لا يوجد أيٌّ من هذه الأعمال الفنية على خريطة المتحف."
           }
         }
       }
@@ -1313,7 +1294,18 @@
         }
       }
     },
+    "The museum’s server is busy. Try again in a moment." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "خادم المتحف مشغول. حاول مجددًا بعد قليل."
+          }
+        }
+      }
+    },
     "The next stop of your journey is less than %lld m away." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -1779,6 +1771,16 @@
         }
       }
     },
+    "Your position is not shown on this level." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "لا يظهر موقعك في هذا الطابق."
+          }
+        }
+      }
+    },
     "Your position is uncertain here." : {
       "localizations" : {
         "ar" : {
@@ -1820,6 +1822,7 @@
       }
     },
     "Your wristband has stopped responding" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
