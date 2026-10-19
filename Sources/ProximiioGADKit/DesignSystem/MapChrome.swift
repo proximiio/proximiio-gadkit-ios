@@ -130,13 +130,16 @@ struct AmenityChipList: View {
 /// Bottom card for the next stop (Figma "Stop Info"): icon in a white circle, NEXT STOP,
 /// title, and the instruction with distance and time on one line. The card spans the width
 /// of the map card.
-struct StopInfoCard<Icon: View, Trailing: View>: View {
+struct StopInfoCard<Icon: View, Trailing: View, Badges: View>: View {
     let caption: LocalizedStringKey
     let title: String
     var instruction: String?
     var remaining: String?
     @ViewBuilder let icon: Icon
     @ViewBuilder let trailing: Trailing
+    /// At the end of the caption line: the artwork's AR and audio badges (PM, Monday "Augmented
+    /// Reality and Audio symbols").
+    @ViewBuilder let badges: Badges
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -147,7 +150,11 @@ struct StopInfoCard<Icon: View, Trailing: View>: View {
                 .overlay(Circle().strokeBorder(Palette.badgeStroke, lineWidth: 1.5))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
-                Text(caption, bundle: .module).textStyle(.caption).textCase(.uppercase)
+                HStack(spacing: 4) {
+                    Text(caption, bundle: .module).textStyle(.caption).textCase(.uppercase)
+                    Spacer(minLength: 4)
+                    badges
+                }
                 Text(title).textStyle(.largeBodyBold).lineLimit(2)
                 if instruction != nil || remaining != nil {
                     HStack(alignment: .firstTextBaseline) {

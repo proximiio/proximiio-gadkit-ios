@@ -13,6 +13,7 @@
 //    an amenity detour (PM 2026-10-15, "Level changer highlighting")
 //  - every other lift, staircase and escalator that serves the shown floor, with its amenity icon
 //    (`LevelChangerPlace`; Monday "All level changers visible", 2026-10-15)
+//  - the amenity picked in the menu: the red marker with its white icon (`PlaceFraming`)
 //
 //  The stop markers are the map library's (`MapStyle.journeyStops`).
 //
@@ -46,6 +47,34 @@ final class JourneyMapLayers {
         static func standardImageName(for featureType: String) -> String { "gad-level-changer-standard-\(featureType)" }
     }
 
+    /// The amenity picked in the menu.
+    struct Highlight: Equatable {
+        var coordinate: ProximiioCoordinate
+        var level: Double
+        var icon: GADIcon
+
+        var imageName: String { Self.imageName(for: icon) }
+
+        static func imageName(for icon: GADIcon) -> String { "gad-highlight-\(icon.rawValue)" }
+    }
+
+    /// The gallery a leg leads to first (gallery first): a red label with the gallery's short name
+    /// at its POI (PM, Monday "Navigation to a gallery").
+    struct GalleryMarker: Equatable {
+        var coordinate: ProximiioCoordinate
+        var level: Double
+        /// "G303".
+        var label: String
+
+        var imageName: String { "gad-gallery-\(label)" }
+    }
+
+    /// `place` with the icon of its amenity kind; `nil` for a place of no `AmenityKind`.
+    static func highlight(of place: VenuePlace?) -> Highlight? {
+        guard let place, let kind = AmenityKind.allCases.first(where: { $0.matches(place) }) else { return nil }
+        return Highlight(coordinate: place.coordinate, level: place.level, icon: kind.icon)
+    }
+
     private static let gallerySource = "gad-journey-galleries"
     private static let destinationLayer = "gad-gallery-destination"
     private static let visitedLayer = "gad-gallery-visited"
@@ -61,6 +90,8 @@ final class JourneyMapLayers {
     private var connector: [ProximiioCoordinate] = []
     private var changer: LevelChanger?
     private var changers: [LevelChangerPlace] = []
+    private var highlight: Highlight?
+    private var galleryMarker: GalleryMarker?
 
     func attach(to session: ProximiioMapSession) {
         self.session = session
@@ -105,6 +136,22 @@ final class JourneyMapLayers {
         applyLevelChanger(on: style)
     }
 
+    /// The amenity picked in the menu, or `nil` for none.
+    func updateHighlight(_ highlight: Highlight?) {
+        guard highlight != self.highlight else { return }
+        self.highlight = highlight
+        guard let style = session?.canvas?.style else { return }
+        applyLevelChanger(on: style)
+    }
+
+    /// The gallery a leg leads to first, or `nil` for none.
+    func updateGalleryMarker(_ marker: GalleryMarker?) {
+        guard marker != galleryMarker else { return }
+        galleryMarker = marker
+        guard let style = session?.canvas?.style else { return }
+        applyLevelChanger(on: style)
+    }
+
     // MARK: Style
 
     private func install(on style: MLNStyle) {
@@ -137,6 +184,9 @@ final class JourneyMapLayers {
                     canvas.floors.register(image, named: LevelChanger.standardImageName(for: type))
                 }
             }
+            for icon in Set(AmenityKind.allCases.map(\.icon)) {
+                if let image = Self.redMarker(glyph: icon) { canvas.floors.register(image, named: Highlight.imageName(for: icon)) }
+            }
             let source = MLNShapeSource(identifier: Self.changerSource, shape: nil)
             style.addSource(source)
             let layer = MLNSymbolStyleLayer(identifier: Self.changerLayer, source: source)
@@ -161,7 +211,34 @@ final class JourneyMapLayers {
         if let highlighted {
             features.append(Self.point(highlighted.coordinate, image: highlighted.imageName, sort: 1))
         }
+        if let highlight, sameLevel(highlight.level) {
+            features.append(Self.point(highlight.coordinate, image: highlight.imageName, sort: 2))
+        }
+        if let galleryMarker, sameLevel(galleryMarker.level) {
+            if style.image(forName: galleryMarker.imageName) == nil, let image = Self.galleryLabel(galleryMarker.label) {
+                session?.canvas?.floors.register(image, named: galleryMarker.imageName)
+            }
+            features.append(Self.point(galleryMarker.coordinate, image: galleryMarker.imageName, sort: 3))
+        }
         source.shape = MLNShapeCollectionFeature(shapes: features)
+    }
+
+    /// The red label of a gallery that a leg leads to first: white text, 28 pt high, like the white
+    /// gallery labels of the venue style (Figma, Monday "Navigation to a gallery").
+    static func galleryLabel(_ text: String) -> UIImage? {
+        let font = UIFont(name: "GuggenheimSansDisplay-SemiBold", size: 14) ?? .systemFont(ofSize: 14, weight: .semibold)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
+        let textSize = (text as NSString).size(withAttributes: attributes)
+        let size = CGSize(width: ceil(textSize.width) + 28, height: 28)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            let pill = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), cornerRadius: 13)
+            UIColor(hex: 0xED3731).setFill()
+            pill.fill()
+            UIColor.white.setStroke()
+            pill.lineWidth = 2
+            pill.stroke()
+            (text as NSString).draw(at: CGPoint(x: 14, y: (size.height - textSize.height) / 2), withAttributes: attributes)
+        }
     }
 
     private static func point(_ coordinate: ProximiioCoordinate, image: String, sort: Int) -> MLNPointFeature {
@@ -179,7 +256,12 @@ final class JourneyMapLayers {
     /// The 30 pt red marker of the journey's active stop and detour (`MapStyle.journeyStops`) with
     /// the design's lift or stairs glyph in white.
     private static func changerImage(featureType: String) -> UIImage? {
-        guard let glyph = UIImage(named: icon(featureType: featureType).rawValue, in: .module, compatibleWith: nil)?
+        redMarker(glyph: icon(featureType: featureType))
+    }
+
+    /// The 30 pt red marker with `glyph` in white.
+    private static func redMarker(glyph icon: GADIcon) -> UIImage? {
+        guard let glyph = UIImage(named: icon.rawValue, in: .module, compatibleWith: nil)?
             .withTintColor(.white, renderingMode: .alwaysOriginal) else { return nil }
         let size = CGSize(width: 30, height: 30)
         return UIGraphicsImageRenderer(size: size).image { _ in

@@ -31,9 +31,11 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
     /// `metadata.artist_name`: the artist shown under an artwork's title. A string, or an i18n
     /// object like `title_i18n`.
     var artist: String?
-    /// `metadata.has_ar`: the artwork has an AR view ("AR" in the journey list).
+    /// `metadata.augmented_reality` or `metadata.has_ar`: the artwork has an AR view ("AR" in the
+    /// journey list and on the stop card).
     var hasAR = false
-    /// `metadata.has_audio`: the artwork has audio (a note in the journey list).
+    /// `metadata.audio` or `metadata.has_audio`: the artwork has audio (a note in the journey list
+    /// and on the stop card).
     var hasAudio = false
     /// `place_id`: the venue (building) of the POI. The GAD organisation has the Guggenheim and the
     /// DCT office.
@@ -106,8 +108,10 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
         isArtwork = Self.isArtwork(amenityID: amenityID, metadata: properties?["metadata"], remoteID: remoteID)
         if case .object(let metadata)? = properties?["metadata"] {
             artist = Self.localized(metadata["artist_name"]) ?? Self.text(metadata["artist_name"])
-            hasAR = Self.flag(metadata["has_ar"])
-            hasAudio = Self.flag(metadata["has_audio"])
+            // The editor's keys since 2026-10-15 are `augmented_reality` and `audio` with the value
+            // "enabled" (PM, Monday "Augmented Reality and Audio symbols").
+            hasAR = Self.flag(metadata["augmented_reality"]) || Self.flag(metadata["has_ar"])
+            hasAudio = Self.flag(metadata["audio"]) || Self.flag(metadata["has_audio"])
             galleryID = Self.text(metadata["gallery_id"])
         }
         if case .array(let images)? = properties?["images"], let first = images.first.flatMap(Self.text),
@@ -135,11 +139,11 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
         return text(translations[language]) ?? text(translations[base])
     }
 
-    /// `true`, `"true"` or a non-zero number. Pure; covered by tests.
+    /// `true`, `"true"`, `"enabled"` or a non-zero number. Pure; covered by tests.
     static func flag(_ value: JSONValue?) -> Bool {
         switch value {
         case .bool(let flag)?: flag
-        case .string(let text)?: text.lowercased() == "true"
+        case .string(let text)?: ["true", "enabled"].contains(text.trimmingCharacters(in: .whitespaces).lowercased())
         case .number(let number)?: number != 0
         default: false
         }

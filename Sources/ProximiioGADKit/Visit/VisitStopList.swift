@@ -150,12 +150,7 @@ private struct StopList: View {
                 }
             }
             Spacer(minLength: 0)
-            if place?.hasAR == true {
-                OutlineBadge(text: "AR").accessibilityLabel(Text("AR view", bundle: .module))
-            }
-            if place?.hasAudio == true {
-                OutlineBadge(systemImage: "music.note").accessibilityLabel(Text("Audio", bundle: .module))
-            }
+            if let place { ArtworkBadges(place: place) }
         }
         .foregroundStyle(Palette.ink)
         .padding(.horizontal, 16)
@@ -163,6 +158,23 @@ private struct StopList: View {
         .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
         .accessibilityAddTraits(isActive ? .isSelected : [])
         .accessibilityValue(isVisited ? Text("Visited", bundle: .module) : Text("", bundle: .module))
+    }
+}
+
+/// "AR" and a note when the artwork has an AR view and audio, in the journey list and on the stop
+/// card (PM, Monday "Augmented Reality and Audio symbols").
+struct ArtworkBadges: View {
+    let place: VenuePlace
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if place.hasAR {
+                OutlineBadge(text: "AR").accessibilityLabel(Text("AR view", bundle: .module))
+            }
+            if place.hasAudio {
+                OutlineBadge(systemImage: "music.note").accessibilityLabel(Text("Audio", bundle: .module))
+            }
+        }
     }
 }
 

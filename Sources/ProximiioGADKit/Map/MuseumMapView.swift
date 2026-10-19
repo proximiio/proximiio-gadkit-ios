@@ -119,6 +119,9 @@ struct MuseumMapView: View {
         .onReceive(session.$selectedFloor) { floor in
             mapLayers.update(fills: [], level: floor.level)
         }
+        .onChange(of: destination) { _, place in
+            mapLayers.updateHighlight(JourneyMapLayers.highlight(of: place))
+        }
         .onChange(of: accessibility) {
             if let destination { Task { await route(to: destination) } }
         }
@@ -197,6 +200,8 @@ struct MuseumMapView: View {
                             .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel(Text("End route", bundle: .module))
+                } badges: {
+                    EmptyView()
                 }
                 if session.guidance?.isOffRoute == true && session.guidance?.hasArrived == false && !floorGuide.isActive {
                     Button(String(localized: "New route from here", bundle: .module)) { Task { await route(to: destination) } }
@@ -286,7 +291,12 @@ struct MuseumMapView: View {
         let from = here.map { ProximiioCoordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude) }
         guard let place = kind.nearest(in: places, from: from, level: here?.floor?.level) else { return }
         selectedPlace = nil
-        Task { await route(to: place) }
+        Task {
+            await route(to: place)
+            // Under the search button, beside the map buttons, above the route card.
+            PlaceFraming.show(place, on: session, padding: UIEdgeInsets(top: 90, left: 40, bottom: 230, right: 90),
+                              minimumMeters: venue.settings.amenityFramingMinimumMeters)
+        }
     }
 
     // MARK: Routing

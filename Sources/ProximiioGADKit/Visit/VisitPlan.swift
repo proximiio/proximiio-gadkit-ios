@@ -212,26 +212,12 @@ struct VisitMeta: Codable, Equatable, Sendable {
     }
 }
 
-/// Gallery first on the stop card (DAILY-CALL R2). While the visitor is outside the gallery of the
-/// active stop, the card names the gallery and shows no stop number. The first fix inside that
-/// gallery latches the stop: the card names the artwork until the active stop changes, so it does
-/// not flicker at the gallery's edge. The route always leads to the artwork. Same rule as
-/// `guggenheim-android` `GalleryFirst`.
+/// Gallery first on the stop card (DAILY-CALL R2; PM, Monday "Navigation to a gallery"). While the
+/// leg ends at the gallery of the active artwork (`GalleryFirstRouting`), the card names the gallery
+/// and shows no stop number. The first fix inside that gallery marks the artwork reached: the leg and
+/// the card lead to the artwork until the active stop changes, so the card does not flicker at the
+/// gallery's edge.
 enum GalleryFirst {
-    /// The gallery the card names instead of the artwork, or `nil` once the stop is latched.
-    static func galleryAhead(activeStopID: String?, stopGallery: Gallery?, reachedStopID: String?) -> Gallery? {
-        guard let activeStopID, reachedStopID != activeStopID else { return nil }
-        return stopGallery
-    }
-
-    /// The latched stop after a fix or a change of the active stop: the active stop once the
-    /// visitor is in its gallery, otherwise `reachedStopID` unchanged.
-    static func reachedStopID(activeStopID: String?, stopGallery: Gallery?, visitorGallery: Gallery?, reachedStopID: String?) -> String? {
-        guard let activeStopID, reachedStopID != activeStopID,
-              let stopGallery, visitorGallery?.id == stopGallery.id else { return reachedStopID }
-        return activeStopID
-    }
-
     /// Stop numbers appear at the stop and inside the stop's gallery only.
     static func showsStopNumber(state: VisitCardState, galleryAhead: Gallery?) -> Bool {
         if case .atStop = state { return true }

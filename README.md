@@ -310,12 +310,27 @@ A journey the visitor built with the guide is `.personalised`; a tour by the mus
 
 | | `.personalised` | `.curated` |
 |---|---|---|
+| Route | Leads to the gallery of the next artwork first, then to the artwork (see "Gallery first"). | Leads to the artwork. |
 | Stop card | Names the gallery of the next stop until the visitor is in it, then the artwork. | Names the artwork. |
 | List | Stops under gallery names. | Stops without gallery names. |
 | Skip | The visitor can skip an artwork. | No skip. |
 | Order | Ordered floor by floor and gallery by gallery from the visitor, at the start and after a detour or an artwork visited out of order. | The curators' order. An artwork visited out of order is marked visited; the rest keep their order. |
 
 The map and the background are the same for both.
+
+### Gallery first
+
+In a personalised journey, a leg to an artwork in a gallery the visitor is not in ends at that
+gallery. The artwork's `metadata.gallery_id` names the gallery: the gallery geofence
+(`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. The route ends
+at the POI. The map fills the geofence's outline with the floor's colour and marks the POI with a red
+label, the first word of its title ("G303"); the POI's own icon is hidden. The stop card names the
+POI ("G303 Language") with a gallery icon and no stop number.
+
+The first fix inside the gallery geofence routes the leg again from the visitor, to the artwork. A
+leg that starts in the artwork's gallery ends at the artwork. An artwork without `gallery_id`, or
+whose gallery has no geofence polygon or no POI, is routed to directly. The GAD venue data on
+2026-10-19 has 14 such galleries.
 
 ### Venue data changes
 
@@ -423,6 +438,7 @@ let configuration = GADConfiguration(
 | `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
+| `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
 | `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
 | `levelsWithoutPositioning` | [0] | Floors without positioning. See "Floors without positioning". |
 | `levelChangerReachedMeters` | 5 m | Distance from the lift or stairs to a floor without positioning at which the lift or stairs view shows. |
@@ -437,15 +453,16 @@ let configuration = GADConfiguration(
 ## Artwork details in the list
 
 A journey list row shows the artist and "AR" and audio badges from the artwork's POI
-`properties.metadata`. Without `artist_name` the row shows the level.
+`properties.metadata`. Without `artist_name` the row shows the level. The stop card shows the same
+badges while it names the artwork.
 
 | Key | Value | Shows |
 |---|---|---|
 | `artist_name` | String, or an i18n object like `title_i18n` | The artist under the title. |
-| `has_ar` | `true` | "AR". |
-| `has_audio` | `true` | A note. |
+| `augmented_reality` or `has_ar` | `"enabled"` or `true` | "AR". |
+| `audio` or `has_audio` | `"enabled"` or `true` | A note. |
 
-The GAD venue data on 2026-10-14 has none of the three keys.
+In the GAD venue data on 2026-10-15 one artwork has `augmented_reality` and `audio` (Tongari-kun).
 
 ### Gallery headers
 
@@ -600,6 +617,28 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.5.0 (2026-10-19)
+
+No change for host apps' code.
+
+Added:
+
+- Gallery first in personalised journeys (PM, Monday "Navigation to a gallery"): a leg to an artwork
+  in another gallery ends at the gallery's POI, with the gallery filled and a red label on the map;
+  the first fix inside the gallery routes the leg to the artwork. See "Gallery first".
+- An amenity picked in the menu of the journey map or the museum map gets the red marker with its
+  white icon. On the visitor's floor the map shows the visitor and the amenity; on another floor it
+  shows the amenity's floor around the amenity (PM, Monday "When selecting an amenity from the menu,
+  zoom to location"). `GADSettings.amenityFramingMinimumMeters`, 40 m.
+- "AR" and audio badges on the stop card.
+
+Changed:
+
+- The badges also read `metadata.augmented_reality` and `metadata.audio` with the value
+  `"enabled"`, the keys of the GAD venue data.
+- The stop card names the gallery of the next artwork only while the leg ends at that gallery. The
+  gallery comes from the artwork's `gallery_id`, not from the gallery outline that holds the artwork.
 
 ### 1.4.2 (2026-10-19)
 

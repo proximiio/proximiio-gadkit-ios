@@ -36,6 +36,11 @@
 //  Without `managesProgress` (`ProximiMapView.Options.progress`) the host app moves the journey on:
 //  no arrival by geofence, no ordering, and `apply(_:)` takes the host app's changes.
 //
+//  Gallery first, personalised journeys only (PM, Monday "Navigation to a gallery", 2026-10-15): a
+//  leg to an artwork in another gallery ends at that gallery's POI (`GalleryFirstRouting`). When a
+//  fix is in that gallery, the leg is drawn again from the visitor, to the artwork
+//  (`checkGalleryFirst`).
+//
 import Foundation
 import Observation
 import Proximiio
@@ -64,6 +69,10 @@ final class VisitController {
     private var isApplying = false
     /// Stops whose POI is no longer a place, reported once (`stopsWithoutPlace`).
     private var reportedWithoutPlace: Set<String> = []
+    /// The navigator's legs (gallery first).
+    private let galleryRouting: GalleryFirstRouting
+    /// The gallery the leg to the active artwork ends at, or `nil` when it ends at the artwork.
+    private(set) var galleryAhead: GalleryDestination?
 
     /// Times and distances (`GADSettings`): the move to the next artwork after an arrival, the
     /// wait for a fix before ordering, the out-of-order dwell, the detour arrival, the off-route
@@ -130,7 +139,9 @@ final class VisitController {
         self.settings = settings
         self.persist = persist
         self.session = session
-        self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules, guidanceRules: Self.artworkGuidanceRules)
+        let routing = GalleryFirstRouting(inner: ProximiioJourneyRouting(sdk: session.sdk))
+        self.galleryRouting = routing
+        self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules, guidanceRules: Self.artworkGuidanceRules, routing: routing)
         var deviation = navigator.deviationRules
         deviation.farFromRouteMeters = settings.offRouteMeters
         deviation.offRouteTooLongSeconds = settings.offRouteSeconds
@@ -200,6 +211,7 @@ final class VisitController {
     }
 
     private func handle(_ event: JourneyEvent) {
+        refreshGalleryAhead()
         switch event {
         case .stopReached(let stop) where stop.kind != .detour:
             scheduleDone(stop.id)
@@ -255,6 +267,40 @@ final class VisitController {
         for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: settings.outOfOrderDwell) {
             markOutOfOrder(id)
         }
+    }
+
+    /// Sets the gallery of each artwork among `places` for gallery first, from `metadata.gallery_id`
+    /// (`GalleryDestination`). Off with `isEnabled` false.
+    func setGalleryFirst(isEnabled: Bool, places: [VenuePlace], destinations: [String: GalleryDestination]) {
+        var galleries: [GalleryFirstRouting.Key: GalleryDestination] = [:]
+        for place in places where place.isArtwork {
+            guard let id = place.galleryID, let destination = destinations[id] else { continue }
+            galleries[GalleryFirstRouting.Key(MapCoordinate(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude))] = destination
+        }
+        galleryRouting.update(isEnabled: isEnabled, galleries: galleries)
+        refreshGalleryAhead()
+    }
+
+    /// Called on every fix. A fix in the gallery that the leg to the active artwork ends at: the leg
+    /// is drawn again from the visitor, to the artwork.
+    func checkGalleryFirst() {
+        defer { refreshGalleryAhead() }
+        guard isNavigating, navigator.detourStop == nil, !navigator.hasArrived, let stop = navigator.activeStop,
+              let gallery = galleryRouting.gallery(of: stop.coordinate), let position = session.position,
+              gallery.gallery.contains(position.coordinate.proximiio, level: position.floor?.level)
+        else { return }
+        galleryRouting.markReached(stop.coordinate)
+        FieldLog.log("gallery first: in \(gallery.gallery.name) · leg to \(stop.title)")
+        tasks.append(Task { [weak self] in
+            guard let self else { return }
+            self.isOffRoute = false
+            await self.navigator.resumeJourney()
+        })
+    }
+
+    private func refreshGalleryAhead() {
+        let gallery = navigator.detourStop == nil ? navigator.activeStop.flatMap { galleryRouting.gallery(of: $0.coordinate) } : nil
+        if gallery != galleryAhead { galleryAhead = gallery }
     }
 
     /// Marks a pending artwork visited out of order and orders the stops still ahead again from

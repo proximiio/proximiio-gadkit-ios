@@ -22,6 +22,27 @@ extension ProximiioGeofence {
     }
 }
 
+/// A gallery that a personalised journey leads to before the artworks in it (PM, Monday "Navigation to
+/// a gallery", 2026-10-15). Two records share the id that an artwork names in `metadata.gallery_id`:
+/// the gallery geofence (`metadata.geofence_type` gallery) has it in `remote_id`, and so does the
+/// gallery's POI. The geofence gives the outline; the POI gives the name and the end of the route.
+struct GalleryDestination: Identifiable, Equatable, Sendable {
+    /// `id` is the `gallery_id`, `name` the POI's title, such as "G303 Language", `level` the POI's,
+    /// `ring` the geofence's outline.
+    let gallery: Gallery
+    /// The gallery's POI: where the route to the gallery ends.
+    let entry: ProximiioCoordinate
+    /// The id of the gallery's POI.
+    let placeID: String
+
+    var id: String { gallery.id }
+
+    /// The text of the map marker: the first word of the name, such as "G303".
+    var label: String {
+        gallery.name.split(separator: " ").first.map(String.init) ?? gallery.name
+    }
+}
+
 struct Gallery: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -56,6 +77,33 @@ struct Gallery: Identifiable, Equatable, Sendable {
             },
             uniquingKeysWith: { first, _ in first }
         )
+    }
+
+    /// The galleries a personalised journey leads to first, by `gallery_id` (`GalleryDestination`). A
+    /// gallery without a polygon geofence or a POI is left out. Pure; covered by tests.
+    static func destinations(geofences: [ProximiioGeofence], places: [VenuePlace]) -> [String: GalleryDestination] {
+        let pois = Dictionary(
+            places.compactMap { place -> (String, VenuePlace)? in
+                guard !place.isArtwork, let id = place.remoteID, !id.isEmpty else { return nil }
+                return (id, place)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var destinations: [String: GalleryDestination] = [:]
+        for geofence in geofences where geofence.isGallery {
+            guard let id = geofence.remoteId, !id.isEmpty, destinations[id] == nil, let poi = pois[id],
+                  let polygon = geofence.polygon else { continue }
+            let ring = polygon.compactMap { pair in
+                pair.count >= 2 ? ProximiioCoordinate(latitude: pair[1], longitude: pair[0]) : nil
+            }
+            guard ring.count >= 3 else { continue }
+            destinations[id] = GalleryDestination(
+                gallery: Gallery(id: id, name: poi.title, level: poi.level, ring: ring),
+                entry: poi.coordinate,
+                placeID: poi.id
+            )
+        }
+        return destinations
     }
 
     /// The gallery outlines among `features`, or the named polygon geofences when there are none.

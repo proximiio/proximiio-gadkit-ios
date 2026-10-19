@@ -29,6 +29,13 @@ struct ArtworkMetadataTests {
         #expect(place.hasAudio)
     }
 
+    @Test func readsTheEditorKeysForTheBadges() throws {
+        // Tongari-kun 01c4cf17 in the GAD data, 2026-10-15.
+        let place = try place(metadata: #"{"status": "draft", "augmented_reality": "enabled", "audio": "enabled"}"#)
+        #expect(place.hasAR)
+        #expect(place.hasAudio)
+    }
+
     @Test func withoutTheKeysThereIsNoArtistAndNoBadge() throws {
         let place = try place(metadata: #"{"artwork_id": "x", "artist_id": "y"}"#)
         #expect(place.artist == nil)
@@ -39,6 +46,8 @@ struct ArtworkMetadataTests {
     @Test func flagValues() {
         #expect(VenuePlace.flag(.bool(true)))
         #expect(VenuePlace.flag(.string("TRUE")))
+        #expect(VenuePlace.flag(.string("Enabled")))
+        #expect(!VenuePlace.flag(.string("disabled")))
         #expect(VenuePlace.flag(.number(1)))
         #expect(!VenuePlace.flag(.bool(false)))
         #expect(!VenuePlace.flag(.string("yes")))

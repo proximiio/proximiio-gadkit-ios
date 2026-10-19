@@ -46,6 +46,9 @@ struct VisitView: View {
     @State private var galleries: [Gallery] = []
     /// Gallery names by gallery id, for the list's headers (`Gallery.names(places:)`).
     @State private var galleryNames: [String: String] = [:]
+    /// The artworks and level changers, which the map draws itself. The gallery that a leg leads to
+    /// first is hidden too (gallery first).
+    @State private var hiddenFeatureIDs: Set<String> = []
     /// Galleries the visitor has been in during this visit.
     @State private var visitedGalleries: Set<String> = []
     @State private var mapLayers = JourneyMapLayers()
@@ -234,6 +237,7 @@ struct VisitView: View {
                 }
             }
         }
+        .onChange(of: amenityOnMap) { _, place in show(amenity: place) }
         // Field log only. Camera diagnostics for the map library: why the heading-up follow does not start on a
         // device (PM review 2026-10-12).
         .onReceive(controller.session.$cameraMode) { mode in
@@ -336,7 +340,10 @@ struct VisitView: View {
                     destinationID: navigator.detourStop?.id ?? navigator.activeStop?.id
                 )
                 // On a floor without positioning the fixes come from the floor the visitor left.
-                if !floorGuide.isActive { controller.checkArtworkGeofences() }
+                if !floorGuide.isActive {
+                    controller.checkArtworkGeofences()
+                    controller.checkGalleryFirst()
+                }
             }
         }
         // The session updates the guidance after the position on every fix; a fix without guidance
@@ -366,6 +373,7 @@ struct VisitView: View {
                 refreshLevelChanger()
             }
         }
+        .onChange(of: controller.galleryAhead) { _, gallery in galleryAheadChanged(gallery) }
         .onReceive(controller.session.$selectedFloor) { _ in
             Task { @MainActor in
                 refreshMapLayers()
@@ -416,15 +424,40 @@ struct VisitView: View {
         // level changers on every floor they serve.
         let levelChangers = LevelChangerPlace.all(in: features)
         mapLayers.updateLevelChangers(levelChangers)
-        controller.session.hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
+        hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
+        controller.session.hiddenFeatureIDs = hiddenFeatureIDs.union(controller.galleryAhead.map { [$0.placeID] } ?? [])
         let geofences = await venue.sdk.geofences()
         controller.artworkAreas = VisitController.artworkAreas(of: geofences)
+        let destinations = Gallery.destinations(geofences: geofences, places: places)
+        controller.setGalleryFirst(isEnabled: kind.guidesToGalleryFirst, places: places, destinations: destinations)
         galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
         galleryNames = Gallery.names(places: places)
-        FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", ")) · \(galleryNames.count) named by id")
+        FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", ")) · \(galleryNames.count) named by id · \(destinations.count) for gallery first")
     }
 
     // MARK: Map layers
+
+    /// The amenity picked in the menu while its card or route is on screen.
+    private var amenityOnMap: VenuePlace? {
+        selectedAmenity ?? amenityToConfirm ?? routedAmenity
+    }
+
+    /// Highlights `place` and shows it with the visitor (`PlaceFraming`); `nil` removes the highlight.
+    private func show(amenity place: VenuePlace?) {
+        mapLayers.updateHighlight(JourneyMapLayers.highlight(of: place))
+        guard let place else { return }
+        // Under the Map / List toggle, beside the map buttons, above the place card.
+        PlaceFraming.show(place, on: controller.session, padding: UIEdgeInsets(top: 100, left: 40, bottom: 220, right: 90),
+                          minimumMeters: settings.amenityFramingMinimumMeters)
+    }
+
+    /// The leg now ends at `gallery`, or at the artwork for `nil` (gallery first).
+    private func galleryAheadChanged(_ gallery: GalleryDestination?) {
+        refreshMapLayers()
+        // The red gallery marker takes the place of the gallery's own POI.
+        controller.session.hiddenFeatureIDs = hiddenFeatureIDs.union(gallery.map { [$0.placeID] } ?? [])
+        FieldLog.log("gallery first: \(gallery.map { "route ends at \($0.gallery.name)" } ?? "route ends at the artwork")")
+    }
 
     /// Reports `stopNearby` once per stop.
     private func checkStopNearby(position: VenuePosition?, guidance: RouteGuidance?) {
@@ -441,11 +474,18 @@ struct VisitView: View {
         let visitedByStops = journey.stops.filter { $0.state == .done }
             .compactMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries)?.id }
         let visited = visitedGalleries.union(visitedByStops)
-        let fills = galleries.compactMap { gallery -> JourneyMapLayers.GalleryFill? in
-            if gallery.id == destination?.id { return .init(gallery: gallery, isDestination: true) }
+        // Gallery first: the outline of the gallery geofence the leg ends at, in place of the
+        // outline that holds the artwork.
+        let galleryAhead = controller.galleryAhead
+        var fills = galleries.compactMap { gallery -> JourneyMapLayers.GalleryFill? in
+            if gallery.id == destination?.id, galleryAhead == nil { return .init(gallery: gallery, isDestination: true) }
             return visited.contains(gallery.id) ? .init(gallery: gallery, isDestination: false) : nil
         }
+        if let galleryAhead { fills.append(.init(gallery: galleryAhead.gallery, isDestination: true)) }
         mapLayers.update(fills: fills, level: controller.session.selectedFloor.level)
+        mapLayers.updateGalleryMarker(galleryAhead.map {
+            .init(coordinate: $0.entry, level: $0.gallery.level, label: $0.label)
+        })
     }
 
     /// The line from the visitor to the start of the route ahead, on the visitor's floor only.
@@ -659,8 +699,8 @@ struct VisitView: View {
                     VisitCard(
                         navigator: controller.navigator,
                         session: controller.session,
-                        // Without galleries the card names the artwork at once.
-                        galleries: kind.guidesToGalleryFirst ? galleries : [],
+                        galleries: galleries,
+                        galleryAhead: controller.galleryAhead?.gallery,
                         places: places,
                         isOnFloorWithoutPositioning: floorGuide.isActive,
                         onResume: {
@@ -741,32 +781,24 @@ struct VisitView: View {
 /// The card at the bottom of the map (Figma "Stop Info"): an icon in a white circle, the
 /// caption, the stop, and the instruction with distance and time.
 ///
-/// Gallery first (DAILY-CALL R2): while the visitor is outside the gallery of the next stop, the
-/// card names the gallery and shows no stop number. After the visitor enters that gallery, the
-/// card names the artwork until the stop changes. The route always leads to the artwork.
+/// Gallery first (DAILY-CALL R2; PM, Monday "Navigation to a gallery"): while the leg ends at the
+/// gallery of the next artwork (`VisitController.galleryAhead`), the card names the gallery, with the
+/// gallery icon and no stop number. Once the visitor is in that gallery, the card names the artwork.
 private struct VisitCard: View {
     @ObservedObject var navigator: JourneyNavigator
     @ObservedObject var session: ProximiioMapSession
+    /// The gallery outlines, for "GALLERY · <name>".
     let galleries: [Gallery]
+    /// The gallery the card names instead of the artwork.
+    let galleryAhead: Gallery?
     let places: [VenuePlace]
     /// The map shows a floor without positioning: the card names the stop, with no instruction
     /// from fixes of another floor.
     var isOnFloorWithoutPositioning = false
     let onResume: () -> Void
-    /// The stop whose gallery the visitor has entered.
-    @State private var stopWithGalleryReached: String?
-
-    private var stopGallery: Gallery? {
-        navigator.activeStop.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries) }
-    }
 
     private var visitorGallery: Gallery? {
         session.position.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries) }
-    }
-
-    /// The gallery the card names instead of the artwork.
-    private var galleryAhead: Gallery? {
-        GalleryFirst.galleryAhead(activeStopID: navigator.activeStop?.id, stopGallery: stopGallery, reachedStopID: stopWithGalleryReached)
     }
 
     private var state: VisitCardState {
@@ -805,9 +837,9 @@ private struct VisitCard: View {
                 if case .nextStopOnOtherLevel(_, let level) = state {
                     OutlineBadge(text: "L\(level)").accessibilityLabel(Text("Level \(level)", bundle: .module))
                 }
+            } badges: {
+                if let artwork = namedArtwork { ArtworkBadges(place: artwork) }
             }
-            .onReceive(session.$position) { _ in markGalleryReached() }
-            .onChange(of: navigator.activeStop?.id) { _, _ in markGalleryReached() }
         }
     }
 
@@ -815,11 +847,15 @@ private struct VisitCard: View {
         GalleryFirst.showsStopNumber(state: state, galleryAhead: galleryAhead)
     }
 
-    private func markGalleryReached() {
-        stopWithGalleryReached = GalleryFirst.reachedStopID(
-            activeStopID: navigator.activeStop?.id, stopGallery: stopGallery,
-            visitorGallery: visitorGallery, reachedStopID: stopWithGalleryReached
-        )
+    /// The place of the active stop while the title names it.
+    private var namedArtwork: VenuePlace? {
+        guard let stop = navigator.activeStop else { return nil }
+        let namesStop = switch state {
+        case .walking: isOnFloorWithoutPositioning || galleryAhead == nil
+        case .atStop: true
+        default: isOnFloorWithoutPositioning
+        }
+        return namesStop ? places.first { $0.id == (stop.poiID ?? stop.id) } : nil
     }
 
     private var caption: LocalizedStringKey {
@@ -897,6 +933,8 @@ private struct VisitCard: View {
         case .walking, .atStop, .nextStopOnOtherLevel:
             if let stopNumber, showsStopNumber {
                 Text("\(stopNumber)", bundle: .module).textStyle(.bodyMedium)
+            } else if galleryAhead != nil {
+                Image(systemName: "photo.artframe")
             } else {
                 Image(systemName: "arrow.up")
             }

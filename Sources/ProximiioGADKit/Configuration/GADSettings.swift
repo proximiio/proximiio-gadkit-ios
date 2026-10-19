@@ -52,6 +52,9 @@ public struct GADSettings: Equatable, Sendable {
 
     /// Zoom of "Centre on me" and of the first position.
     public var followZoom: Double = 21
+    /// The smallest width and height in metres of the area the map shows for an amenity picked in
+    /// the menu, so a near amenity does not zoom the map in further than this.
+    public var amenityFramingMinimumMeters: Double = 40
 
     // MARK: Lift
 
