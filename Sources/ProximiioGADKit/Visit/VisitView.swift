@@ -73,6 +73,8 @@ struct VisitView: View {
     /// Back, "Leave the tour" and the close button of Journey Complete. `nil`: no Back and no "Leave
     /// the tour here"; Journey Complete's close button returns to the map.
     let onClose: (() -> Void)?
+    /// Gets the navigator before the journey starts (`ProximiMapView`'s `onNavigator`).
+    private let onNavigator: (@MainActor (JourneyNavigator) -> Void)?
 
     private var accessibility: RouteAccessibility {
         RouteAccessibility.effective(hostNeeds: hostAccessibility, accessibleRoutes: accessibleRoutes)
@@ -84,6 +86,7 @@ struct VisitView: View {
     ///   - incoming: The host app's journey after a change (`ProximiMapView`).
     ///   - onClose: See `onClose`.
     ///   - persist: Stores the journey after each change (`VisitController.persist`).
+    ///   - onNavigator: See `onNavigator`.
     init(
         venue: VenueService,
         journey: Journey,
@@ -92,7 +95,8 @@ struct VisitView: View {
         mode: VisitMode = .map,
         incoming: IncomingJourney? = nil,
         persist: @escaping @MainActor (Journey?) -> Void = VisitStore.persist,
-        onClose: (() -> Void)?
+        onClose: (() -> Void)?,
+        onNavigator: (@MainActor (JourneyNavigator) -> Void)? = nil
     ) {
         self.venue = venue
         self.kind = kind
@@ -122,6 +126,7 @@ struct VisitView: View {
             settings: settings, persist: persist
         ))
         self.onClose = onClose
+        self.onNavigator = onNavigator
     }
 
     var body: some View {
@@ -203,6 +208,8 @@ struct VisitView: View {
             }
         }
         .task {
+            // Before `controller.start` below: the host app's streams get the journey's first events.
+            onNavigator?(controller.navigator)
             #if DEBUG
             if DebugLaunch.current.visitList { mode = .list }
             #endif

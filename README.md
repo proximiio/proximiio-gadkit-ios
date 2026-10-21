@@ -39,6 +39,10 @@ lists every change; changes that need a change in the host app are marked **Brea
 6.0.0-beta.45 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
+A host app that draws its journey with the map library's `ProximiioMapView` and its own
+`JourneyNavigator` moves to `ProximiMapView` with [MIGRATION.md](MIGRATION.md). It lists the SDK and
+Map changes since SDK 6.0.0-beta.58 and Map 6.0.0-beta.43.
+
 ## Host app setup
 
 ### Info.plist
@@ -190,6 +194,7 @@ journey.stops[0].state = .visited
 | `mode` | `.map` (default) or `.list` when the view opens. |
 | `onEvent` | `ProximiMapEvent`s of the journey screen, on the main actor. |
 | `onClose` | Back on the bottom bar, "Leave the tour" and the close button of Journey Complete. Default `nil`: the bottom bar has no Back, "Leave the tour here" never shows, and the close button of Journey Complete returns to the map. |
+| `onNavigator` | The map library's `JourneyNavigator` that draws the journey, on the main actor, before the journey starts and again each time the screen starts again. See [The navigator](#the-navigator). |
 
 The host app:
 
@@ -228,6 +233,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `stops` | `[ProximiJourney.Stop]` in visit order. A stop has the `id` the host app gave (a collection id `remote_id` or a Proximi.io POI id) and a `state`: `.pending`, `.visited` or `.skipped`. |
 | `init(kind:artworks:)` | A journey whose stops are all pending. |
 | `init(kind:stops:)` | A journey with its progress. |
+| `init(kind:journey:)` | The stops of a map library `Journey`, with their ids. `.done` is `.visited`, `.skipped` is `.skipped`, `.pending`, `.active` and `.reached` are `.pending`. Detour stops are left out. |
 
 - The route leads to the first pending stop in the journey's order. In a `.personalised` journey it
   leads to the stop's gallery first (see "Gallery first").
@@ -266,6 +272,53 @@ also `artworkReached` and `artworkVisitedOutOfOrder`; with `.bottomBar`, `.promp
 the exit events. Screen, wristband,
 arrival, geofence and `journeyChanged` events come only from `ProximiMap`; geofence enter and exit
 events are on the host app's SDK (`geofenceEvents()`).
+
+### The navigator
+
+`onNavigator` gives the host app the map library's `JourneyNavigator` that draws the journey. The host
+app reads its `events` and sets its `onCue` as on a navigator of its own.
+
+```swift
+@State private var navigatorTask: Task<Void, Never>?
+
+ProximiMapView(sdk: sdk, journey: $journey, onNavigator: { navigator in
+    let events = navigator.events           // read here: the stream gets every later event
+    navigatorTask?.cancel()                 // a new navigator replaces the previous one
+    navigatorTask = Task {
+        for await event in events {
+            switch event {
+            case .stopSkipped(let stop): print("skipped", stop.id)
+            case .offRouteTooLong(let duration): print("off route for", duration)
+            case .journeyFinished: print("finished")
+            default: break
+            }
+        }
+    }
+    navigator.onCue = { cue in
+        if cue.kind == .approachingDestination { print("approaching", cue.text) }
+    }
+})
+```
+
+- The view calls `onNavigator` before the journey starts. Each time the screen starts again (see
+  "ProximiJourney") it calls it with a new navigator, and the streams of the previous one finish.
+- Every access to `events` returns a new stream. The view's own stream takes no events from it.
+- The view sets neither `onCue` nor `cueRules`. `cueRules` is the map library's default
+  (`.venueWalk`: a cue 15 m before each manoeuvre).
+- The host app changes the journey through the `journey` binding only. The view does not see calls
+  that change the navigator (`markDone(stopID:)`, `skip(stopID:)`, `reopen(stopID:)`, `add(_:)`,
+  `move(stopID:toIndex:)`, `apply(_:)`, `detour(to:)`, `resumeJourney()`, `setRouteOptions(_:)`), and its
+  next change of the journey can undo them.
+
+The view's navigator differs from a navigator with the map library's default rules:
+
+| | The view's navigator |
+|---|---|
+| `.stopSkipped`, `.legChanged`, `.journeyFinished` | Sent when the view applies a change of the binding. |
+| `.farFromRoute`, `.offRouteTooLong` | After `GADSettings.offRouteMeters` (30 m) and `GADSettings.offRouteSeconds` (300 s). |
+| Off the route | Without `.prompts` the route follows the visitor (`deviationPolicy` `.automatic`); with `.prompts` the view asks (`.askApp`). |
+| `.stopReached` and the cue `.arrived` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
+| The cue `.approachingDestination` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
 
 ## Screens
 
@@ -628,6 +681,18 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.7.0 (2026-10-21)
+
+No change for host apps' code. SDK 6.0.0-beta.60 and Map 6.0.0-beta.45, as in 1.6.0.
+
+Added:
+
+- `ProximiMapView`'s `onNavigator`: the `JourneyNavigator` that draws the journey. The host app reads
+  its `events` and sets `onCue` itself. See [The navigator](#the-navigator).
+- `ProximiJourney.init(kind:journey:)`: a `ProximiJourney` from a map library `Journey`.
+- [MIGRATION.md](MIGRATION.md): moving from `ProximiioMapView` and an own `JourneyNavigator` on SDK
+  6.0.0-beta.58 and Map 6.0.0-beta.43 to `ProximiMapView`.
 
 ### 1.6.0 (2026-10-19)
 

@@ -116,4 +116,18 @@ struct HostedJourneyTests {
         let data = try JSONEncoder().encode(journey)
         #expect(try JSONDecoder().decode(ProximiJourney.self, from: data) == journey)
     }
+
+    @Test func aMapLibraryJourneyKeepsItsStopIDsAndProgressWithoutTheDetour() {
+        func stop(_ id: String, _ state: JourneyStop.State, kind: JourneyStop.Kind = .planned) -> JourneyStop {
+            JourneyStop(id: id, title: id, coordinate: .init(latitude: 24.5, longitude: 54.4), poiID: id, kind: kind, state: state)
+        }
+        let journey = Journey(stops: [
+            stop("a", .done), stop("b", .skipped), stop("cafe", .active, kind: .detour),
+            stop("c", .reached), stop("d", .active), stop("e", .pending),
+        ])
+        #expect(ProximiJourney(kind: .curated, journey: journey) == ProximiJourney(kind: .curated, stops: [
+            .init(id: "a", state: .visited), .init(id: "b", state: .skipped),
+            .init(id: "c"), .init(id: "d"), .init(id: "e"),
+        ]))
+    }
 }

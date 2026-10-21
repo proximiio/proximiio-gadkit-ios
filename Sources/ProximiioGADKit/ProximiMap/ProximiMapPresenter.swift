@@ -119,26 +119,48 @@ private struct JourneyReadyFlow: View {
 #if DEBUG
 /// `-hostedMap`: `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses
 /// it. This view is the host app: it skips a stop the visitor swiped, and "Visited" marks the first
-/// pending stop visited. The line at the top counts the stop states of its journey,
-/// for UI tests.
+/// pending stop visited. The lines at the top count the stop states of its journey and list the
+/// events of the navigator it got from `onNavigator`, for UI tests.
 private struct HostedMapCheck: View {
     @Bindable var map: ProximiMap
     let sdk: Proximiio
+    /// The names of the navigator's events, oldest first.
+    @State private var navigatorEvents: [String] = []
+    @State private var navigatorTask: Task<Void, Never>?
 
     var body: some View {
-        ProximiMapView(sdk: sdk, journey: $map.hostedJourney, routeAccessibility: map.routeAccessibility) { event in
-            FieldLog.log("hosted map → host app: \(event)")
-            if case .skipRequested(let stop) = event { set(stop.id, to: .skipped) }
-        }
-        .overlay(alignment: .top) {
-            HStack {
-                Text(Self.states(of: map.hostedJourney))
-                    .font(.caption2)
-                    .accessibilityIdentifier("hostedJourneyStates")
-                if let first = map.hostedJourney.stops.first(where: { $0.state == .pending }) {
-                    Button("Visited") { set(first.id, to: .visited) }.font(.caption2)
+        ProximiMapView(
+            sdk: sdk,
+            journey: $map.hostedJourney,
+            routeAccessibility: map.routeAccessibility,
+            onEvent: { event in
+                FieldLog.log("hosted map → host app: \(event)")
+                if case .skipRequested(let stop) = event { set(stop.id, to: .skipped) }
+            },
+            onNavigator: { navigator in
+                let events = navigator.events
+                navigatorTask?.cancel()
+                navigatorTask = Task {
+                    for await event in events {
+                        navigatorEvents.append(String(String(describing: event).prefix { $0 != "(" }))
+                    }
                 }
-                Button("Close map") { map.cover = nil }.font(.caption2)
+            }
+        )
+        .overlay(alignment: .top) {
+            VStack {
+                HStack {
+                    Text(Self.states(of: map.hostedJourney))
+                        .font(.caption2)
+                        .accessibilityIdentifier("hostedJourneyStates")
+                    if let first = map.hostedJourney.stops.first(where: { $0.state == .pending }) {
+                        Button("Visited") { set(first.id, to: .visited) }.font(.caption2)
+                    }
+                    Button("Close map") { map.cover = nil }.font(.caption2)
+                }
+                Text("navigator: \(navigatorEvents.suffix(6).joined(separator: " "))")
+                    .font(.caption2)
+                    .accessibilityIdentifier("hostedNavigatorEvents")
             }
         }
     }

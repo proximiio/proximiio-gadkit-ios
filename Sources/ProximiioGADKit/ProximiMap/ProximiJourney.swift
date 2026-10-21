@@ -29,6 +29,22 @@ public struct ProximiJourney: Codable, Equatable, Sendable {
         self.init(kind: kind, stops: artworks.map { Stop(id: $0) })
     }
 
+    /// The stops of a map library journey, for a host app that built a `Journey` for its own
+    /// `JourneyNavigator`. Each stop keeps its id (`JourneyStop(poi)` uses the POI id). A done stop
+    /// is visited, a skipped stop is skipped, and a pending, active or reached stop is pending. A
+    /// detour stop is left out.
+    public init(kind: JourneyKind = .personalised, journey: Journey) {
+        self.init(kind: kind, stops: journey.stops.filter { $0.kind != .detour }.map { stop in
+            let state: State = switch stop.state {
+            case .done: .visited
+            case .skipped: .skipped
+            case .pending, .active, .reached: .pending
+            @unknown default: .pending
+            }
+            return Stop(id: stop.id, state: state)
+        })
+    }
+
     public struct Stop: Codable, Equatable, Sendable, Identifiable {
         /// The id the host app gave: a collection id (`remote_id`) or a Proximi.io POI id.
         public var id: String

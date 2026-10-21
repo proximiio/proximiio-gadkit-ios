@@ -10,7 +10,9 @@
 //  wristband session, owns the journey (`ProximiJourney`) and decides when a stop is visited or
 //  skipped. The view draws the journey it gets, routes to the first stop still to visit and
 //  reports what the visitor does as `ProximiMapEvent`s. It does not start or stop the SDK, does not
-//  change the wristband session and reports no geofence or wristband event.
+//  change the wristband session and reports no geofence or wristband event. It hands its
+//  `JourneyNavigator` to `onNavigator`, so the host app reads the map library's journey events and
+//  route cues itself.
 //
 //  Everything beyond that is in `Options`, off by default: the bottom bar, the background, the
 //  view's own prompts, the journey logic (visits, order) and the Live Activity. `ProximiMap` uses
@@ -59,6 +61,7 @@ public struct ProximiMapView: View {
     private let mode: VisitMode
     private let onEvent: (ProximiMapEvent) -> Void
     private let onClose: (() -> Void)?
+    private let onNavigator: @MainActor (JourneyNavigator) -> Void
 
     @State private var model = HostedMapModel()
 
@@ -79,6 +82,13 @@ public struct ProximiMapView: View {
     ///   - onClose: Back on the bottom bar, "Leave the tour" and the close button of Journey Complete.
     ///     `nil` (default): the bottom bar has no Back, so "Leave the tour here" never shows, and the
     ///     close button of Journey Complete returns to the map.
+    ///   - onNavigator: Called with the `JourneyNavigator` that draws the journey, before the journey
+    ///     starts, and again with a new navigator each time the screen starts again (a new journey
+    ///     kind, a removed stop, the first journey on an empty map). The previous navigator's
+    ///     `events` streams then finish. Read `navigator.events` inside the call, so no event is
+    ///     missed, and set `onCue` and `cueRules` there; the view sets neither. Change the journey
+    ///     through `journey` only: the view does not see calls such as `skip(stopID:)` or
+    ///     `markDone(stopID:)` on the navigator.
     public init(
         sdk: Proximiio,
         journey: Binding<ProximiJourney>,
@@ -87,7 +97,8 @@ public struct ProximiMapView: View {
         routeAccessibility: RouteAccessibility = .none,
         mode: VisitMode = .map,
         onEvent: @escaping (ProximiMapEvent) -> Void = { _ in },
-        onClose: (() -> Void)? = nil
+        onClose: (() -> Void)? = nil,
+        onNavigator: @escaping @MainActor (JourneyNavigator) -> Void = { _ in }
     ) {
         _journey = journey
         self.sdk = sdk
@@ -97,6 +108,7 @@ public struct ProximiMapView: View {
         self.mode = mode
         self.onEvent = onEvent
         self.onClose = onClose
+        self.onNavigator = onNavigator
     }
 
     public var body: some View {
@@ -112,7 +124,8 @@ public struct ProximiMapView: View {
                     persist: { [model, binding = $journey, generation = loaded.generation] journey in
                         model.write(journey, generation: generation, to: binding)
                     },
-                    onClose: onClose
+                    onClose: onClose,
+                    onNavigator: onNavigator
                 )
                 .id(loaded.generation)
                 .routeAccessibility(routeAccessibility)
