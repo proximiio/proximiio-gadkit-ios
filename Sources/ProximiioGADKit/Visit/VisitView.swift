@@ -378,10 +378,12 @@ struct VisitView: View {
         }
         .onChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
         .onChange(of: venue.data.version) { _, _ in
+            let routeNetworkChanged = venue.data.changedKinds.contains(.features)
             Task {
                 await loadVenueData()
                 refreshMapLayers()
-                for stop in await controller.stopsWithoutPlace(places: places) {
+                let withoutPlace = await controller.venueChanged(places: places, galleries: galleries, routeNetworkChanged: routeNetworkChanged)
+                for stop in withoutPlace {
                     emit(.stopPlaceDeleted(stop))
                 }
             }

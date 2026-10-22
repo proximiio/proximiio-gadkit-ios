@@ -54,61 +54,20 @@ struct HostedJourneyTests {
         #expect(written.stops.map(\.state) == [.visited, .pending, .skipped])
     }
 
-    /// A removed stop, a new kind and a first journey on a map without one start the screen again.
+    /// A new kind, a journey without a stop on the map and a first journey on a map without one
+    /// start the screen again. Fewer stops are taken in place (`JourneyNavigator.update(to:)`).
     @Test func theOpenScreenTakesAJourneyInPlaceUnlessItCannot() {
         let shown = HostedJourney(ProximiJourney(artworks: ["GAD.1", "GAD.2"]), places: places)
         let more = HostedJourney(ProximiJourney(stops: [.init(id: "GAD.2", state: .visited), .init(id: "c"), .init(id: "GAD.1")]), places: places)
         #expect(more.canReplace(shown, kind: .personalised, shownKind: .personalised))
         #expect(!more.canReplace(shown, kind: .curated, shownKind: .personalised))
         let fewer = HostedJourney(ProximiJourney(artworks: ["GAD.1"]), places: places)
-        #expect(!fewer.canReplace(shown, kind: .personalised, shownKind: .personalised))
+        #expect(fewer.canReplace(shown, kind: .personalised, shownKind: .personalised))
         let empty = HostedJourney(ProximiJourney(artworks: []), places: places)
         #expect(!more.canReplace(empty, kind: .personalised, shownKind: .personalised))
-    }
-
-    @Test func stateChangesTakeTheHostAppsStates() {
-        var current = HostedJourney(ProximiJourney(artworks: ["GAD.1", "GAD.2", "c"]), places: places).journey
-        current.stops[0].state = .active
-        current.stops[1].state = .done
-        current.stops[2].state = .skipped
-        let target = HostedJourney(ProximiJourney(stops: [
-            .init(id: "GAD.1", state: .visited),
-            .init(id: "GAD.2"),
-            .init(id: "c", state: .skipped),
-        ]), places: places).journey
-        // Reopens come first.
-        #expect(JourneyUpdate.stateChanges(from: current, to: target) == [
-            .init(stopID: "b", kind: .reopen),
-            .init(stopID: "a", kind: .markDone),
-        ])
-        // Active and reached are pending for the host app: nothing to change.
-        current.stops[1].state = .reached
-        let pending = HostedJourney(ProximiJourney(artworks: ["GAD.1", "GAD.2"]), places: places).journey
-        #expect(JourneyUpdate.stateChanges(from: current, to: pending).isEmpty)
-    }
-
-    /// The navigator does not skip a done stop: a visited stop the host app skips is reopened first.
-    @Test func aVisitedStopTheHostAppSkipsIsReopenedFirst() {
-        var current = HostedJourney(ProximiJourney(artworks: ["GAD.1", "GAD.2"]), places: places).journey
-        current.stops[0].state = .done
-        current.stops[1].state = .skipped
-        let target = HostedJourney(ProximiJourney(stops: [.init(id: "GAD.1", state: .skipped), .init(id: "GAD.2", state: .visited)]), places: places).journey
-        #expect(JourneyUpdate.stateChanges(from: current, to: target) == [
-            .init(stopID: "a", kind: .reopen),
-            .init(stopID: "a", kind: .skip),
-            .init(stopID: "b", kind: .markDone),
-        ])
-    }
-
-    @Test func theOrderPutsTheHostAppsPendingStopsInItsOrder() {
-        #expect(JourneyUpdate.order(reorderable: ["a", "b", "c"], activeStopID: "a", pending: ["a", "b", "c"], closing: []) == nil)
-        #expect(JourneyUpdate.order(reorderable: ["a", "b", "c"], activeStopID: "a", pending: ["c", "a", "b"], closing: []) == ["c", "a", "b"])
-        // The active stop the host app closes stays first, so the route changes once, to C.
-        #expect(JourneyUpdate.order(reorderable: ["a", "b", "c"], activeStopID: "a", pending: ["c", "b"], closing: ["a"]) == ["a", "c", "b"])
-        // A stop the host app closes that is not active goes after the pending ones.
-        #expect(JourneyUpdate.order(reorderable: ["a", "b", "c"], activeStopID: "a", pending: ["a", "c"], closing: ["b"]) == ["a", "c", "b"])
-        // An id in one list only: the rest keep their order.
-        #expect(JourneyUpdate.order(reorderable: ["a", "x", "b"], activeStopID: "a", pending: ["b", "a", "y"], closing: []) == ["b", "a", "x"])
+        #expect(!empty.canReplace(shown, kind: .personalised, shownKind: .personalised))
+        let offTheMap = HostedJourney(ProximiJourney(artworks: ["GAD.unknown"]), places: places)
+        #expect(!offTheMap.canReplace(shown, kind: .personalised, shownKind: .personalised))
     }
 
     @Test func aJourneyCanBeStoredAsJSON() throws {

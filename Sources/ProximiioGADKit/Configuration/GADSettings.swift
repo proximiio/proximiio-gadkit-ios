@@ -113,10 +113,9 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Venue data
 
-    /// Seconds between two downloads of the venue's features (`GET /v7/geo/features`) while the app
-    /// is in the foreground. The features are also downloaded when the app returns to the
-    /// foreground. Changed features update the routes, the screens and the stored journey. 0 turns
-    /// the downloads off.
+    /// No effect since 1.8.0. The screens follow `Proximiio.venueDataChanges()`, and the SDK's audit
+    /// sync brings the changed features (`ProximiioConfiguration.syncInterval`).
+    @available(*, deprecated, message: "No effect: the venue data follows Proximiio.venueDataChanges(). Set ProximiioConfiguration.syncInterval instead.")
     public var venueDataRefreshInterval: TimeInterval = 300
 
     public init() {}

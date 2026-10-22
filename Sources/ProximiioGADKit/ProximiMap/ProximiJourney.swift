@@ -105,13 +105,12 @@ struct HostedJourney: Equatable {
         self.unmatched = unmatched
     }
 
-    /// Whether the open screen, which shows `shown`, can take this journey in place: the same kind,
-    /// a stop on the map in both, and every stop of `shown` still in this one. The navigator cannot
-    /// remove a stop (map 6.0.0-beta.45), and a screen without stops has no started navigator to add
-    /// them to. Pure; covered by tests.
+    /// Whether the open screen, which shows `shown`, can take this journey in place
+    /// (`JourneyNavigator.update(to:)`): the same kind and a stop on the map in both. A screen
+    /// without stops has no started navigator, and a journey without stops shows the map alone.
+    /// Pure; covered by tests.
     func canReplace(_ shown: HostedJourney, kind: JourneyKind, shownKind: JourneyKind) -> Bool {
         kind == shownKind && !shown.journey.stops.isEmpty && !journey.stops.isEmpty
-            && Set(shown.journey.stops.map(\.id)).isSubset(of: journey.stops.map(\.id))
     }
 
     /// The host app's journey with the order and states of `journey`. Detours are left out. A
@@ -127,58 +126,6 @@ struct HostedJourney: Equatable {
             return ProximiJourney.Stop(id: id, state: state)
         }
         return ProximiJourney(kind: kind, stops: stops + unmatched)
-    }
-}
-
-/// The steps that turn the navigator's journey into the host app's journey on the open screen
-/// (`VisitController.apply`). Pure; covered by tests.
-enum JourneyUpdate {
-    struct StateChange: Equatable {
-        enum Kind: Equatable { case markDone, skip, reopen }
-        var stopID: String
-        var kind: Kind
-    }
-
-    /// The state changes that give the stops of `current` the states of `target`, reopens first. A
-    /// stop of `target` that `current` lacks counts as pending. Pending, active and reached are one
-    /// state for the host app. A done stop the host app skips is reopened first: the navigator does
-    /// not skip a done stop.
-    static func stateChanges(from current: Journey, to target: Journey) -> [StateChange] {
-        let states = Dictionary(current.stops.map { ($0.id, $0.state) }, uniquingKeysWith: { first, _ in first })
-        var reopens: [StateChange] = []
-        var closes: [StateChange] = []
-        for stop in target.stops {
-            let state = states[stop.id] ?? .pending
-            switch stop.state {
-            case .done where state != .done:
-                closes.append(StateChange(stopID: stop.id, kind: .markDone))
-            case .skipped where state != .skipped:
-                if state == .done { reopens.append(StateChange(stopID: stop.id, kind: .reopen)) }
-                closes.append(StateChange(stopID: stop.id, kind: .skip))
-            case .pending where state == .done || state == .skipped:
-                reopens.append(StateChange(stopID: stop.id, kind: .reopen))
-            default:
-                break
-            }
-        }
-        return reopens + closes
-    }
-
-    /// The order of the navigator's `reorderableStops` for the host app's journey, or `nil` when it
-    /// is the current order. The host app's pending stops come in its order. The active stop stays
-    /// first when the host app closes it, so the route changes once, when it is closed. Stops the host
-    /// app closes follow, in their current order.
-    /// - Parameters:
-    ///   - reorderable: The ids of `reorderableStops`, the active stop first.
-    ///   - pending: The ids of the host app's pending stops, in its order.
-    ///   - closing: The ids the host app marks visited or skipped.
-    static func order(reorderable: [String], activeStopID: String?, pending: [String], closing: Set<String>) -> [String]? {
-        let available = Set(reorderable)
-        var order: [String] = []
-        if let activeStopID, closing.contains(activeStopID), available.contains(activeStopID) { order.append(activeStopID) }
-        for id in pending where available.contains(id) && !order.contains(id) { order.append(id) }
-        for id in reorderable where !order.contains(id) { order.append(id) }
-        return order == reorderable ? nil : order
     }
 }
 

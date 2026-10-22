@@ -12,7 +12,9 @@
 //  against the artwork geofences (`checkArtworkGeofences`). A geofence the SDK counts the visitor
 //  inside (`enteredGeofenceIDs`) counts too: the SDK exits a geofence only beyond 1.2 × its radius,
 //  and its event stream does not repeat the geofences entered before the screen opened (field test
-//  2026-10-19). The journey moves to the next
+//  2026-10-19). Since SDK 6.0.0-beta.63 the SDK also exits a geofence only
+//  `ProximiioConfiguration.geofenceExitDelay` (3 s by default) after the position left it, so an
+//  artwork counts as inside up to that long after the visitor left it. The journey moves to the next
 //  artwork `GADSettings.artworkAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
 //  the visitor walks past without entering its geofence stays unvisited until it is skipped.
 //  Out of order: a visitor inside the geofence of another open artwork for
@@ -437,23 +439,40 @@ final class VisitController {
         persist(navigator.journey)
     }
 
-    /// The stops whose POI is no longer a place after a change of the venue data, each once. With
-    /// `managesProgress` they are skipped: the navigator has no call that removes or changes a stop
-    /// (map 6.0.0-beta.45). When the journey screen of `ProximiMap` closes, the stored journey drops
-    /// these stops and takes the changed places (`VisitPlan.reconciled`). Without `managesProgress`
-    /// the stops stay; the host app decides.
-    func stopsWithoutPlace(places: [VenuePlace]) async -> [JourneyStop] {
-        let stops = VisitPlan.stopsWithoutPlace(in: navigator.journey, places: places)
+    /// Takes a change of the venue data into the open journey, after the journey changes started
+    /// before it (`serially`). Returns the stops whose POI is no longer a place, each once.
+    /// - A planned stop that is not reached or done takes the title, coordinate, floor and gallery
+    ///   of its POI (`JourneyNavigator.replace(_:)`). A moved stop being walked to is routed again.
+    /// - A stop whose POI is no longer a place is skipped with `managesProgress`, so `ProximiMapView`
+    ///   writes it to the host app's journey as skipped. Without `managesProgress` it stays; the
+    ///   host app decides. When the journey screen of `ProximiMap` closes, the stored journey drops
+    ///   it (`VisitPlan.reconciled`).
+    /// - With `routeNetworkChanged` (changed features) the legs are routed again
+    ///   (`JourneyNavigator.routeNetworkChanged()`). A leg on the line already drawn stays quietly.
+    func venueChanged(places: [VenuePlace], galleries: [Gallery], routeNetworkChanged: Bool) async -> [JourneyStop] {
+        let withoutPlace = VisitPlan.stopsWithoutPlace(in: navigator.journey, places: places)
             .filter { $0.state != .skipped && !reportedWithoutPlace.contains($0.id) }
-        guard !stops.isEmpty else { return [] }
-        reportedWithoutPlace.formUnion(stops.map(\.id))
-        guard managesProgress else { return stops }
-        for stop in stops {
-            FieldLog.log("journey: \(stop.title) is no longer a place · skipped")
-            await navigator.skip(stopID: stop.id)
+        reportedWithoutPlace.formUnion(withoutPlace.map(\.id))
+        let skipped = managesProgress ? withoutPlace : []
+        await serially { [weak self] in
+            guard let self else { return }
+            var changed = false
+            let current = Dictionary(self.navigator.journey.stops.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let reconciled = VisitPlan.reconciled(self.navigator.journey, places: places, galleries: galleries)
+            for stop in reconciled.stops where current[stop.id] != stop {
+                if await self.navigator.replace(stop) {
+                    FieldLog.log("journey: \(stop.title) takes the changed place")
+                    changed = true
+                }
+            }
+            for stop in skipped {
+                FieldLog.log("journey: \(stop.title) is no longer a place · skipped")
+                if await self.navigator.skip(stopID: stop.id) { changed = true }
+            }
+            if routeNetworkChanged { await self.navigator.routeNetworkChanged() }
+            if changed { self.persist(self.navigator.journey) }
         }
-        persist(navigator.journey)
-        return stops
+        return withoutPlace
     }
 
     func undoSkip() async {
@@ -463,11 +482,11 @@ final class VisitController {
         persist(navigator.journey)
     }
 
-    /// Takes the host app's journey on the open screen (`ProximiMapView`): stops added, visited,
-    /// skipped, reopened and moved. The navigator, its route cache and the camera stay. `target`
-    /// holds every stop of the navigator (`HostedJourney.canReplace`). Calls run one after another;
-    /// a call during another keeps only the latest journey, applied after it. Before the navigator
-    /// has started, the latest journey waits for the start.
+    /// Takes the host app's journey on the open screen (`ProximiMapView`): stops added, removed,
+    /// visited, skipped, reopened and moved. The navigator, its route cache, its event streams and
+    /// the camera stay. Calls run one after another; a call during another keeps only the latest
+    /// journey, applied after it. Before the navigator has started, the latest journey waits for
+    /// the start.
     func apply(_ target: Journey) async {
         pendingTarget = target
         await applyPendingTarget()
@@ -484,45 +503,15 @@ final class VisitController {
         }
     }
 
-    /// Adds the new stops, reopens, sets the order in one transition, then closes. Each step calls
-    /// the navigator only for a stop that changes.
+    /// Hands the host app's whole journey to the navigator (`JourneyNavigator.update(to:)`). The
+    /// navigator merges it with the list it got last and its own stops: a detour stays, and a step
+    /// the navigator has already made stays. The navigator was created with the host app's list, so
+    /// the first call merges against it.
     private func performApply(_ target: Journey) async {
-        let existing = Set(navigator.journey.stops.map(\.id))
-        var added = 0
-        for var stop in target.stops where !existing.contains(stop.id) {
-            stop.state = .pending
-            if await navigator.add(stop) { added += 1 }
-        }
-        let changes = JourneyUpdate.stateChanges(from: navigator.journey, to: target)
-        for change in changes where change.kind == .reopen {
-            await navigator.reopen(stopID: change.stopID)
-        }
-        let closing = changes.filter { $0.kind != .reopen }
-        let current = navigator.reorderableStops.map(\.id)
-        let active = navigator.activeStop?.id
-        let ordered = JourneyUpdate.order(
-            reorderable: current,
-            activeStopID: active,
-            pending: target.stops.filter { $0.state == .pending }.map(\.id),
-            closing: Set(closing.map(\.stopID))
-        )
-        if let ordered {
-            let proposal = JourneyOrderProposal(
-                order: ordered, currentOrder: current, pinnedStopIDs: [],
-                currentSeconds: 0, proposedSeconds: 0, liveStopID: active
-            )
-            await navigator.apply(proposal)
-        }
-        for change in closing {
-            switch change.kind {
-            case .markDone: await navigator.markDone(stopID: change.stopID)
-            case .skip: await navigator.skip(stopID: change.stopID)
-            case .reopen: break
-            }
-        }
+        let taken = await navigator.update(to: target)
         // "Undo skip" belongs to a skip the host app has since changed.
         if let id = lastSkippedStopID, stop(id)?.state != .skipped { lastSkippedStopID = nil }
-        FieldLog.log("journey applied · \(added) added · \(changes.count) state changes · order \(ordered == nil ? "kept" : "set")")
+        FieldLog.log("journey applied · \(target.stops.count) stops · \(taken ? "taken" : "not taken: two stops with one id")")
     }
 
     /// Makes `stopID` the next stop (EC04a: the visitor picked the artwork they are at).

@@ -74,7 +74,8 @@ struct VenueDataTests {
         #expect(VenueDataRefresh.changes(from: old, to: old.reversed()).isEmpty)
     }
 
-    @Test func theRefreshIntervalIsFiveMinutes() {
-        #expect(GADSettings.standard.venueDataRefreshInterval == 300)
+    /// The open map redraws a changed style and amenity catalogue itself.
+    @Test func theScreensFollowFeaturesGeofencesFloorsAndPlaces() {
+        #expect(VenueDataRefresh.watchedKinds == [.features, .geofences, .floors, .places])
     }
 }

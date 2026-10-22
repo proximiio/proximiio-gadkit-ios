@@ -84,10 +84,11 @@ public struct ProximiMapView: View {
     ///     close button of Journey Complete returns to the map.
     ///   - onNavigator: Called with the `JourneyNavigator` that draws the journey, before the journey
     ///     starts, and again with a new navigator each time the screen starts again (a new journey
-    ///     kind, a removed stop, the first journey on an empty map). The previous navigator's
-    ///     `events` streams then finish. Read `navigator.events` inside the call, so no event is
-    ///     missed, and set `onCue` and `cueRules` there; the view sets neither. Change the journey
-    ///     through `journey` only: the view does not see calls such as `skip(stopID:)` or
+    ///     kind, a journey without a stop on the map, the first journey on an empty map). The
+    ///     previous navigator's `events` streams then finish. Read `navigator.events` inside the
+    ///     call, so no event is missed, and set `onCue` and `cueRules` there; the view sets neither.
+    ///     Any other change of `journey` goes to `update(to:)` of the same navigator. Change the
+    ///     journey through `journey` only: the view does not see calls such as `skip(stopID:)` or
     ///     `markDone(stopID:)` on the navigator.
     public init(
         sdk: Proximiio,
@@ -176,10 +177,10 @@ final class HostedMapModel {
     @ObservationIgnored private var revision = 0
     @ObservationIgnored private var isStarting = false
 
-    /// Loads the venue and shows `journey`. After `stop()`, starts the venue data downloads again.
+    /// Loads the venue and shows `journey`. After `stop()`, follows the venue data changes again.
     func start(sdk: Proximiio, settings: GADSettings, options: ProximiMapView.Options, journey: Binding<ProximiJourney>) async {
         if let venue {
-            await venue.data.start(interval: settings.venueDataRefreshInterval)
+            await venue.data.start()
             return
         }
         guard !isStarting else { return }

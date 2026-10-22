@@ -118,15 +118,18 @@ private struct JourneyReadyFlow: View {
 
 #if DEBUG
 /// `-hostedMap`: `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses
-/// it. This view is the host app: it skips a stop the visitor swiped, and "Visited" marks the first
-/// pending stop visited. The lines at the top count the stop states of its journey and list the
-/// events of the navigator it got from `onNavigator`, for UI tests.
+/// it. This view is the host app: it skips a stop the visitor swiped, "Visited" marks the first
+/// pending stop visited, and "Remove" removes the last stop. The lines at the top count the stop
+/// states of its journey and list the navigators it got from `onNavigator` and the events of the
+/// last one, for UI tests.
 private struct HostedMapCheck: View {
     @Bindable var map: ProximiMap
     let sdk: Proximiio
     /// The names of the navigator's events, oldest first.
     @State private var navigatorEvents: [String] = []
     @State private var navigatorTask: Task<Void, Never>?
+    /// The navigators `onNavigator` got. The screen starts again with a new one.
+    @State private var navigators = 0
 
     var body: some View {
         ProximiMapView(
@@ -139,6 +142,7 @@ private struct HostedMapCheck: View {
             },
             onNavigator: { navigator in
                 let events = navigator.events
+                navigators += 1
                 navigatorTask?.cancel()
                 navigatorTask = Task {
                     for await event in events {
@@ -156,9 +160,12 @@ private struct HostedMapCheck: View {
                     if let first = map.hostedJourney.stops.first(where: { $0.state == .pending }) {
                         Button("Visited") { set(first.id, to: .visited) }.font(.caption2)
                     }
+                    if map.hostedJourney.stops.count > 1 {
+                        Button("Remove") { map.hostedJourney.stops.removeLast() }.font(.caption2)
+                    }
                     Button("Close map") { map.cover = nil }.font(.caption2)
                 }
-                Text("navigator: \(navigatorEvents.suffix(6).joined(separator: " "))")
+                Text("navigator \(navigators): \(navigatorEvents.suffix(6).joined(separator: " "))")
                     .font(.caption2)
                     .accessibilityIdentifier("hostedNavigatorEvents")
             }

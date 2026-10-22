@@ -1,8 +1,8 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.7.0 uses SDK
-6.0.0-beta.60 and Map 6.0.0-beta.45.
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.8.0 uses SDK
+6.0.0-beta.63 and Map 6.0.0-beta.50.
 
 Each change has a mark:
 
@@ -19,7 +19,9 @@ Each change has a mark:
 |---|---|---|---|
 | SDK 6.0.0-beta.59 | `BlueiotBindingError` has three new cases (relay-api 0.11): `swapBandsApart(requestID:)` (code 18), `swapAtReception(requestID:)` (code 19) and `signingUnavailable(retryAfter:requestID:)` (code 20). Before, the first two arrived as `.unexpected(code:status:message:requestID:)` and the third as `.server(status: 503, requestID:)`. | An exhaustive `switch` over `BlueiotBindingError` without `default` does not compile. Add the three cases. The SDK's texts: "Hold your current wristband next to the new one and scan again.", "Your wristband isn't reachable. Please swap it at the reception desk." and, for `signingUnavailable`, a retry after `retryAfter` seconds. | **Required** with an exhaustive `switch` |
 
-SDK 6.0.0-beta.59 and beta.60 and Map 6.0.0-beta.44 and beta.45 have no other source break.
+The other versions up to SDK 6.0.0-beta.63 and Map 6.0.0-beta.50 have no source break.
+`ProximiioConfiguration.init` gains the defaulted `geofenceExitDelay:` in SDK 6.0.0-beta.63; existing
+calls compile unchanged.
 
 ### Behaviour changes
 
@@ -31,6 +33,16 @@ SDK 6.0.0-beta.59 and beta.60 and Map 6.0.0-beta.44 and beta.45 have no other so
 | SDK 6.0.0-beta.60 | `ComputedRoute.levelChanges` has one entry per lift or stairs ride: level 1 to level 4 is one entry, not three. `instructions` has one `.levelChange` for it. | Code that counts floors with `levelChanges.count` counts rides. | **Check** |
 | SDK 6.0.0-beta.60 | A level changer whose feature has `properties.levels` connects exactly those floors. | Routes in a venue whose changers carry `levels` can change. | Info |
 | Map 6.0.0-beta.44 | The drop-in map is clear, not black, where the style draws nothing. `options.backgroundColor = .black` keeps black. | Applies to a `ProximiioMapView` the app keeps. | Info |
+| SDK 6.0.0-beta.61 | `mapStyle()` answers from the stored style without waiting for the network and checks the service once per run in the background. | An app that needs the service's current style calls `refreshMapStyle()`. | **Check** |
+| SDK 6.0.0-beta.61 | `loadRouteNetwork()` sends `If-None-Match`. When every page answers `304`, nothing is downloaded or rebuilt. | | Info |
+| SDK 6.0.0-beta.61 | A sync pass that changed features rebuilds the route network. A running `JourneyNavigator` keeps its legs until `routeNetworkChanged()`. | `ProximiMapView` calls it on a change of features. | Info |
+| SDK 6.0.0-beta.61 | Audit records are stored under the canonical entity name. The first launch on this version replays the audit feed once, and `syncEvents()` reports every record in it. | An app that acts on each `syncEvents()` record sees one burst after the update. | **Check** |
+| SDK 6.0.0-beta.61 | `amenities()` downloads until the store holds the whole catalogue. An install that stored the catalogue with an earlier SDK downloads it once more. | | Info |
+| SDK 6.0.0-beta.62 | `journeys()` returns every journey. Before, it returned the API's default page: the 100 most recently edited journeys. | An app that lists journeys gets all of them. | **Check** |
+| SDK 6.0.0-beta.62 | A venue feature whose coordinates are not in degrees is left out of the route network. `features()` keeps it. | | Info |
+| SDK 6.0.0-beta.63 | A geofence or privacy-zone exit comes `geofenceExitDelay` (3 s by default) after the position left it. Enters come at once. A position back inside within the delay emits nothing. Until the exit, `enteredGeofenceIds` lists the geofence and a privacy zone keeps position reporting suppressed. `stop()` emits every waiting exit. | An app that acts on a `geofenceEvents()` exit, for example the end of an artwork's audio, acts 3 s later. `geofenceExitDelay: 0` in `ProximiioConfiguration` restores the exit at the first position outside. | **Check** |
+| Map 6.0.0-beta.47 | An open map follows `venueDataChanges()`: it draws changed features, amenity icons, floors, places, geofences and the stored style. | | Info |
+| Map 6.0.0-beta.48 | A venue feature whose coordinates are not in degrees is not drawn. Map 6.0.0-beta.45 ended the app on such a feature when it framed the venue. | | Info |
 
 ### Added
 
@@ -40,6 +52,13 @@ All Info.
   `BlueiotBindingPolicy.swapNearMeters`.
 - SDK 6.0.0-beta.60: `LevelChanger.levels` and `LevelChanger.init(id:type:coordinate:level:direction:levels:)`.
 - Map 6.0.0-beta.44: `MapOptions.backgroundColor` and `MapColor.clear`.
+- SDK 6.0.0-beta.61: `Proximiio.venueDataChanges()`, `VenueDataChange`, `VenueDataKind`,
+  `refreshMapStyle()` and `cachedMapStyle()`.
+- SDK 6.0.0-beta.63: `ProximiioConfiguration.geofenceExitDelay` and `defaultGeofenceExitDelay`,
+  `ProximiioDiagnostics.ConfigurationSummary.geofenceExitDelay`.
+- Map 6.0.0-beta.46: `JourneyNavigator.remove(stopID:)`, `replace(_:)`, `update(to:)`,
+  `routeNetworkChanged()` and the initialisers with `hostJourney:`; the same on `JourneyPlan`;
+  `JourneyUpdate`; `ProximiioMapSession.reloadVenueData()`.
 
 ### Fixed
 
@@ -52,11 +71,16 @@ All Info.
   names level 4.
 - Map 6.0.0-beta.44: a drop-in map shows no black frame while it is presented.
 - Map 6.0.0-beta.45: a ride over several floors draws no stops on the floor it arrives at.
+- SDK 6.0.0-beta.61: relay and wristband-binding streams no longer drop after 15 s of silence; a dead
+  stream is detected after up to 45 s. A fresh install no longer takes the few amenities of the audit
+  feed for the whole catalogue.
+- SDK 6.0.0-beta.62: a list page the API cut short no longer loses rows. A venue feature with a
+  `"NaN"` level no longer ends the app.
+- Map 6.0.0-beta.46: a leg still being routed is no longer dropped by an edit that routes nothing.
+- Map 6.0.0-beta.48: a floor level that is NaN, an infinity or beyond about 4.6 × 10¹⁶ no longer ends
+  the app.
 
 The SDK and Map changelogs of these versions have the full entries.
-
-SDK 6.0.0-beta.61 and Map 6.0.0-beta.46 and beta.47 are published. ProximiioGADKit 1.7.0 does not use
-them, and an app on them does not resolve with ProximiioGADKit 1.7.0.
 
 ## 2. From ProximiioMapView to ProximiMapView
 
@@ -75,10 +99,10 @@ them, and an app on them does not resolve with ProximiioGADKit 1.7.0.
 
 ### Step 1: Dependencies (Required)
 
-- Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.7.0`,
+- Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.8.0`,
   and the product `ProximiioGADKit` to the app target.
-- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.60` and `proximiio-map-ios-binary` to exactly
-  `6.0.0-beta.45`. ProximiioGADKit pins these versions; with other versions the packages do not
+- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.63` and `proximiio-map-ios-binary` to exactly
+  `6.0.0-beta.50`. ProximiioGADKit pins these versions; with other versions the packages do not
   resolve.
 - ProximiioGADKit does not re-export the SDK and the Map. Files that use their types keep
   `import Proximiio` and `import ProximiioMap`. The file that shows the map adds
@@ -87,8 +111,8 @@ them, and an app on them does not resolve with ProximiioGADKit 1.7.0.
 ### Step 2: SDK and Map changes (Required / Check)
 
 Section 1: the `BlueiotBindingError` cases (**Required** with an exhaustive `switch`), the headers on
-the on-premises proxy and the privacy details (**Required**), `.sessionLost` and `levelChanges`
-(**Check**).
+the on-premises proxy and the privacy details (**Required**), `.sessionLost`, `levelChanges`,
+`mapStyle()`, the `syncEvents()` burst, `journeys()` and the geofence exit delay (**Check**).
 
 ### Step 3: Languages (Check)
 
@@ -167,9 +191,10 @@ The app's `for await event in navigator.events` loop and its `onCue` closure mov
 
 - The view calls `onNavigator` before the journey starts. Reading `navigator.events` inside the call
   gives a stream with every later event.
-- The view calls it again with a new navigator when the screen starts again: a removed stop, a new
-  `kind`, or the first journey on an empty map. The previous navigator's streams finish. The app
-  cancels its old task.
+- The view calls it again with a new navigator when the screen starts again: a new `kind`, a journey
+  without a stop on the map, or the first journey on an empty map. The previous navigator's streams
+  finish. The app cancels its old task. Any other change of the journey goes to `update(to:)` of the
+  same navigator.
 - The view sets neither `onCue` nor `cueRules`.
 
 ### Step 7: Changes of the journey (Required)
@@ -184,7 +209,7 @@ It does not see calls on the navigator that change the journey, and its next cha
 | `reopen(stopID:)` | `journey.stops[i].state = .pending` |
 | `add(_:)`, `insert(_:at:)` | Append or insert `ProximiJourney.Stop(id:)` |
 | `move(stopID:toIndex:)`, `apply(_:)` | Reorder `journey.stops` |
-| Remove a stop | Remove it from `journey.stops`. The screen starts again (step 6). |
+| Remove a stop | Remove it from `journey.stops` |
 | `detour(to:)`, `cancelDetour()` | No call. The visitor picks an amenity in the view's search and taps "Go here". `onEvent` reports `amenitySelected`, `detourStarted` and `detourEnded`. |
 | `resumeJourney()` | No call. The route follows a visitor who left it. |
 | `setRouteOptions(_:)` | The `routeAccessibility:` parameter (`RouteAccessibility`) |
@@ -198,6 +223,8 @@ app matches the one its journey uses.
 
 `sdk.geofenceEvents()` and `sdk.positions()` stay as they are. Every call returns a new stream. The
 view opens its own streams and takes no events from the app's. The view reports no geofence event.
+It follows `sdk.venueDataChanges()` itself: the open map draws changed venue data, and the journey
+routes again after a change of features.
 
 ### Step 9: The view's navigator (Check)
 
