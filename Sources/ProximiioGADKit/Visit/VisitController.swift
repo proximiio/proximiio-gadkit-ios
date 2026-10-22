@@ -13,8 +13,9 @@
 //  inside (`enteredGeofenceIDs`) counts too: the SDK exits a geofence only beyond 1.2 × its radius,
 //  and its event stream does not repeat the geofences entered before the screen opened (field test
 //  2026-10-19). Since SDK 6.0.0-beta.63 the SDK also exits a geofence only
-//  `ProximiioConfiguration.geofenceExitDelay` (3 s by default) after the position left it, so an
-//  artwork counts as inside up to that long after the visitor left it. The journey moves to the next
+//  `ProximiioConfiguration.geofenceExitDelay` after the position left it (`ProximiMap`:
+//  `GADSettings.geofenceExitDelay`, 5 s; the SDK default is 3 s), so an artwork counts as inside up
+//  to that long after the visitor left it. The journey moves to the next
 //  artwork `GADSettings.artworkAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
 //  the visitor walks past without entering its geofence stays unvisited until it is skipped.
 //  Out of order: a visitor inside the geofence of another open artwork for

@@ -93,6 +93,13 @@ struct ProximiMapTests {
         #expect(configuration.fallbackAPIBaseURLs.isEmpty)
     }
 
+    @Test @MainActor func theSDKReportsAGeofenceExitAfterTheSettingsDelay() throws {
+        #expect(VenueService.configuration(for: try Self.configuration()).geofenceExitDelay == 5)
+        var backend = try Self.configuration()
+        backend.settings.geofenceExitDelay = 0
+        #expect(VenueService.configuration(for: backend).geofenceExitDelay == 0)
+    }
+
     private static func configuration() throws -> GADConfiguration {
         GADConfiguration(
             apiBaseURL: try #require(URL(string: "https://api.example.com")),

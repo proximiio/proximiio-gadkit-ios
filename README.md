@@ -458,7 +458,7 @@ do {
 | `arrivedAtMuseum` | `isAtMuseum` became `true`. Once per launch. |
 | `wristbandChanged(WristbandStatus)` | The wristband session changed. |
 | `trackingChanged(TrackingHealth)` | During a journey: the wristband's positions stopped (`lostPlace` after `trackingLostAfter`, `stoppedResponding` after `trackingStoppedAfter`) or came back (`tracking`). |
-| `geofenceEntered(ProximiGeofence)`, `geofenceExited(ProximiGeofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkID`. An exit comes `ProximiioConfiguration.geofenceExitDelay` (3 s by default) after the position left the geofence (SDK 6.0.0-beta.63). |
+| `geofenceEntered(ProximiGeofence)`, `geofenceExited(ProximiGeofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkID`. An exit comes `GADSettings.geofenceExitDelay` (5 s) after the position left the geofence (SDK 6.0.0-beta.63). |
 | `journeyChanged(JourneySummary?)` | A new, planned, edited or deleted (`nil`) journey, and the progress after the journey screen closed. |
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
 | `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The package posts no notification for it. |
@@ -503,6 +503,7 @@ let configuration = GADConfiguration(
 | `artworkAdvanceDelay` | 2 s | From the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order. |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
+| `geofenceExitDelay` | 5 s | Time outside an entered geofence or privacy zone before the SDK reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK default 3 s). Enters are reported at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. 0 reports the exit at the first position outside. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
 | `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
@@ -687,6 +688,22 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.9.0 (2026-10-22)
+
+No change for host apps' code. SDK 6.0.0-beta.63 and Map 6.0.0-beta.50, as in 1.8.0.
+
+Added:
+
+- `GADSettings.geofenceExitDelay` (default 5 s): the time outside an entered geofence or privacy zone
+  before the SDK reports the exit. `ProximiMap` sets it in the SDK's configuration
+  (`ProximiioConfiguration.geofenceExitDelay`). `ProximiMapView` runs on the host app's SDK and does
+  not change it.
+
+Changed:
+
+- `ProximiMap`: a geofence exit comes 5 s after the position left the geofence, not 3 s (the SDK
+  default in 1.8.0).
 
 ### 1.8.0 (2026-10-22)
 

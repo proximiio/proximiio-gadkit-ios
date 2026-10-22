@@ -60,6 +60,7 @@ final class VenueService {
         // visitor consent for it (2026-10-14), so it is on in every build. It is the SDK default
         // since 6.0.0-beta.58; it is set here so a later default does not turn it off.
         configuration.visitorReportingEnabled = true
+        configuration.geofenceExitDelay = backend.settings.geofenceExitDelay
         return configuration
     }
 

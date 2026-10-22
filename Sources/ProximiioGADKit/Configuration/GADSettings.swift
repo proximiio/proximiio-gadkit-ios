@@ -32,6 +32,15 @@ public struct GADSettings: Equatable, Sendable {
     /// …for this many seconds.
     public var amenityArrivalDwell: TimeInterval = 5
 
+    // MARK: Geofences
+
+    /// Seconds the position stays outside an entered geofence or privacy zone before the SDK
+    /// reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK 6.0.0-beta.63, whose
+    /// default is 3). A position back inside within this time reports nothing. Enters are reported
+    /// at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` runs on the host app's
+    /// SDK, which has its own value. 0 reports the exit at the first position outside.
+    public var geofenceExitDelay: TimeInterval = 5
+
     // MARK: Next stop nearby
 
     /// `ProximiMapEvent.stopNearby`: the active stop is less than this many metres away, along the
