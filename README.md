@@ -756,6 +756,15 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.11.2 (2026-10-23)
+
+No change for host apps' code.
+
+Fixed:
+
+- The Explore Museum map shows its floor changer once the museum's levels are loaded. Before, a tap
+  right after the map opened showed an empty menu.
+
 ### 1.11.1 (2026-10-23)
 
 No change for host apps' code.

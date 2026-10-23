@@ -100,7 +100,10 @@ struct ExploreMuseumView: View {
                 .padding(.top, 8)
                 .accessibilityIdentifier("exploreLevel")
             Spacer()
-            floorChanger
+            // Shown once the museum's levels are known, so its menu is never empty.
+            if !catalog.levels.isEmpty {
+                floorChanger
+            }
         }
         .foregroundStyle(Palette.ink)
         .padding(.horizontal, 20)
