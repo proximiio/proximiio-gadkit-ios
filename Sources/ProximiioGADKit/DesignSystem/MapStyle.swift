@@ -72,6 +72,21 @@ enum MapStyle {
         return options
     }
 
+    /// The Explore Museum map: no position dot and a camera that never follows. The visitor is not
+    /// at the museum there (user, 2026-10-23).
+    static func exploreOptions() -> MapOptions {
+        var options = options(routeMarkers: false)
+        options.camera = .free
+        let clear = MapColor(hex: 0xFFFFFF, alpha: 0)
+        options.position.dot.color = clear
+        options.position.dot.staleColor = clear
+        options.position.dot.strokeColor = clear
+        options.position.dot.shadowOpacity = 0
+        options.position.accuracy = .none
+        options.position.heading = .none
+        return options
+    }
+
     /// Journey stop markers, drawn by the map library. Skipped stops have no marker and no number.
     static let journeyStops: JourneyStopMarkerStyle = {
         let ink = MapColor(hex: 0x2B2B2B)

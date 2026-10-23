@@ -332,7 +332,7 @@ first. Nothing opens before `start()` has finished.
 
 | `ProximiMap.Screen` | Shows | Inside the flow |
 |---|---|---|
-| `.museumMap` | The museum map: floors, amenities, the visitor's position, search, a route to a tapped place, the gallery legend. | Back closes it. |
+| `.museumMap` | The Explore Museum map, without the visitor's position: "Level N" and the floor changer, the galleries in the level colour, the Spaces, Highlights and Amenities lists, and a card for a picked place (see [Explore Museum](#explore-museum)). | Back closes it. |
 | `.journeyReady` | Journey ready (02.10A): the journey's title and summary. Needs a stored journey. | "Start the Journey" (at the museum) opens the journey. "Go to Museum" (away from it) and "Back to Hub" close it. |
 | `.journey` | The journey: map and list, the stop card, guidance from stop to stop, detours to amenities, the Live Activity, Journey Complete. Needs a stored journey. | Back on a journey in progress (a stop visited or skipped, not finished) asks "Leave the tour here" first; otherwise it closes. |
 | `.planJourney` | The stop picker ("Plan your visit"). | "Start" stores a personalised journey and opens Journey ready. |
@@ -407,7 +407,7 @@ changed features only while its store holds the whole feature collection, that i
 - The open map draws the new POIs, amenity icons, floors, places and geofences (map 6.0.0-beta.47).
 - The SDK has rebuilt the route network from the changed features. The open journey routes its legs
   again (`JourneyNavigator.routeNetworkChanged()`); a leg on the line already drawn stays as it is.
-- The stop picker, the museum map's search, the journey list, the galleries, the artwork geofences
+- The stop picker, the Explore Museum lists, the journey list, the galleries, the artwork geofences
   and the lift outlines use the new data.
 - On the open journey screen a stop whose POI changed takes the new title, position, floor and
   gallery (`JourneyNavigator.replace(_:)`), and the leg to it is routed again when it moved. A
@@ -481,6 +481,35 @@ for await state in binding.stateChanges() {
     await sdk.setPositioningSourcePrivate(since: privateSince)
 }
 ```
+
+## Explore Museum
+
+`open(.museumMap)` shows the Explore Museum map (Figma "Explore Museum", node 12129:102006). The visitor
+is not at the museum there: the map has no position dot, no route, and its camera does not follow.
+
+- At the top: "Level N" and the floor changer (the level in a tile of the level colour). The changer
+  lists the museum's levels. The map opens on the lowest level with a gallery, framed on the museum.
+- The galleries of the shown level are filled with the level colour (`Palette.level(_:)`). Artworks
+  have no marker.
+- At the bottom: the list button and the tabs Spaces, Highlights and Amenities. A tab opens its list
+  over the map, grouped by level; the list button opens the last one. A second tap, or a drag down on
+  the list's top, closes it.
+  - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline, the POI
+    with the same `remote_id` the name, the level, the category (its amenity, such as "Thematic
+    Gallery") and the description.
+  - Highlights: the artworks that list the "Highlight" amenity in `included_amenities`
+    (`VenuePlace.highlightAmenityID`), with `metadata.artist_name` and the gallery.
+  - Amenities: restrooms, café, help desk, prayer room and shop. Stairs and lifts are not listed.
+  - Only the museum's POIs are listed: the `place_id` of the gallery POIs. The GAD organisation also
+    holds the DCT office.
+- A row, or a tap on a gallery or a listed POI on the map, shows its level and a card with its icon,
+  title, lines and level. With a gallery's card open, the other galleries are lighter. An amenity gets
+  the red marker with its icon.
+- The design's About the Building and Collections tabs are not in the package: their content is not in
+  the venue data.
+
+The map of Journey Complete (the map button of its bottom bar) is the museum map with the visitor's
+position, search and routes.
 
 ## Events
 
@@ -582,7 +611,8 @@ in, else under its level ("Level 4"). The GAD venue data on 2026-10-15 has `gall
 ## Floors without positioning
 
 A floor in `GADSettings.levelsWithoutPositioning` has no positioning. In stage 1 that is the GAD
-level 0, with the café and the prayer room. A route there, on the journey map and the museum map:
+level 0, with the café and the prayer room. A route there, on the journey map and the museum map of
+Journey Complete:
 
 1. leads to the lift or stairs as usual;
 2. within `levelChangerReachedMeters` of the lift or stairs, shows the lift or stairs view ("Take the
@@ -615,7 +645,8 @@ map.routeAccessibility = RouteAccessibility(avoidsStairs: true, avoidsRevolvingD
 
 - The GAD venue data on 2026-10-14 has staircases and elevators. It has no escalators, no `door`
   features and no `narrowPath` paths, so only `avoidsStairs` changes routes until the data has them.
-- The museum map and the journey map have an accessible routes button (a wheelchair, blue while on).
+- The journey map and the museum map of Journey Complete have an accessible routes button (a wheelchair,
+  blue while on).
   While it is on, routes avoid all four (`RouteAccessibility.accessible`), whatever the host app set.
   Its state is kept on the device for both maps and later launches.
 - When no route meets the needs, the museum map shows "No route from here with your accessibility
@@ -669,7 +700,7 @@ In the Debug configuration `start()` reads these launch arguments:
 | `-visitKind personalised\|curated` | With `-visit`: the kind of journey. Default personalised. |
 | `-visitList` | The journey opens in List mode. |
 | `-visitAutoAdvance` | The journey advances 5 m after the visitor leaves a stop. |
-| `-openMap` | Opens the museum map. |
+| `-openMap` | Opens the Explore Museum map. |
 | `-routeTo <title>` | With `-openMap`: routes to the first place whose title matches, after the first position. |
 | `-routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `routeAccessibility`. |
 
@@ -724,6 +755,22 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.11.0 (2026-10-23)
+
+No change for host apps' code.
+
+Changed:
+
+- `open(.museumMap)` shows the [Explore Museum](#explore-museum) map of the PM's screens (2026-10-23):
+  "Explore Museum" with the back button, "Level N" and a new floor changer, the galleries in the level
+  colour, the Spaces, Highlights and Amenities lists and a card for a picked place. It has no position
+  dot, no route, no search and no gallery legend.
+
+Added:
+
+- `VenuePlace.includedAmenityIDs` and `isHighlight` (internal): the "Highlight" amenity in
+  `included_amenities`.
 
 ### 1.10.0 (2026-10-23)
 

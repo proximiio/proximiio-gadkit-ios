@@ -2,8 +2,9 @@
 //  MuseumMapScreen.swift
 //  ProximiioGADKit
 //
-//  The museum map as a full screen: header with back button and title, then `MuseumMapView`
-//  with the gallery legend. Opened from the Hub's journey card away from the museum.
+//  The Explore Museum map as a full screen: the back button and "Explore Museum", then
+//  `ExploreMuseumView`. Opened with `ProximiMap.open(.museumMap)`, in this app from the Hub's journey
+//  card away from the museum.
 //
 import SwiftUI
 
@@ -19,15 +20,19 @@ struct MuseumMapScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            MuseumMapView(venue: venue, showsLegend: true)
+            ExploreMuseumView(venue: venue)
                 .frame(maxHeight: .infinity)
         }
         .background(AuroraBackground())
     }
 
+    /// The back button and the title, "Explore" bold and "Museum" regular.
     private var header: some View {
         ZStack {
-            Text("Museum Map", bundle: .module).textStyle(.largeBodyBold)
+            (Text("Explore", bundle: .module).font(TextStyle.largeBodyBold.font)
+                + Text(verbatim: " ")
+                + Text("Museum", bundle: .module).font(TextStyle.largeBodyRegular.font))
+                .accessibilityAddTraits(.isHeader)
             HStack {
                 Button(action: onBack) {
                     Image(systemName: "chevron.backward").font(.system(size: 14, weight: .medium))

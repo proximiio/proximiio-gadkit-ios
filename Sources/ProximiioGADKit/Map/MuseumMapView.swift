@@ -2,10 +2,10 @@
 //  MuseumMapView.swift
 //  ProximiioGADKit
 //
-//  The museum map: venue style, floors, amenities, the visitor's position and one route.
-//  A tap on a place shows `PlaceInfoCard`; "Go here" computes a route from the current
+//  The museum map of Journey Complete: venue style, floors, amenities, the visitor's position and
+//  one route. A tap on a place shows `PlaceInfoCard`; "Go here" computes a route from the current
 //  position and shows `StopInfoCard`. Layout and controls follow the Figma map frames
-//  ("MAP Functionality Approach 02" and "Explore Museum").
+//  ("MAP Functionality Approach 02"). The Explore Museum map is `ExploreMuseumView`.
 //
 //  `MapOptions.fallbackStyleURL` is `nil`. With the default, a failed style load makes
 //  the map fetch demotiles.maplibre.org, which a production build must not contact.
@@ -18,8 +18,6 @@ struct MuseumMapView: View {
     let venue: VenueService
     /// Routed to after the first position, e.g. a place picked in "Before You Go".
     let initialDestination: VenuePlace?
-    /// The gallery category legend of the Explore Museum map.
-    let showsLegend: Bool
 
     @StateObject private var session: ProximiioMapSession
     @Environment(\.routeAccessibility) private var hostAccessibility
@@ -38,10 +36,9 @@ struct MuseumMapView: View {
     /// The lift or stairs view and the map of a floor without positioning.
     @State private var floorGuide: FloorWithoutPositioningGuide
 
-    init(venue: VenueService, initialDestination: VenuePlace? = nil, showsLegend: Bool = false) {
+    init(venue: VenueService, initialDestination: VenuePlace? = nil) {
         self.venue = venue
         self.initialDestination = initialDestination
-        self.showsLegend = showsLegend
         _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.options(followZoom: venue.settings.followZoom)))
         _floorGuide = State(initialValue: FloorWithoutPositioningGuide(settings: venue.settings))
     }
@@ -172,9 +169,6 @@ struct MuseumMapView: View {
             }
             Spacer()
             HStack(alignment: .bottom) {
-                if showsLegend && destination == nil && selectedPlace == nil {
-                    GalleryLegend()
-                }
                 Spacer()
                 VStack(spacing: 5) {
                     GlassSquareButton(action: { floorGuide.leave(); session.followMyFloor(); session.recentre() }) {
@@ -340,30 +334,6 @@ struct MuseumMapView: View {
         destination = nil
         routeError = nil
         session.clearRoute()
-    }
-}
-
-/// Gallery categories of the venue style (Figma "Explore Museum" map legend). The colours
-/// are those the design uses; the map style on the server draws the rooms.
-private struct GalleryLegend: View {
-    private let entries: [(LocalizedStringKey, Color)] = [
-        ("Thematic Gallery", Palette.orange),
-        ("Single Artist Gallery", Palette.yellow),
-        ("Other", Palette.lavender),
-        ("Learning & Engagement", Palette.cyan),
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
-                HStack(spacing: 6) {
-                    Circle().fill(entry.1).frame(width: 8, height: 8)
-                    Text(entry.0, bundle: .module).textStyle(.bodyExtraSmall)
-                }
-            }
-        }
-        .foregroundStyle(Palette.ink)
-        .accessibilityElement(children: .combine)
     }
 }
 

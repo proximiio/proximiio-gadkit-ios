@@ -43,6 +43,16 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
     /// `metadata.gallery_id`: the gallery of an artwork. The gallery's POI holds the same value in
     /// `remote_id` (`Gallery.names(places:)`).
     var galleryID: String?
+    /// `included_amenities`: the amenity ids the POI is also listed under, such as the highlight
+    /// amenity (`highlightAmenityID`).
+    var includedAmenityIDs: [String] = []
+
+    /// The "Highlight" amenity of the GAD data: a highlight artwork lists it in
+    /// `included_amenities` (PM, Monday "Explore museum view", 2026-10-15).
+    static let highlightAmenityID = "7405e6e6-d9f6-4146-adda-de6adbf4a8a1:d2eeebf0-1987-4fe8-80d2-842680bdb0dc"
+
+    /// True for a highlight artwork of the Explore Museum map.
+    var isHighlight: Bool { includedAmenityIDs.contains(Self.highlightAmenityID) }
 
     /// Every point POI in `features`, sorted by title.
     static func all(in features: [ProximiioFeature]) -> [VenuePlace] {
@@ -113,6 +123,9 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
             hasAR = Self.flag(metadata["augmented_reality"]) || Self.flag(metadata["has_ar"])
             hasAudio = Self.flag(metadata["audio"]) || Self.flag(metadata["has_audio"])
             galleryID = Self.text(metadata["gallery_id"])
+        }
+        if case .array(let included)? = properties?["included_amenities"] {
+            includedAmenityIDs = included.compactMap(Self.text)
         }
         if case .array(let images)? = properties?["images"], let first = images.first.flatMap(Self.text),
            let url = URL(string: first), url.scheme != nil {
