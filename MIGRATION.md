@@ -1,8 +1,8 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.8.0 uses SDK
-6.0.0-beta.63 and Map 6.0.0-beta.50.
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.10.0 uses SDK
+6.0.0-beta.64 and Map 6.0.0-beta.51.
 
 Each change has a mark:
 
@@ -18,8 +18,9 @@ Each change has a mark:
 | Since | Change | In the app | Mark |
 |---|---|---|---|
 | SDK 6.0.0-beta.59 | `BlueiotBindingError` has three new cases (relay-api 0.11): `swapBandsApart(requestID:)` (code 18), `swapAtReception(requestID:)` (code 19) and `signingUnavailable(retryAfter:requestID:)` (code 20). Before, the first two arrived as `.unexpected(code:status:message:requestID:)` and the third as `.server(status: 503, requestID:)`. | An exhaustive `switch` over `BlueiotBindingError` without `default` does not compile. Add the three cases. The SDK's texts: "Hold your current wristband next to the new one and scan again.", "Your wristband isn't reachable. Please swap it at the reception desk." and, for `signingUnavailable`, a retry after `retryAfter` seconds. | **Required** with an exhaustive `switch` |
+| SDK 6.0.0-beta.64, Map 6.0.0-beta.51 | New cases `BlueiotBindingSignal.privacyZone(since:)`, `ProximiioDiagnostics.NoPositionReason.privacyZone` and `PositionStage.privacyZone`. | An exhaustive `switch` over these enums without `default` does not compile. Add the case. | **Required** with an exhaustive `switch` |
 
-The other versions up to SDK 6.0.0-beta.63 and Map 6.0.0-beta.50 have no source break.
+The other versions up to SDK 6.0.0-beta.64 and Map 6.0.0-beta.51 have no source break.
 `ProximiioConfiguration.init` gains the defaulted `geofenceExitDelay:` in SDK 6.0.0-beta.63; existing
 calls compile unchanged.
 
@@ -43,6 +44,8 @@ calls compile unchanged.
 | SDK 6.0.0-beta.63 | A geofence or privacy-zone exit comes `geofenceExitDelay` (3 s by default) after the position left it. Enters come at once. A position back inside within the delay emits nothing. Until the exit, `enteredGeofenceIds` lists the geofence and a privacy zone keeps position reporting suppressed. `stop()` emits every waiting exit. | An app that acts on a `geofenceEvents()` exit, for example the end of an artwork's audio, acts 3 s later. `geofenceExitDelay: 0` in `ProximiioConfiguration` restores the exit at the first position outside. | **Check** |
 | Map 6.0.0-beta.47 | An open map follows `venueDataChanges()`: it draws changed features, amenity icons, floors, places, geofences and the stored style. | | Info |
 | Map 6.0.0-beta.48 | A venue feature whose coordinates are not in degrees is not drawn. Map 6.0.0-beta.45 ended the app on such a feature when it framed the venue. | | Info |
+| SDK 6.0.0-beta.64 | The binding reads relay-api's `private` (a band silent in a privacy zone) as `.privacyZone(since:)`; older SDKs read it as `.ok`. With `withholdsPositionsInPrivacyZones` on, `positions()` yields no fix while private and positioning stays available. | Turn the option on and pass the binding's signal with `setPositioningSourcePrivate(since:)` (README "Privacy zones"). | **Required** for the privacy zones |
+| Map 6.0.0-beta.51 | While the SDK is private, the dot stays grey at the last fix before the zone, and `JourneyNavigator` takes no fix: no off-route, re-route, deviation, passed stop or arrival. | | Info |
 
 ### Added
 
@@ -56,6 +59,10 @@ All Info.
   `refreshMapStyle()` and `cachedMapStyle()`.
 - SDK 6.0.0-beta.63: `ProximiioConfiguration.geofenceExitDelay` and `defaultGeofenceExitDelay`,
   `ProximiioDiagnostics.ConfigurationSummary.geofenceExitDelay`.
+- SDK 6.0.0-beta.64: `ProximiioConfiguration.withholdsPositionsInPrivacyZones`,
+  `Proximiio.setPositioningSourcePrivate(since:)`, `privacyZoneStateChanges()`, `privacyZoneState` and
+  `PrivacyZoneState`.
+- Map 6.0.0-beta.51: `PositionStyle.privacy` and `PositionPrivacyStyle`.
 - Map 6.0.0-beta.46: `JourneyNavigator.remove(stopID:)`, `replace(_:)`, `update(to:)`,
   `routeNetworkChanged()` and the initialisers with `hostJourney:`; the same on `JourneyPlan`;
   `JourneyUpdate`; `ProximiioMapSession.reloadVenueData()`.
@@ -99,10 +106,10 @@ The SDK and Map changelogs of these versions have the full entries.
 
 ### Step 1: Dependencies (Required)
 
-- Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.8.0`,
+- Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.10.0`,
   and the product `ProximiioGADKit` to the app target.
-- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.63` and `proximiio-map-ios-binary` to exactly
-  `6.0.0-beta.50`. ProximiioGADKit pins these versions; with other versions the packages do not
+- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.64` and `proximiio-map-ios-binary` to exactly
+  `6.0.0-beta.51`. ProximiioGADKit pins these versions; with other versions the packages do not
   resolve.
 - ProximiioGADKit does not re-export the SDK and the Map. Files that use their types keep
   `import Proximiio` and `import ProximiioMap`. The file that shows the map adds
@@ -110,8 +117,8 @@ The SDK and Map changelogs of these versions have the full entries.
 
 ### Step 2: SDK and Map changes (Required / Check)
 
-Section 1: the `BlueiotBindingError` cases (**Required** with an exhaustive `switch`), the headers on
-the on-premises proxy and the privacy details (**Required**), `.sessionLost`, `levelChanges`,
+Section 1: the `BlueiotBindingError` and privacy-zone cases (**Required** with an exhaustive `switch`),
+the headers on the on-premises proxy, the privacy details and the privacy zones (**Required**), `.sessionLost`, `levelChanges`,
 `mapStyle()`, the `syncEvents()` burst, `journeys()` and the geofence exit delay (**Check**).
 
 ### Step 3: Languages (Check)

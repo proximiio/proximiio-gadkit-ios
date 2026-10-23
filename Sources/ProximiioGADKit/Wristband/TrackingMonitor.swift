@@ -12,6 +12,10 @@
 //  unavailable for `trackingStoppedAfter` seconds is "stopped responding". The position stream is
 //  not used for this: its timestamps are publish times, not fix times.
 //
+//  In a privacy zone (`Proximiio.privacyZoneStateChanges()`, SDK 6.0.0-beta.64) the state is
+//  `.privacyZone`, however long the band is silent there: the visitor is not lost (Monday "Privacy
+//  zones", 2026-10-19).
+//
 import Foundation
 import Observation
 import Proximiio
@@ -25,9 +29,13 @@ public enum TrackingHealth: Equatable, Sendable {
     case lostPlace
     /// No positions for `GADSettings.trackingStoppedAfter` seconds, for example an empty battery.
     case stoppedResponding
+    /// The visitor is in a privacy zone (`PrivacyZoneState.isPrivate`). The map holds a grey dot at
+    /// the last position before the zone.
+    case privacyZone
 
     /// `settings`: `trackingLostAfter` and `trackingStoppedAfter`. Pure; covered by tests.
-    static func evaluate(wasEverAvailable: Bool, unavailableSince: Date?, now: Date, settings: GADSettings = .standard) -> TrackingHealth {
+    static func evaluate(wasEverAvailable: Bool, unavailableSince: Date?, isPrivate: Bool = false, now: Date, settings: GADSettings = .standard) -> TrackingHealth {
+        if isPrivate { return .privacyZone }
         guard wasEverAvailable else { return .waiting }
         guard let unavailableSince else { return .tracking }
         let unavailable = now.timeIntervalSince(unavailableSince)
@@ -46,6 +54,7 @@ final class TrackingMonitor {
 
     private var wasEverAvailable = false
     private var unavailableSince: Date?
+    private var isPrivate = false
     private let sdk: Proximiio
     private let settings: GADSettings
     private var tasks: [Task<Void, Never>] = []
@@ -89,6 +98,16 @@ final class TrackingMonitor {
                 self.reevaluate()
             }
         })
+        // Privacy zone: the phone's own zone or the relay's `private`.
+        tasks.append(Task { [weak self] in
+            guard let changes = await self?.sdk.privacyZoneStateChanges() else { return }
+            for await state in changes {
+                guard let self else { return }
+                FieldLog.log("privacy zone: private \(state.isPrivate) · zone \(state.isInPrivacyZone) · relay \(state.positioningSourcePrivateSince.map { $0.formatted(.iso8601) } ?? "-")")
+                self.isPrivate = state.isPrivate
+                self.reevaluate()
+            }
+        })
         // Moves "lost your place" to "stopped responding" while nothing else changes.
         tasks.append(Task { [weak self] in
             while !Task.isCancelled {
@@ -104,7 +123,7 @@ final class TrackingMonitor {
     }
 
     private func reevaluate() {
-        let health = TrackingHealth.evaluate(wasEverAvailable: wasEverAvailable, unavailableSince: unavailableSince, now: Date(), settings: settings)
+        let health = TrackingHealth.evaluate(wasEverAvailable: wasEverAvailable, unavailableSince: unavailableSince, isPrivate: isPrivate, now: Date(), settings: settings)
         guard health != self.health else { return }
         FieldLog.log("tracking health: \(health)")
         self.health = health

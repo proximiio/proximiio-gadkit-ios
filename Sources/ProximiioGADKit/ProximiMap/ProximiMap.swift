@@ -163,6 +163,7 @@ public final class ProximiMap {
         do {
             let venue = try await VenueService.start(configuration: configuration, binding: session.binding)
             self.venue = venue
+            await session.forwardPrivacy(to: venue.sdk)
             await loadPlaces(from: venue)
             reconcileStoredJourney()
             arrival.check(places: places)

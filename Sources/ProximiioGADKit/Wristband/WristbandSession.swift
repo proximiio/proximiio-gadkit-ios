@@ -43,6 +43,10 @@ final class WristbandSession {
     @ObservationIgnored private let location = LocationAccess()
     /// Called after every state change, for `ProximiMap`.
     @ObservationIgnored var onStateChange: ((BlueiotBindingState) -> Void)?
+    /// The SDK that gets the relay's privacy signal (`forwardPrivacy(to:)`).
+    @ObservationIgnored private var privacySDK: Proximiio?
+    /// The value last passed to `setPositioningSourcePrivate(since:)`; `.some(nil)` is "not private".
+    @ObservationIgnored private var forwardedPrivateSince: Date??
 
     init(configuration backend: GADConfiguration) {
         binding = BlueiotWristbandBinding(configuration: Self.configuration(for: backend))
@@ -91,6 +95,7 @@ final class WristbandSession {
         for await state in binding.stateChanges() {
             self.state = state
             onStateChange?(state)
+            await forwardPrivacy()
             if FieldLog.isEnabled {
                 FieldLog.log("wristband: \(WristbandCopy.logLine(for: state))")
                 if let session = BindingLog.session(of: state) { FieldLog.log("wristband session: \(session)") }
@@ -98,6 +103,31 @@ final class WristbandSession {
                 FieldLog.log("binding diagnostics: \(BindingLog.diagnostics(diagnostics))")
             }
         }
+    }
+
+    /// Passes the relay's privacy signal of every binding state to `sdk`
+    /// (`setPositioningSourcePrivate(since:)`, SDK 6.0.0-beta.64), starting with the current state.
+    /// The SDK cannot see the binding itself: a band without venue coverage in a restroom falls
+    /// silent at the door, and only the relay knows that it is in a privacy zone.
+    func forwardPrivacy(to sdk: Proximiio) async {
+        privacySDK = sdk
+        forwardedPrivateSince = nil
+        await forwardPrivacy()
+    }
+
+    private func forwardPrivacy() async {
+        guard let sdk = privacySDK else { return }
+        let since = Self.privateSince(of: state)
+        guard forwardedPrivateSince != .some(since) else { return }
+        forwardedPrivateSince = .some(since)
+        FieldLog.log("wristband privacy: \(since.map { "private since \($0.formatted(.iso8601))" } ?? "not private")")
+        await sdk.setPositioningSourcePrivate(since: since)
+    }
+
+    /// When the relay saw the band fall silent in a privacy zone, or `nil`. Pure; covered by tests.
+    nonisolated static func privateSince(of state: BlueiotBindingState?) -> Date? {
+        if case let .active(_, _, .privacyZone(since)) = state { return since }
+        return nil
     }
 
     /// Ends the visit on the relay-api. The state becomes `.ended(.userEnded)`.

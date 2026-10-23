@@ -16,7 +16,8 @@ import ProximiioBlueiot
 
 enum BindingLog {
     /// "binding <id> · ends <time> · token expires <time>", plus "signal lost since <time>" while
-    /// the venue does not hear the band. `nil` without an active session.
+    /// the venue does not hear the band, or "privacy zone since <time>" while it is silent in a
+    /// privacy zone. `nil` without an active session.
     static func session(of state: BlueiotBindingState) -> String? {
         guard case let .active(session, _, signal) = state else { return nil }
         var parts = [
@@ -24,7 +25,11 @@ enum BindingLog {
             "ends \(session.endsAt.formatted(.iso8601))",
             "token expires \(session.tokenExpiresAt.formatted(.iso8601))",
         ]
-        if case let .lost(since) = signal { parts.append("signal lost since \(since.formatted(.iso8601))") }
+        switch signal {
+        case let .lost(since): parts.append("signal lost since \(since.formatted(.iso8601))")
+        case let .privacyZone(since): parts.append("privacy zone since \(since.formatted(.iso8601))")
+        default: break
+        }
         return parts.joined(separator: " · ")
     }
 

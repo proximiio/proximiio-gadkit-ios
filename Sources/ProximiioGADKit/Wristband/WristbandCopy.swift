@@ -118,8 +118,11 @@ enum WristbandCopy {
         case .unbound: return "unbound"
         case .binding: return "binding"
         case .active(_, let link, let signal):
-            if case .lost = signal { return "active, \(link.rawValue), signal lost" }
-            return "active, \(link.rawValue)"
+            switch signal {
+            case .lost: return "active, \(link.rawValue), signal lost"
+            case .privacyZone: return "active, \(link.rawValue), privacy zone"
+            default: return "active, \(link.rawValue)"
+            }
         case .ended(let reason): return "ended, \(reason.rawValue)"
         @unknown default: return "unknown"
         }

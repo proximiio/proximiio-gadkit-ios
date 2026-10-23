@@ -35,8 +35,8 @@ repository. From 1.0.0 a minor or patch version does not break the public API. N
 cases come in minor versions; a `switch` with `default` keeps compiling. The [Changelog](#changelog)
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.63 and `proximiio-map-ios-binary`
-6.0.0-beta.50 exactly. The host app needs no dependency on them. A host app that also depends on
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.64 and `proximiio-map-ios-binary`
+6.0.0-beta.51 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 A host app that draws its journey with the map library's `ProximiioMapView` and its own
@@ -200,7 +200,9 @@ The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
-- uses `proximiio-sdk-ios-binary` 6.0.0-beta.63, the version this package pins;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.64, the version this package pins;
+- turns on the SDK's privacy-zone option and passes the wristband's privacy signal to the SDK (see
+  [Privacy zones](#privacy-zones));
 - lays the view out and closes it; draws the background and the bottom bar (for example the audio
   guide's controls);
 - stores the journey and moves it on. The view stores nothing but the accessible routes button
@@ -446,6 +448,40 @@ do {
 - The package shows no wristband alerts. `ProximiMapEvent.wristbandChanged(_:)` and
   `trackingChanged(_:)` let the host app show its own.
 
+## Privacy zones
+
+Privacy zones are drawn in the Proximi portal (Privacy zones), for example over the restrooms and the
+prayer room. These rooms have no positioning anchors, so the wristband falls silent at the zone.
+
+- relay-api (0.17.0 and later) syncs the organization's privacy zones every hour. A band that falls
+  silent with its last position inside a privacy zone, or within the site's `privacy_margin_m` (3 m by
+  default), gets the signal `private` instead of `lost`. While private, relay-api does not close the
+  binding for silence (`TIMEOUT`) or for leaving the venue (`LEFT_VENUE`). The other end reasons stay.
+- The SDK (6.0.0-beta.64) is private (`Proximiio.privacyZoneState`, `privacyZoneStateChanges()`)
+  while its last fix is inside a privacy zone or the relay says `private`. With
+  `ProximiioConfiguration.withholdsPositionsInPrivacyZones`, `positions()` yields no fix while private,
+  and positioning stays available.
+- The map (6.0.0-beta.51) holds the dot at the last fix before the zone, grey
+  (`PositionStyle.privacy`), with the accuracy ring of that fix. While private the journey reports no
+  off-route, re-route or arrival.
+- The journey screen reports `trackingChanged(.privacyZone)` and no `lostPlace` or
+  `stoppedResponding` while private.
+
+`ProximiMap` turns the option on and passes the binding's signal to its SDK. A host app with
+`ProximiMapView` does both on its own SDK:
+
+```swift
+var configuration = ProximiioConfiguration.relayOnly(token: token, runsInBackground: true)
+configuration.withholdsPositionsInPrivacyZones = true
+
+// In the loop over the wristband binding's states:
+for await state in binding.stateChanges() {
+    var privateSince: Date?
+    if case let .active(_, _, .privacyZone(since)) = state { privateSince = since }
+    await sdk.setPositioningSourcePrivate(since: privateSince)
+}
+```
+
 ## Events
 
 `ProximiMap` performs every action itself; the events report them. They arrive on the main actor.
@@ -457,7 +493,7 @@ do {
 | `curatedTourChangeRequested` | "Edit stops" on Manage journey for a curated tour, after it closed. The host app shows its tour choice. |
 | `arrivedAtMuseum` | `isAtMuseum` became `true`. Once per launch. |
 | `wristbandChanged(WristbandStatus)` | The wristband session changed. |
-| `trackingChanged(TrackingHealth)` | During a journey: the wristband's positions stopped (`lostPlace` after `trackingLostAfter`, `stoppedResponding` after `trackingStoppedAfter`) or came back (`tracking`). |
+| `trackingChanged(TrackingHealth)` | During a journey: the wristband's positions stopped (`lostPlace` after `trackingLostAfter`, `stoppedResponding` after `trackingStoppedAfter`), came back (`tracking`), or the visitor is in a privacy zone (`privacyZone`, never lost there). |
 | `geofenceEntered(ProximiGeofence)`, `geofenceExited(ProximiGeofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkID`. An exit comes `GADSettings.geofenceExitDelay` (5 s) after the position left the geofence (SDK 6.0.0-beta.63). |
 | `journeyChanged(JourneySummary?)` | A new, planned, edited or deleted (`nil`) journey, and the progress after the journey screen closed. |
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
@@ -688,6 +724,24 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.10.0 (2026-10-23)
+
+Breaking:
+
+- SDK 6.0.0-beta.64 and Map 6.0.0-beta.51. A host app that depends on these packages moves to the
+  same versions. The SDK adds `BlueiotBindingSignal.privacyZone(since:)` and
+  `ProximiioDiagnostics.NoPositionReason.privacyZone`, the map `PositionStage.privacyZone`: a `switch`
+  over them without `default` adds the case.
+- New `TrackingHealth.privacyZone`. A `switch` over `TrackingHealth` without `default` adds the case.
+
+Added:
+
+- [Privacy zones](#privacy-zones): `ProximiMap` turns on `withholdsPositionsInPrivacyZones` and passes
+  the wristband binding's `private` signal to the SDK (`setPositioningSourcePrivate(since:)`). The map
+  holds a grey dot at the last fix before the zone.
+- `trackingChanged(.privacyZone)` while the visitor is in a privacy zone, instead of `lostPlace` or
+  `stoppedResponding`.
 
 ### 1.9.0 (2026-10-22)
 

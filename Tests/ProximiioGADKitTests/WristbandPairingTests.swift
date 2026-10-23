@@ -143,6 +143,25 @@ struct WristbandCopyTests {
         #expect(WristbandCopy.logLine(for: .ended(.timeout)) == "ended, TIMEOUT")
         #expect(WristbandCopy.logLine(for: .unbound) == "unbound")
     }
+
+    @Test func logLineNamesThePrivacyZone() {
+        let session = BlueiotBindingSession(bindingID: UUID(), endsAt: .distantFuture, tokenExpiresAt: .distantFuture)
+        let since = Date(timeIntervalSince1970: 1_792_400_000)
+        #expect(WristbandCopy.logLine(for: .active(session, link: .online, signal: .privacyZone(since: since))) == "active, online, privacy zone")
+        #expect(WristbandCopy.logLine(for: .active(session, link: .online, signal: .lost(since: since))) == "active, online, signal lost")
+        #expect(BindingLog.session(of: .active(session, link: .online, signal: .privacyZone(since: since)))?
+            .hasSuffix("privacy zone since \(since.formatted(.iso8601))") == true)
+    }
+
+    @Test func onlyThePrivacyZoneSignalIsPrivate() {
+        let session = BlueiotBindingSession(bindingID: UUID(), endsAt: .distantFuture, tokenExpiresAt: .distantFuture)
+        let since = Date(timeIntervalSince1970: 1_792_400_000)
+        #expect(WristbandSession.privateSince(of: .active(session, link: .online, signal: .privacyZone(since: since))) == since)
+        #expect(WristbandSession.privateSince(of: .active(session, link: .online, signal: .lost(since: since))) == nil)
+        #expect(WristbandSession.privateSince(of: .active(session, link: .online, signal: .ok)) == nil)
+        #expect(WristbandSession.privateSince(of: .ended(.timeout)) == nil)
+        #expect(WristbandSession.privateSince(of: nil) == nil)
+    }
 }
 
 struct TrackingHealthTests {
@@ -156,6 +175,13 @@ struct TrackingHealthTests {
         #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: now.addingTimeInterval(-110), now: now) == .lostPlace)
         #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: now.addingTimeInterval(-169), now: now) == .lostPlace)
         #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: now.addingTimeInterval(-170), now: now) == .stoppedResponding)
+    }
+
+    @Test func aPrivacyZoneIsNeverLost() {
+        #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: now.addingTimeInterval(-3600), isPrivate: true, now: now) == .privacyZone)
+        #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: nil, isPrivate: true, now: now) == .privacyZone)
+        #expect(TrackingHealth.evaluate(wasEverAvailable: false, unavailableSince: nil, isPrivate: true, now: now) == .privacyZone)
+        #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: nil, isPrivate: false, now: now) == .tracking)
     }
 
     @Test func nearestPlaceIsOnTheSameLevel() {
