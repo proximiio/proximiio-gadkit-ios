@@ -56,6 +56,7 @@ struct ExploreMuseumView: View {
     var body: some View {
         ZStack {
             ProximiioMapView(session: session)
+                .softEdges(cornerRadius: 40)
                 .ignoresSafeArea(edges: .bottom)
             VStack(spacing: 0) {
                 header

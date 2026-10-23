@@ -32,7 +32,7 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
 
     var body: some View {
         ZStack {
-            map
+            map.softEdges(cornerRadius: 50)
             overlay
         }
         .clipShape(shape)
@@ -46,6 +46,20 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
         }
         .overlay(shape.strokeBorder(Palette.white, lineWidth: 1))
         .padding(.horizontal, 10)
+    }
+}
+
+extension View {
+    /// Fades the view to transparent over `width` points at every edge, so the screen background
+    /// shows through (the map card of the Figma map frames; PM 2026-10-23). A mask changes the look
+    /// only: taps on the faded edge still reach the view.
+    func softEdges(_ width: CGFloat = 28, cornerRadius: CGFloat) -> some View {
+        mask {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .padding(width / 2)
+                .blur(radius: width / 2)
+                .drawingGroup()
+        }
     }
 }
 

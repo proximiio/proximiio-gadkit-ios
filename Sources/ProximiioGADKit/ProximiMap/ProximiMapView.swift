@@ -284,6 +284,9 @@ private struct HostedMapLoading: View {
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom - 14, 4))
                 .foregroundStyle(Palette.ink)
             }
+            // Without `.background` the stack is as wide as the spinner, and the reader puts it at
+            // the leading edge (Nagarro, 2026-10-23).
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
         }
     }

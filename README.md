@@ -756,6 +756,21 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.11.1 (2026-10-23)
+
+No change for host apps' code.
+
+Changed:
+
+- The journey map and the Explore Museum map fade out over about 28 pt at every edge, so the background
+  behind the view shows through (Figma map card; PM 2026-10-23). The cards and buttons over the map do
+  not fade. Taps on the faded edge still reach the map.
+
+Fixed:
+
+- `ProximiMapView` without `.background` shows its spinner in the middle of the view while the venue
+  loads, not at the leading edge (Nagarro, 2026-10-23).
+
 ### 1.11.0 (2026-10-23)
 
 No change for host apps' code.
