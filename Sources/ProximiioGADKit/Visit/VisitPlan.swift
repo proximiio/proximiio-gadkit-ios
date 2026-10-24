@@ -185,6 +185,10 @@ public enum JourneyKind: String, Codable, Sendable, CaseIterable {
     /// Whether the stops keep their order: no ordering from the visitor at the start, after a
     /// detour or after an artwork visited out of order. Pure; covered by tests.
     var keepsOrder: Bool { self == .curated }
+    /// Whether an artwork further on counts as visited when the visitor stays at it. A curated tour
+    /// ignores it: the artwork stays open (PM, Monday "Curated tours: ignore other artworks",
+    /// 2026-10-23). Pure; covered by tests.
+    var countsOutOfOrder: Bool { self == .personalised }
 }
 
 /// Title, summary and kind of a visit, shown on Journey ready (02.10A) and the Hub card.

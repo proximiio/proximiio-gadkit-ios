@@ -84,6 +84,8 @@ enum MapStyle {
         options.position.dot.shadowOpacity = 0
         options.position.accuracy = .none
         options.position.heading = .none
+        // The dot a privacy zone holds is clear too (as on Android).
+        options.position.privacy = PositionPrivacyStyle(color: clear, showsAccuracy: false)
         return options
     }
 

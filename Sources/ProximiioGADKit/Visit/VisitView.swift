@@ -121,6 +121,7 @@ struct VisitView: View {
         #endif
         _controller = State(initialValue: VisitController(
             session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder,
+            countsOutOfOrder: kind.countsOutOfOrder,
             managesProgress: options.contains(.progress),
             deviationPolicy: options.contains(.prompts) ? .askApp : .automatic,
             settings: settings, persist: persist

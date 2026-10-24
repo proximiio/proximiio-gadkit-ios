@@ -12,6 +12,7 @@ struct JourneyKindTests {
         #expect(JourneyKind.personalised.listsGalleries)
         #expect(JourneyKind.personalised.allowsSkip)
         #expect(!JourneyKind.personalised.keepsOrder)
+        #expect(JourneyKind.personalised.countsOutOfOrder)
     }
 
     @Test func curatedGoesStraightToTheArtworkWithoutSkip() {
@@ -19,6 +20,7 @@ struct JourneyKindTests {
         #expect(!JourneyKind.curated.listsGalleries)
         #expect(!JourneyKind.curated.allowsSkip)
         #expect(JourneyKind.curated.keepsOrder)
+        #expect(!JourneyKind.curated.countsOutOfOrder)
     }
 
     @Test func storedMetaWithoutKindIsPersonalised() throws {

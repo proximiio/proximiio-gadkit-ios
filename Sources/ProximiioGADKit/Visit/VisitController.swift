@@ -20,7 +20,8 @@
 //  the visitor walks past without entering its geofence stays unvisited until it is skipped.
 //  Out of order: a visitor inside the geofence of another open artwork for
 //  `GADSettings.outOfOrderDwell` (0 s while testing) marks it visited, and the stops still ahead are
-//  ordered again from the visitor (PM review 2026-10-12).
+//  ordered again from the visitor (PM review 2026-10-12). A curated tour ignores such an artwork: it
+//  stays open (`countsOutOfOrder`; PM, Monday "Curated tours: ignore other artworks", 2026-10-23).
 //  An amenity has no geofence. A detour is reached within 5–10 m for 5 s (`GADSettings`)
 //  and the journey continues only after "Resume your Journey" (`JourneyRules.visit`).
 //
@@ -124,6 +125,9 @@ final class VisitController {
     /// after an artwork visited out of order. So does a journey whose progress the host app
     /// manages.
     private let keepsOrder: Bool
+    /// Whether an artwork further on that the visitor stays at counts as visited. Off in a curated
+    /// tour: only the active artwork is visited.
+    private let countsOutOfOrder: Bool
     /// `ProximiMapView.Options.progress`: artwork geofences mark stops visited, the journey is
     /// ordered, and a stop whose POI is deleted is skipped. Off, only `apply(_:)` changes the stops.
     private let managesProgress: Bool
@@ -140,12 +144,14 @@ final class VisitController {
         journey: Journey,
         rules: JourneyRules = .visit,
         keepsOrder: Bool = false,
+        countsOutOfOrder: Bool = true,
         managesProgress: Bool = true,
         deviationPolicy: JourneyDeviationPolicy = .askApp,
         settings: GADSettings = .standard,
         persist: @escaping @MainActor (Journey?) -> Void = VisitStore.persist
     ) {
         self.keepsOrder = keepsOrder || !managesProgress
+        self.countsOutOfOrder = countsOutOfOrder
         self.managesProgress = managesProgress
         self.deviationPolicy = deviationPolicy
         self.settings = settings
@@ -253,8 +259,8 @@ final class VisitController {
     /// against `enteredGeofenceIDs`. Inside
     /// the active artwork's geofence: the arrival, which also covers a leg that starts inside it,
     /// where the SDK sends no enter event. Inside another open artwork's geofence for
-    /// `GADSettings.outOfOrderDwell`: that artwork is visited out of order. During a detour to an
-    /// amenity no artwork counts (PM review 2026-10-12).
+    /// `GADSettings.outOfOrderDwell`: that artwork is visited out of order, except in a curated tour
+    /// (`countsOutOfOrder`). During a detour to an amenity no artwork counts (PM review 2026-10-12).
     func checkArtworkGeofences() {
         // Before the start the journey is still being ordered.
         guard managesProgress, isNavigating else { return }
@@ -276,7 +282,7 @@ final class VisitController {
             guard areas.contains(where: { enteredGeofenceIDs.contains($0.id) || $0.contains(point) }) else { continue }
             if stop.id == activeID {
                 artworkGeofenceEntered(remoteID: remoteID)
-            } else {
+            } else if countsOutOfOrder {
                 inside.insert(stop.id)
             }
         }
