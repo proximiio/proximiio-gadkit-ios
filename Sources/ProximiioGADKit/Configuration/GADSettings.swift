@@ -70,6 +70,10 @@ public struct GADSettings: Equatable, Sendable {
     /// library's adaptive smoothing), which shows a fix a moment later (PM, Monday "Visual delay",
     /// 2026-10-23).
     public var smoothsPosition = false
+    /// The longest time in seconds the maps show their spinner while the map library draws the
+    /// venue. The spinner goes when the venue's features are on the map, when the map reports an
+    /// error, or after this time.
+    public var mapLoadingTimeout: TimeInterval = 20
     /// The smallest width and height in metres of the area the map shows for an amenity picked in
     /// the menu, so a near amenity does not zoom the map in further than this.
     public var amenityFramingMinimumMeters: Double = 40

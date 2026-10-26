@@ -1796,16 +1796,6 @@
         }
       }
     },
-    "Undo skip" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "تراجع عن التخطي"
-          }
-        }
-      }
-    },
     "Visited" : {
       "localizations" : {
         "ar" : {

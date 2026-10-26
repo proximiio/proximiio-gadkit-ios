@@ -65,6 +65,7 @@ struct ExploreMuseumView: View {
             ProximiioMapView(session: session)
                 .softEdges(cornerRadius: 40)
                 .ignoresSafeArea(edges: .bottom)
+            MapLoadingSpinner(session: session, timeout: venue.settings.mapLoadingTimeout)
             VStack(spacing: 0) {
                 header
                 Spacer()

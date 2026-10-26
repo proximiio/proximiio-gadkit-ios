@@ -51,6 +51,7 @@ struct MuseumMapView: View {
         ZStack {
             ProximiioMapView(session: session)
                 .ignoresSafeArea(edges: .bottom)
+            MapLoadingSpinner(session: session, timeout: venue.settings.mapLoadingTimeout)
             controls
             if case .changing(let change) = floorGuide.phase {
                 FloorChangeView(change: change)

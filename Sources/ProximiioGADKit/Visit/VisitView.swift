@@ -175,9 +175,7 @@ struct VisitView: View {
                 // The map ignores the safe area; the card starts below the status bar as in the design.
                 .padding(.top, geometry.safeAreaInsets.top + 8)
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom - 14, 4))
-                if hasStops {
-                    StartingSpinner(navigator: controller.navigator)
-                }
+                StartingSpinner(navigator: controller.navigator, session: controller.session, timeout: settings.mapLoadingTimeout, hasStops: hasStops)
                 if case .changing(let change) = floorGuide.phase {
                     FloorChangeView(change: change)
                         .onTapGesture { floorGuide.showFloor() }
@@ -978,22 +976,17 @@ private struct VisitCard: View {
     }
 }
 
-/// The spinner in the middle of the screen while the first leg is routed (PM, Monday "Spinner on map
-/// loading center", 2026-10-26). The stop card shows "Your journey" meanwhile.
+/// The spinner in the middle of the screen while the map draws the venue and, with stops, until the
+/// first leg is routed (PM, Monday "Spinner on map loading center", 2026-10-26). The stop card shows
+/// "Your journey" meanwhile.
 private struct StartingSpinner: View {
     @ObservedObject var navigator: JourneyNavigator
+    let session: ProximiioMapSession
+    let timeout: TimeInterval
+    let hasStops: Bool
 
     var body: some View {
-        if navigator.activeStop == nil && !navigator.isFinished {
-            ProgressView()
-                .controlSize(.large)
-                .tint(Palette.ink)
-                .padding(24)
-                .glassSurface(RoundedRectangle(cornerRadius: 16), strength: .frosted)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(false)
-                .transition(.opacity)
-        }
+        MapLoadingSpinner(session: session, timeout: timeout, isBusy: hasStops && navigator.activeStop == nil && !navigator.isFinished)
     }
 }
 

@@ -11,6 +11,7 @@
 //  - amenity chips, stop card or amenity card at the bottom of the card
 //  - a glass bar under the card with round buttons
 //
+import ProximiioMap
 import SwiftUI
 
 /// Full-screen background image of a design screen.
@@ -60,6 +61,44 @@ extension View {
                 .blur(radius: width / 2)
                 .drawingGroup()
         }
+    }
+}
+
+/// The spinner in the middle of a map while the map library draws the venue (PM, Monday "Spinner on
+/// map loading center", 2026-10-26). `isBusy` keeps it while the screen has more to do, such as
+/// routing the first leg of a journey.
+struct MapLoadingSpinner: View {
+    @ObservedObject var session: ProximiioMapSession
+    /// `GADSettings.mapLoadingTimeout`.
+    let timeout: TimeInterval
+    var isBusy = false
+    @State private var hasTimedOut = false
+
+    var body: some View {
+        let isShown = Self.isShown(featureCount: session.featureCount, lastError: session.lastError, hasTimedOut: hasTimedOut, isBusy: isBusy)
+        ZStack {
+            if isShown {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(Palette.ink)
+                    .padding(24)
+                    .glassSurface(RoundedRectangle(cornerRadius: 16), strength: .frosted)
+                    .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(false)
+        .animation(.easeInOut(duration: 0.2), value: isShown)
+        .task {
+            try? await Task.sleep(for: .seconds(timeout))
+            hasTimedOut = true
+        }
+    }
+
+    /// Shown until the venue's features are on the map, the map reports an error or the timeout
+    /// passes, and while `isBusy`. Pure; covered by tests.
+    static func isShown(featureCount: Int, lastError: String?, hasTimedOut: Bool, isBusy: Bool) -> Bool {
+        isBusy || (featureCount == 0 && lastError == nil && !hasTimedOut)
     }
 }
 

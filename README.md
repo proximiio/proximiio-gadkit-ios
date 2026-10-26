@@ -581,6 +581,7 @@ let configuration = GADConfiguration(
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
 | `minimumZoom`, `maximumZoom` | `nil` | The zoom levels the visitor cannot go beyond on every map of the package, or the map library's limits. |
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
+| `mapLoadingTimeout` | 20 s | The longest time a map shows its spinner while the venue's features are not on the map. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
 | `galleryFirstMarginMeters` | 50 m | Gallery first: an artwork farther than this outside its gallery's geofence, or on another floor, is routed to directly. |
 | `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
@@ -764,6 +765,21 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.13.1 (2026-10-26)
+
+No change for host apps' code.
+
+Added:
+
+- `GADSettings.mapLoadingTimeout` (default 20 s): the longest time the maps show their loading spinner.
+
+Changed:
+
+- The journey map, the Explore Museum map and the museum map show the spinner in the middle until
+  the venue's features are on the map, the map reports an error or `mapLoadingTimeout` passes. Before,
+  only the journey map had a spinner, and only while the first leg was routed (PM, Monday "Spinner on
+  map loading center", 2026-10-26).
 
 ### 1.13.0 (2026-10-26)
 

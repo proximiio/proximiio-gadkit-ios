@@ -26,4 +26,13 @@ struct DesignSystemTests {
     func iconAssetsExist(_ name: String) {
         #expect(UIImage(named: name, in: .module, with: nil) != nil)
     }
+
+    @Test func theMapSpinnerStaysUntilTheVenueIsDrawn() {
+        #expect(MapLoadingSpinner.isShown(featureCount: 0, lastError: nil, hasTimedOut: false, isBusy: false))
+        #expect(!MapLoadingSpinner.isShown(featureCount: 120, lastError: nil, hasTimedOut: false, isBusy: false))
+        #expect(!MapLoadingSpinner.isShown(featureCount: 0, lastError: "style", hasTimedOut: false, isBusy: false))
+        #expect(!MapLoadingSpinner.isShown(featureCount: 0, lastError: nil, hasTimedOut: true, isBusy: false))
+        #expect(MapLoadingSpinner.isShown(featureCount: 120, lastError: nil, hasTimedOut: true, isBusy: true))
+        #expect(GADSettings.standard.mapLoadingTimeout == 20)
+    }
 }
