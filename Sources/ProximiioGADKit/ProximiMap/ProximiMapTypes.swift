@@ -152,6 +152,10 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// The visitor stayed at an artwork further down the journey. It counts as visited. A
     /// personalised journey orders the stops ahead again.
     case artworkVisitedOutOfOrder(ProximiStop)
+    /// `ProximiMapView` with `Options.progress`: the view ordered the stops again, from the visitor's
+    /// first position, after `artworkVisitedOutOfOrder` or after a detour. The journey in the host
+    /// app's ids and its new order; the `journey` binding already holds it.
+    case stopOrderChanged(ProximiJourney)
     /// The visitor swiped a stop in the list. With `ProximiMapView.Options.prompts` a dialog asks
     /// "Skip artwork?"; without them the host app decides.
     case skipRequested(ProximiStop)

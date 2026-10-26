@@ -54,6 +54,20 @@ struct HostedJourneyTests {
         #expect(written.stops.map(\.state) == [.visited, .pending, .skipped])
     }
 
+    /// `stopOrderChanged` follows a write with a new order, not one with new states only.
+    @Test @MainActor func aNewOrderIsAReorderButNewStatesAreNot() {
+        let matched = HostedJourney(ProximiJourney(artworks: ["GAD.1", "GAD.2", "c"]), places: places)
+        let shown = matched.hostJourney(from: matched.journey, kind: .personalised)
+        var visited = matched.journey
+        visited.stops[0].state = .done
+        #expect(!HostedMapModel.isReordered(shown, to: matched.hostJourney(from: visited, kind: .personalised)))
+        var reordered = visited
+        reordered.stops = [visited.stops[0], visited.stops[2], visited.stops[1]]
+        let written = matched.hostJourney(from: reordered, kind: .personalised)
+        #expect(written.stops.map(\.id) == ["GAD.1", "c", "GAD.2"])
+        #expect(HostedMapModel.isReordered(shown, to: written))
+    }
+
     /// A new kind, a journey without a stop on the map and a first journey on a map without one
     /// start the screen again. Fewer stops are taken in place (`JourneyNavigator.update(to:)`).
     @Test func theOpenScreenTakesAJourneyInPlaceUnlessItCannot() {

@@ -273,7 +273,7 @@ With `.progress` the view also writes:
 detour events, `journeyResumed`, `offRoute`, `backOnRoute`, `journeyFinished`, the floor without
 positioning events, `modeChanged`, `recentred` and `accessibleRoutesChanged`; with `.prompts` also
 `stopSkipped` and `skipCancelled`; with `.progress`
-also `artworkReached` and `artworkVisitedOutOfOrder`; with `.bottomBar`, `.prompts` and `onClose` also
+also `artworkReached`, `artworkVisitedOutOfOrder` and `stopOrderChanged`; with `.bottomBar`, `.prompts` and `onClose` also
 the exit events. Screen, wristband,
 arrival, geofence and `journeyChanged` events come only from `ProximiMap`; geofence enter and exit
 events are on the host app's SDK (`geofenceEvents()`).
@@ -328,7 +328,11 @@ The view's navigator differs from a navigator with the map library's default rul
 
 #### Any change of the journey
 
-No `ProximiMapEvent` reports a new order of the stops. The navigator's `journey` (`@Published`) does:
+With `.progress`, `stopOrderChanged(ProximiJourney)` reports each new order the view gives the stops: from
+the visitor's first position, after `artworkVisitedOutOfOrder` and after a detour. It carries the journey
+in your ids, as the binding gets it. A change of the states alone sends no `stopOrderChanged`.
+
+The navigator's `journey` (`@Published`) reports every change of the stops, with or without `.progress`:
 
 - The map library republishes it when the stops change: a stop is added, removed, replaced, moved or
   changes state, or a detour starts or ends. A position fix does not republish it.
@@ -560,6 +564,7 @@ position, search and routes.
 | `positionUncertain(ProximiStop)` | `ProximiMapView` without `.prompts`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.prompts` the view asks "Probably at …" instead. |
 | `artworkReached(ProximiStop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, or a fix lies in it, or the SDK counts the visitor inside it (`enteredGeofenceIds`, also for a journey opened inside it): the stop is done and the route leads to the next stop. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
 | `artworkVisitedOutOfOrder(ProximiStop)` | Personalised journeys only: the visitor stayed at an artwork further down the journey. It counts as visited, and the stops ahead are ordered again. A curated tour ignores such an artwork. |
+| `stopOrderChanged(ProximiJourney)` | `ProximiMapView` with `.progress`: the view ordered the stops again, from the visitor's first position, after `artworkVisitedOutOfOrder` or after a detour. The journey in the host app's ids and its new order; the `journey` binding already holds it. A change of the states alone does not send it. |
 | `skipRequested`, `stopSkipped`, `skipCancelled` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it". `ProximiMapView` without `.prompts` sends only `skipRequested`. `skipUndone` is not sent since 1.13.0. |
 | `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
@@ -789,6 +794,14 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### Unreleased
+
+Added:
+
+- `ProximiMapEvent.stopOrderChanged(ProximiJourney)`: `ProximiMapView` with `.progress` reports a new order
+  of the stops (Nagarro, 2026-10-26). A `switch` over `ProximiMapEvent` with `default` keeps compiling.
+- README "The navigator" → "Any change of the journey": `stopOrderChanged` and the navigator's `journey`.
 
 ### 1.14.0 (2026-10-26)
 

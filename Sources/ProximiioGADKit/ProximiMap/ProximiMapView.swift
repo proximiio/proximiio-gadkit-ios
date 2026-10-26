@@ -239,13 +239,24 @@ final class HostedMapModel {
     /// Writes the order and states of the navigator's journey to the host app's journey, with
     /// `Options.progress` only, and only from the screen of the current `generation`: a screen that
     /// started again leaves the controller of the old one running until its tasks end. `nil` (after
-    /// Journey Complete) changes nothing: the journey already holds the last states.
+    /// Journey Complete) changes nothing: the journey already holds the last states. A new order of
+    /// the stops sends `stopOrderChanged` after the write.
     func write(_ journey: Journey?, generation: Int, to binding: Binding<ProximiJourney>) {
         guard options.contains(.progress), generation == self.generation, let journey, let hosted else { return }
-        let updated = hosted.hostJourney(from: journey, kind: binding.wrappedValue.kind)
-        guard updated != binding.wrappedValue else { return }
+        let previous = binding.wrappedValue
+        let updated = hosted.hostJourney(from: journey, kind: previous.kind)
+        guard updated != previous else { return }
         current = updated
         binding.wrappedValue = updated
+        if Self.isReordered(previous, to: updated) {
+            onEvent?(.stopOrderChanged(updated))
+        }
+    }
+
+    /// `true` when the stop ids of `updated` are in another order than those of `previous`. A change
+    /// of the states alone is no new order. Pure; covered by tests.
+    nonisolated static func isReordered(_ previous: ProximiJourney, to updated: ProximiJourney) -> Bool {
+        previous.stops.map(\.id) != updated.stops.map(\.id)
     }
 
     func handle(_ event: VisitEvent) {
