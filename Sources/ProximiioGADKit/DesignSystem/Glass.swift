@@ -10,11 +10,14 @@
 //  - stroke: 1.5 pt white
 //  - shadow: x 0, y 3, blur 10, black 15 %
 //
-//  On iOS 26 and later the surface is SwiftUI Liquid Glass (`glassEffect`). Earlier versions
-//  use a material fallback.
+//  On iOS 26 and later the surface is Apple's Regular glass (`glassEffect(.regular)`) without the
+//  gradient, the stroke and the shadow: "One glass for the whole app: Apple's Regular glass" (Figma
+//  "Glass review: iOS 26, iOS 27 and Android", node 16349:60996, 2026-10-24). Earlier versions
+//  draw the design's glass with a material.
 //
 import SwiftUI
 
+/// The glass below iOS 26. On iOS 26 and later every strength is Apple's Regular glass.
 @_spi(GADApp) public enum GlassStrength {
     /// Buttons, cards and bars over the coloured backgrounds.
     case regular
@@ -45,13 +48,7 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
-            // Figma's GLASS effect is Liquid Glass. The design gradient sits on the glass
-            // at reduced strength, as the Figma layer stack shows.
-            content
-                .background(shape.fill(figmaGradient).opacity(gradientOpacity))
-                .glassEffect(liquidGlass, in: shape)
-                .overlay(shape.strokeBorder(Palette.white, lineWidth: 1.5))
-                .shadow(color: .black.opacity(showsShadow ? 0.15 : 0), radius: 5, x: 0, y: 3)
+            content.glassEffect(.regular, in: shape)
         } else {
             content
                 .background {
@@ -79,15 +76,6 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
         case .regular: 0.55
         case .light: 0.2
         case .frosted: 0.5
-        }
-    }
-
-    @available(iOS 26, *)
-    private var liquidGlass: Glass {
-        switch strength {
-        case .regular: .regular
-        case .light: .clear
-        case .frosted: .regular.tint(Palette.white.opacity(0.35))
         }
     }
 }

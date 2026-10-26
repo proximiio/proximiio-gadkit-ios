@@ -177,7 +177,7 @@ struct ExploreMuseumView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
                     if panel == .list(item) {
-                        RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.ink, lineWidth: 1.5)
+                        RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.ink, lineWidth: 1)
                     }
                 }
                 .contentShape(Rectangle())
@@ -226,6 +226,14 @@ struct ExploreMuseumView: View {
                         switch panel {
                         case .list(let tab): list(tab)
                         case .legend: legend
+                        }
+                    }
+                    // The rows fade out above the tab bar: its glass shows the text under it.
+                    .mask {
+                        VStack(spacing: 0) {
+                            Rectangle()
+                            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 30)
+                            Color.clear.frame(height: proxy.safeAreaInsets.bottom + 16 + 50 + 6)
                         }
                     }
                 }

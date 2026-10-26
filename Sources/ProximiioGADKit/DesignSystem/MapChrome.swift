@@ -102,35 +102,21 @@ struct MapLoadingSpinner: View {
     }
 }
 
-/// "Map | List" toggle: glass 150 × 50 with the selected item outlined.
+/// "Map | List" toggle: the system's segmented control, 150 pt wide. iOS draws the control and its
+/// glass (Figma "Glass review", "System controls", 2026-10-24).
 struct MapListToggle: View {
     @Binding var showsList: Bool
 
     var body: some View {
-        HStack(spacing: 0) {
-            item("Map", selected: !showsList) { showsList = false }
-            item("List", selected: showsList) { showsList = true }
+        Picker(selection: $showsList) {
+            Text("Map", bundle: .module).tag(false)
+            Text("List", bundle: .module).tag(true)
+        } label: {
+            EmptyView()
         }
-        .padding(5)
-        .frame(width: 150, height: 50)
-        .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
-    }
-
-    private func item(_ title: LocalizedStringKey, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title, bundle: .module)
-                .textStyle(.bodySmallRegular)
-                .foregroundStyle(Palette.ink)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay {
-                    if selected {
-                        RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.ink, lineWidth: 1.5)
-                    }
-                }
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .pickerStyle(.segmented)
+        .controlSize(.large)
+        .frame(width: 150)
     }
 }
 
@@ -141,18 +127,19 @@ struct GlassSquareButton<Label: View>: View {
     @ViewBuilder let label: Label
 
     var body: some View {
-        Button(action: action) {
-            label
-                .foregroundStyle(Palette.ink)
-                .frame(width: 50, height: 50)
-                .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
-                .overlay {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1.5)
-                    }
-                }
+        Button(action: action) { label }
+            .buttonStyle(SquareGlassButtonStyle(isSelected: isSelected))
+    }
+}
+
+/// The glass of `GlassSquareButton`.
+private struct SquareGlassButtonStyle: PrimitiveButtonStyle {
+    let isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        GlassButton(configuration: configuration, shape: .roundedRectangle(12), isSelected: isSelected, strength: .frosted) {
+            configuration.label.frame(width: 50, height: 50)
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -259,16 +246,14 @@ struct PlaceInfoCard: View {
     }
 }
 
-/// Ghost button stretched to half the card, 50 pt high ("Go here", "Close").
-struct CardGhostButtonStyle: ButtonStyle {
+/// Glass button stretched to half the card, 50 pt high ("Go here", "Close").
+struct CardGhostButtonStyle: PrimitiveButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .textStyle(.bodyMedium)
-            .foregroundStyle(Palette.ink)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1.5))
-            .contentShape(RoundedRectangle(cornerRadius: 12))
-            .opacity(configuration.isPressed ? 0.6 : 1)
+        GlassButton(configuration: configuration, shape: .roundedRectangle(12)) {
+            configuration.label
+                .textStyle(.bodyMedium)
+                .frame(maxWidth: .infinity, minHeight: 50)
+        }
     }
 }
 
@@ -292,15 +277,10 @@ struct BottomGlassBar<Leading: View, Trailing: View>: View {
 }
 
 /// Round glass button of the bottom bar, 60 pt.
-struct RoundGlassButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
+struct RoundGlassButtonStyle: PrimitiveButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(Palette.ink)
-            .frame(width: 60, height: 60)
-            .glassSurface(Circle())
-            .opacity(isEnabled ? 1 : Palette.disabledOpacity)
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+        GlassButton(configuration: configuration, shape: .circle) {
+            configuration.label.frame(width: 60, height: 60)
+        }
     }
 }

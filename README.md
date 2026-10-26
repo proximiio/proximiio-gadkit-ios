@@ -766,6 +766,20 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.14.0 (2026-10-26)
+
+No change for host apps' code. The look changes on iOS 26 and later.
+
+Changed:
+
+- On iOS 26 and later the buttons are Apple's glass button style (`.buttonStyle(.glass)`), and the
+  cards, bars and panels are Apple's Regular glass (`glassEffect(.regular)`). The design's gradient,
+  white border and shadow are gone. The system draws the pressed state. A selected button has a 1 pt
+  ink outline; a disabled one is at 40 % (RPR, Figma "Glass review: iOS 26, iOS 27 and Android",
+  2026-10-24: the app uses native iOS components). iOS 17 and 18 keep the design's glass.
+- The Map / List toggle of the journey map is the system's segmented control.
+- The Explore Museum lists fade out above the tab bar, so the rows do not show through its glass.
+
 ### 1.13.1 (2026-10-26)
 
 No change for host apps' code.
