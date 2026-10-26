@@ -326,6 +326,30 @@ The view's navigator differs from a navigator with the map library's default rul
 | `.stopReached` and the cue `.arrived` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
 | The cue `.approachingDestination` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
 
+#### Any change of the journey
+
+No `ProximiMapEvent` reports a new order of the stops. The navigator's `journey` (`@Published`) does:
+
+- The map library republishes it when the stops change: a stop is added, removed, replaced, moved or
+  changes state, or a detour starts or ends. A position fix does not republish it.
+- A subscription gets the current value at once.
+- Subscribe in each `onNavigator` call: a new navigator replaces the previous one.
+
+```swift
+@State private var journeyChanges: AnyCancellable?
+
+ProximiMapView(sdk: sdk, journey: $journey, onNavigator: { navigator in
+    journeyChanges = navigator.$journey.sink { journey in
+        print("stops", journey.stops.map(\.id))
+    }
+})
+```
+
+With `.progress` the view also writes the `journey` binding: the order of the stops and the visited and
+skipped stops, also the new order of a personalised journey. The binding has no detour stops, and an active
+or reached stop is pending in it. Without `.progress` the view does not reorder the journey and does not
+write the binding.
+
 ## Screens
 
 `open(_:)` shows a screen over the view with `.proximiMap(_:)`. A screen already on screen closes
