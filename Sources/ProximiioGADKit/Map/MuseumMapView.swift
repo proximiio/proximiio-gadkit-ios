@@ -39,7 +39,7 @@ struct MuseumMapView: View {
     init(venue: VenueService, initialDestination: VenuePlace? = nil) {
         self.venue = venue
         self.initialDestination = initialDestination
-        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.options(followZoom: venue.settings.followZoom)))
+        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.options(settings: venue.settings)))
         _floorGuide = State(initialValue: FloorWithoutPositioningGuide(settings: venue.settings))
     }
 
@@ -69,6 +69,7 @@ struct MuseumMapView: View {
                 session.recentre()
             }
             await MapStyle.waitForCanvas(of: session)
+            MapStyle.applyZoomLimits(venue.settings, to: session)
             session.guidanceRules = .venueWalk
             session.onFeatureTap = { identifiers, _ in
                 if let place = VenuePlace.place(under: identifiers, in: places) {

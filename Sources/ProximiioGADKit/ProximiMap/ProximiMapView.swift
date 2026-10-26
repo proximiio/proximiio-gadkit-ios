@@ -37,7 +37,7 @@ public struct ProximiMapView: View {
         /// The package's background image around the map card. Without it the view is transparent.
         public static let background = Options(rawValue: 1 << 1)
         /// The view's own prompts: "Skip this artwork?", "You've left your route", "Probably at …",
-        /// "Change your route?", "Leave the tour here" and Journey Complete. Without them the view
+        /// "Change your route?" and "Leave the tour here". Without them the view
         /// reports `skipRequested`, `offRoute`, `positionUncertain` and `journeyFinished` and shows
         /// nothing, the route follows the visitor who left it, and "Go here" on an amenity starts the
         /// detour at once.
@@ -49,8 +49,11 @@ public struct ProximiMapView: View {
         public static let progress = Options(rawValue: 1 << 3)
         /// The journey's Live Activity. The widget extension needs `ProximiioGADLiveActivity`.
         public static let liveActivity = Options(rawValue: 1 << 4)
+        /// Journey Complete when the last stop is done. Without it the view reports
+        /// `journeyFinished` and shows nothing (Nagarro, Monday "Journey finished view", 2026-10-26).
+        public static let journeyComplete = Options(rawValue: 1 << 5)
 
-        public static let all: Options = [.bottomBar, .background, .prompts, .progress, .liveActivity]
+        public static let all: Options = [.bottomBar, .background, .prompts, .progress, .liveActivity, .journeyComplete]
     }
 
     @Binding private var journey: ProximiJourney

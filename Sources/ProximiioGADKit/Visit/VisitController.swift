@@ -3,7 +3,7 @@
 //  ProximiioGADKit
 //
 //  Owns the map session and the `JourneyNavigator` of a visit, persists the journey, and
-//  implements skip and undo.
+//  implements skip.
 //
 //  Arrival at an artwork: entering the geofence of the active artwork (`artworkGeofenceEntered`).
 //  Nagarro's audio guide reacts to the same enter event, so the map and the guide name the same
@@ -25,7 +25,7 @@
 //  An amenity has no geofence. A detour is reached within 5–10 m for 5 s (`GADSettings`)
 //  and the journey continues only after "Resume your Journey" (`JourneyRules.visit`).
 //
-//  Skip, undo and "choose this stop" edit the running navigator. Its route cache, event streams
+//  Skip and "choose this stop" edit the running navigator. Its route cache, event streams
 //  and deviation state are kept. The arrival, out of order, gallery first and "Resume your Journey"
 //  each read the journey before they change it, so they run one after another (`serially`).
 //
@@ -59,8 +59,6 @@ import ProximiioMap
 final class VisitController {
     let session: ProximiioMapSession
     let navigator: JourneyNavigator
-    /// The last skipped stop, for "Undo". Cleared by the next skip or by undo.
-    private(set) var lastSkippedStopID: String?
     /// `true` after `farFromRoute` or `offRouteTooLong`, until the visitor returns to the route
     /// or answers the warning.
     private(set) var isOffRoute = false
@@ -442,7 +440,6 @@ final class VisitController {
 
     func skip(stopID: String) async {
         guard await navigator.skip(stopID: stopID) else { return }
-        lastSkippedStopID = stopID
         persist(navigator.journey)
     }
 
@@ -482,13 +479,6 @@ final class VisitController {
         return withoutPlace
     }
 
-    func undoSkip() async {
-        guard let id = lastSkippedStopID else { return }
-        lastSkippedStopID = nil
-        await navigator.reopen(stopID: id)
-        persist(navigator.journey)
-    }
-
     /// Takes the host app's journey on the open screen (`ProximiMapView`): stops added, removed,
     /// visited, skipped, reopened and moved. The navigator, its route cache, its event streams and
     /// the camera stay. Calls run one after another; a call during another keeps only the latest
@@ -516,8 +506,6 @@ final class VisitController {
     /// the first call merges against it.
     private func performApply(_ target: Journey) async {
         let taken = await navigator.update(to: target)
-        // "Undo skip" belongs to a skip the host app has since changed.
-        if let id = lastSkippedStopID, stop(id)?.state != .skipped { lastSkippedStopID = nil }
         FieldLog.log("journey applied · \(target.stops.count) stops · \(taken ? "taken" : "not taken: two stops with one id")")
     }
 

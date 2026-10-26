@@ -27,8 +27,6 @@ enum VisitEvent: Sendable, Equatable {
     case stopSkipped(JourneyStop)
     /// The visitor answered "Keep it". The stop stays in the journey.
     case skipCancelled(JourneyStop)
-    /// The visitor tapped "Undo skip". The stop is back in the journey.
-    case skipUndone(JourneyStop)
     /// The visitor picked an amenity on the map. A card shows it with "Go here".
     case amenitySelected(VenuePlace)
     /// The amenity is now a detour of the journey: the visitor confirmed "Change your route?".

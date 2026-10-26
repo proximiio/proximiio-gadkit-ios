@@ -4,8 +4,8 @@
 //
 //  The journey as a list (Figma: "Personalized Journey list"). Stops are numbered in
 //  visit order and grouped under their gallery; visited stops are dimmed; swiping left offers
-//  Skip; a skipped stop is hidden and the list renumbers. "Undo skip" restores the last skipped
-//  stop and reports `VisitEvent.skipUndone`. A curated tour has no gallery headers and no skip.
+//  Skip; a skipped stop is hidden and the list renumbers. There is no undo (PM, Monday "Undo skip
+//  removed", 2026-10-23). A curated tour has no gallery headers and no skip.
 //  A row shows the artist and "AR" and audio badges from the artwork's place
 //  (`VenuePlace.artist`, `hasAR`, `hasAudio`), or the level when the place names no artist.
 //
@@ -19,7 +19,6 @@ import SwiftUI
 import UIKit
 
 struct VisitStopList: View {
-    @Environment(\.visitEventHandler) private var emit
     let controller: VisitController
     var galleries: [Gallery] = []
     /// Gallery names by gallery id (`Gallery.names(places:)`).
@@ -38,13 +37,8 @@ struct VisitStopList: View {
             groupsByGallery: groupsByGallery,
             places: Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
             allowsSkip: allowsSkip,
-            lastSkippedStopID: controller.lastSkippedStopID,
             onSkip: onSkip
-        ) {
-            let stop = controller.navigator.journey.stops.first { $0.id == controller.lastSkippedStopID }
-            Task { await controller.undoSkip() }
-            if let stop { emit(.skipUndone(stop)) }
-        }
+        )
     }
 }
 
@@ -56,9 +50,7 @@ private struct StopList: View {
     /// Places by id, for the artist and the badges of a stop.
     let places: [String: VenuePlace]
     let allowsSkip: Bool
-    let lastSkippedStopID: String?
     let onSkip: (JourneyStop) -> Void
-    let onUndo: () -> Void
 
     private var visibleStops: [JourneyStop] {
         VisitPlan.artworks(in: navigator.journey).filter { $0.state != .skipped }
@@ -104,9 +96,6 @@ private struct StopList: View {
                     }
                 }
                 if allowsSkip {
-                    if lastSkippedStopID != nil {
-                        Button(String(localized: "Undo skip", bundle: .module), action: onUndo).buttonStyle(.small).padding(.top, 6)
-                    }
                     Text("Swipe left to skip an artwork", bundle: .module)
                         .textStyle(.bodyExtraSmall)
                         .foregroundStyle(Palette.ink)

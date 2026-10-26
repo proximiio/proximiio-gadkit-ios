@@ -184,7 +184,8 @@ public final class ProximiMap {
                 }
             })
             if configuration.settings.postsGeofenceNotifications {
-                tasks.append(Task { [notifier] in await notifier.run(sdk: venue.sdk) })
+                let posts = configuration.settings.notifiesGeofenceEvents
+                tasks.append(Task { [notifier] in await notifier.run(sdk: venue.sdk, posts: posts) })
             }
             status = .ready
             FieldLog.log("map: ready · \(places.count) places")
@@ -550,7 +551,6 @@ extension ProximiMap {
         case .skipRequested(let s): return .skipRequested(stop(s))
         case .stopSkipped(let s): return .stopSkipped(stop(s))
         case .skipCancelled(let s): return .skipCancelled(stop(s))
-        case .skipUndone(let s): return .skipUndone(stop(s))
         case .amenitySelected(let p): return .amenitySelected(place(p))
         case .detourStarted(let p): return .detourStarted(place(p))
         case .journeyResumed: return .journeyResumed

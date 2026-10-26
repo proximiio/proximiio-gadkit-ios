@@ -30,11 +30,12 @@ final class GeofenceNotifier {
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])
     }
 
-    /// Posts a notification for every geofence enter and exit event of `sdk`. Returns when the
-    /// stream finishes or the calling task is cancelled.
-    func run(sdk: Proximiio) async {
+    /// Shows notifications in the foreground and, with `posts`, posts one for every geofence enter
+    /// and exit event of `sdk`. Returns when the stream finishes or the calling task is cancelled.
+    func run(sdk: Proximiio, posts: Bool = true) async {
         let center = UNUserNotificationCenter.current()
         center.delegate = Self.presenter
+        guard posts else { return }
         for await event in await sdk.geofenceEvents() {
             guard let request = Self.request(for: event) else { continue }
             FieldLog.log("notification: \(request.identifier) \(request.content.title)")

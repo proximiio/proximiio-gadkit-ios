@@ -3,8 +3,9 @@
 //  ProximiioGADKit
 //
 //  The Explore Museum map (Figma "Explore Museum", node 12129:102006; PM screens 2026-10-23).
-//  "Level N" and the floor changer are at the top. The list button and the Spaces, Highlights and
-//  Amenities tabs are at the bottom. A tab opens its list over the map (`ExploreCatalog`). A row,
+//  "Level N" and the floor changer are at the top. The legend button and the Spaces, Highlights and
+//  Amenities tabs are at the bottom. A tab opens its list over the map (`ExploreCatalog`); the legend
+//  button opens the map legend (PM, Monday "Explore Museum: Map legend missing", 2026-10-23). A row,
 //  or a tap on a gallery or a POI, shows its floor and its card. The galleries of the shown floor
 //  are filled with the level colour; while a gallery's card is open, the other galleries are lighter.
 //
@@ -15,6 +16,12 @@
 import Proximiio
 import ProximiioMap
 import SwiftUI
+
+/// What the panel over the lower part of the map shows.
+enum ExplorePanel: Equatable {
+    case list(ExploreTab)
+    case legend
+}
 
 /// The lists of the Explore Museum map.
 enum ExploreTab: CaseIterable, Identifiable {
@@ -38,16 +45,16 @@ struct ExploreMuseumView: View {
     @State private var mapLayers = JourneyMapLayers()
     @State private var catalog = ExploreCatalog()
     @State private var level: Double = 0
-    /// The open list, or `nil` for the map alone.
-    @State private var tab: ExploreTab?
-    /// The list the list button opens.
-    @State private var lastTab: ExploreTab = .spaces
+    /// The open list or the legend, or `nil` for the map alone.
+    @State private var panel: ExplorePanel?
+    /// The amenities' icons from the venue data, by amenity id.
+    @State private var amenityIcons: [String: UIImage] = [:]
     /// The place whose card is open.
     @State private var selected: ExploreItem?
 
     init(venue: VenueService) {
         self.venue = venue
-        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.exploreOptions()))
+        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.exploreOptions(settings: venue.settings)))
     }
 
     /// The map area under the level title, the card and the tab bar.
@@ -62,14 +69,14 @@ struct ExploreMuseumView: View {
                 header
                 Spacer()
             }
-            if let tab {
-                listPanel(tab)
+            if let panel {
+                panelView(panel)
                     .transition(.move(edge: .bottom))
             }
             VStack(spacing: 12) {
                 Spacer()
-                if tab == nil, let selected {
-                    ExploreCard(item: selected) { self.selected = nil }
+                if panel == nil, let selected {
+                    ExploreCard(item: selected, icons: amenityIcons) { self.selected = nil }
                         .transition(.opacity)
                 }
                 tabBar
@@ -77,7 +84,7 @@ struct ExploreMuseumView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
         }
-        .animation(.easeInOut(duration: 0.25), value: tab)
+        .animation(.easeInOut(duration: 0.25), value: panel)
         .animation(.easeInOut(duration: 0.2), value: selected)
         .task { await start() }
         .onChange(of: venue.data.version) { _, _ in
@@ -144,10 +151,10 @@ struct ExploreMuseumView: View {
 
     private var tabBar: some View {
         HStack(spacing: 10) {
-            GlassSquareButton(isSelected: tab != nil, action: toggleList) {
+            GlassSquareButton(isSelected: panel == .legend, action: { toggle(.legend) }) {
                 Image(systemName: "list.bullet").font(.system(size: 18, weight: .medium))
             }
-            .accessibilityLabel(Text("List", bundle: .module))
+            .accessibilityLabel(Text("Map legend", bundle: .module))
             HStack(spacing: 0) {
                 ForEach(ExploreTab.allCases) { item in
                     tabButton(item)
@@ -161,42 +168,37 @@ struct ExploreMuseumView: View {
 
     private func tabButton(_ item: ExploreTab) -> some View {
         Button {
-            if tab == item {
-                tab = nil
-            } else {
-                selected = nil
-                tab = item
-                lastTab = item
-            }
+            toggle(.list(item))
         } label: {
             Text(item.title)
                 .textStyle(.bodySmallRegular)
                 .foregroundStyle(Palette.ink)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
-                    if tab == item {
+                    if panel == .list(item) {
                         RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.ink, lineWidth: 1.5)
                     }
                 }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(tab == item ? .isSelected : [])
+        .accessibilityAddTraits(panel == .list(item) ? .isSelected : [])
     }
 
-    private func toggleList() {
-        if tab == nil {
-            selected = nil
-            tab = lastTab
+    /// Opens `target`, or closes it when it is open.
+    private func toggle(_ target: ExplorePanel) {
+        if panel == target {
+            panel = nil
         } else {
-            tab = nil
+            selected = nil
+            panel = target
         }
     }
 
-    // MARK: List
+    // MARK: Panel
 
-    /// The list of `tab` over the lower part of the map. Dragging its top edge down closes it.
-    private func listPanel(_ tab: ExploreTab) -> some View {
+    /// A list or the legend over the lower part of the map. Dragging its top edge down closes it.
+    private func panelView(_ panel: ExplorePanel) -> some View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
@@ -206,18 +208,44 @@ struct ExploreMuseumView: View {
                             .fill(Palette.ink.opacity(0.25))
                             .frame(width: 44, height: 5)
                         HStack(alignment: .firstTextBaseline) {
-                            Text(tab.title).textStyle(.cardTitle)
+                            Text(title(of: panel)).textStyle(.cardTitle)
                             Spacer()
-                            Text(summary(tab)).textStyle(.bodySmallRegular)
+                            if case .list(let tab) = panel {
+                                Text(summary(tab)).textStyle(.bodySmallRegular)
+                            }
                         }
                     }
                     .padding(.top, 10)
                     .padding(.horizontal, 24)
                     .contentShape(Rectangle())
                     .gesture(DragGesture(minimumDistance: 10).onEnded { value in
-                        if value.translation.height > 60 { self.tab = nil }
+                        if value.translation.height > 60 { self.panel = nil }
                     })
                     ScrollView {
+                        switch panel {
+                        case .list(let tab): list(tab)
+                        case .legend: legend
+                        }
+                    }
+                }
+                .foregroundStyle(Palette.ink)
+                .frame(maxWidth: .infinity)
+                .frame(height: proxy.size.height * (panel == .legend ? 0.62 : 0.72))
+                .glassSurface(UnevenRoundedRectangle(topLeadingRadius: 40, topTrailingRadius: 40), strength: .frosted)
+            }
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    private func title(of panel: ExplorePanel) -> String {
+        switch panel {
+        case .list(let tab): tab.title
+        case .legend: String(localized: "Map legend", bundle: .module)
+        }
+    }
+
+    /// The rows of `tab`, by level.
+    private func list(_ tab: ExploreTab) -> some View {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             let groups = ExploreCatalog.byLevel(items(for: tab))
                             if groups.isEmpty {
@@ -233,7 +261,7 @@ struct ExploreMuseumView: View {
                                     .padding(.top, 20)
                                     .padding(.bottom, 4)
                                 ForEach(group.items) { item in
-                                    Button { show(item) } label: { ExploreRow(item: item) }
+                                    Button { show(item) } label: { ExploreRow(item: item, icons: amenityIcons) }
                                         .buttonStyle(.plain)
                                         .accessibilityIdentifier("exploreRow")
                                     Divider()
@@ -243,15 +271,35 @@ struct ExploreMuseumView: View {
                         .padding(.horizontal, 24)
                         // Clear of the tab bar.
                         .padding(.bottom, 110)
-                    }
+    }
+
+    /// The map legend of the PM's screen: the facilities and the galleries the museum's POIs use, with
+    /// their map icons.
+    private var legend: some View {
+        HStack(alignment: .top, spacing: 20) {
+            legendColumn(String(localized: "Facilities", bundle: .module), catalog.legendFacilities)
+            legendColumn(String(localized: "Galleries", bundle: .module), catalog.legendGalleries)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
+        // Clear of the tab bar.
+        .padding(.bottom, 110)
+    }
+
+    private func legendColumn(_ title: String, _ entries: [ExploreLegendEntry]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title).textStyle(.bodySmallRegular)
+            ForEach(entries) { entry in
+                HStack(spacing: 8) {
+                    ExploreIcon.glyph(amenityID: entry.amenityID, title: entry.title, icons: amenityIcons)
+                        .frame(width: 30, height: 30)
+                        .accessibilityHidden(true)
+                    Text(entry.title).textStyle(.bodySmallBold)
                 }
-                .foregroundStyle(Palette.ink)
-                .frame(maxWidth: .infinity)
-                .frame(height: proxy.size.height * 0.72)
-                .glassSurface(UnevenRoundedRectangle(topLeadingRadius: 40, topTrailingRadius: 40), strength: .frosted)
             }
         }
-        .ignoresSafeArea(edges: .bottom)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     private func items(for tab: ExploreTab) -> [ExploreItem] {
@@ -277,6 +325,7 @@ struct ExploreMuseumView: View {
 
     private func start() async {
         await MapStyle.waitForCanvas(of: session)
+        MapStyle.applyZoomLimits(venue.settings, to: session)
         session.onFeatureTap = { identifiers, coordinate in
             tapped(identifiers, at: ProximiioCoordinate(latitude: coordinate.latitude, longitude: coordinate.longitude))
         }
@@ -295,11 +344,14 @@ struct ExploreMuseumView: View {
         let places = VenuePlace.all(in: features)
         let geofences = await venue.sdk.geofences()
         let amenities = (try? await venue.sdk.amenities()) ?? []
+        let scale = UIScreen.main.scale
+        amenityIcons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
+                                  uniquingKeysWith: { first, _ in first })
         let categories = Dictionary(amenities.compactMap { amenity in amenity.title.map { (amenity.id, $0) } },
                                     uniquingKeysWith: { first, _ in first })
-        catalog = ExploreCatalog(places: places, destinations: Gallery.destinations(geofences: geofences, places: places),
-                                 categories: categories)
         let levelChangers = LevelChangerPlace.all(in: features)
+        catalog = ExploreCatalog(places: places, destinations: Gallery.destinations(geofences: geofences, places: places),
+                                 categories: categories, levelChangerTypes: Set(levelChangers.map(\.featureType)))
         mapLayers.updateLevelChangers(levelChangers)
         // The artworks are not drawn: the galleries and the Highlights list show them.
         session.hiddenFeatureIDs = Set(levelChangers.map(\.id)).union(places.filter(\.isArtwork).map(\.id))
@@ -318,7 +370,7 @@ struct ExploreMuseumView: View {
 
     /// Closes the list, shows `item`'s floor, frames it and opens its card.
     private func show(_ item: ExploreItem) {
-        tab = nil
+        panel = nil
         show(level: item.level)
         selected = item
         guard let bounds = PlaceFraming.bounds(of: item.framedPoints, minimumMeters: venue.settings.amenityFramingMinimumMeters) else { return }
@@ -330,7 +382,7 @@ struct ExploreMuseumView: View {
         let all = catalog.all
         let item = identifiers.lazy.compactMap { id in all.first { $0.id == id } }.first
             ?? catalog.space(at: coordinate, level: level)
-        tab = nil
+        panel = nil
         selected = item
     }
 
@@ -352,11 +404,12 @@ struct ExploreMuseumView: View {
 /// A row of the lists: the icon, the title and its lines, and the level.
 private struct ExploreRow: View {
     let item: ExploreItem
+    let icons: [String: UIImage]
 
     var body: some View {
         HStack(spacing: 16) {
             if item.kind != .highlight {
-                ExploreIcon(item: item)
+                ExploreIcon(item: item, icons: icons)
             }
             ExploreText(item: item)
             Spacer(minLength: 8)
@@ -370,12 +423,13 @@ private struct ExploreRow: View {
 /// The card of a place on the map: the icon, the title and its lines, the level and a close button.
 private struct ExploreCard: View {
     let item: ExploreItem
+    let icons: [String: UIImage]
     let onClose: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
             if item.kind != .highlight {
-                ExploreIcon(item: item)
+                ExploreIcon(item: item, icons: icons)
             }
             ExploreText(item: item)
             Spacer(minLength: 8)
@@ -417,14 +471,20 @@ private struct ExploreText: View {
     }
 }
 
-/// The icon in a white circle: the amenity's icon, or a symbol for the gallery's category.
+/// The icon in a white circle: the design's glyph of an amenity kind, else the icon of the POI's
+/// amenity in the venue data (the icon the map draws), else a symbol for the gallery's category.
 private struct ExploreIcon: View {
     let item: ExploreItem
+    let icons: [String: UIImage]
 
     var body: some View {
         Group {
             if case .amenity(let kind) = item.kind {
                 kind.icon.image.resizable().scaledToFit().frame(width: 22, height: 22)
+            } else if let id = item.amenityID, let image = icons[id] {
+                // The data's icon is a 30 px marker, a white circle with the glyph: it fills the
+                // circle.
+                Image(uiImage: image).resizable().interpolation(.high).scaledToFit().frame(width: 44, height: 44)
             } else {
                 Image(systemName: ExploreItem.symbol(for: item.category)).font(.system(size: 18, weight: .medium))
             }
@@ -434,5 +494,19 @@ private struct ExploreIcon: View {
         .background(Palette.white, in: Circle())
         .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
         .accessibilityHidden(true)
+    }
+}
+
+extension ExploreIcon {
+    /// The legend's glyph of an amenity: the design's glyph of its kind, else its icon in the venue
+    /// data, else a symbol for a gallery category.
+    @ViewBuilder static func glyph(amenityID: String, title: String, icons: [String: UIImage]) -> some View {
+        if let kind = AmenityKind.kind(forAmenityID: amenityID, title: title) {
+            kind.icon.image.resizable().scaledToFit().foregroundStyle(Palette.ink).padding(4)
+        } else if let image = icons[amenityID] {
+            Image(uiImage: image).resizable().interpolation(.high).scaledToFit()
+        } else {
+            Image(systemName: ExploreItem.symbol(for: title)).resizable().scaledToFit().foregroundStyle(Palette.ink)
+        }
     }
 }

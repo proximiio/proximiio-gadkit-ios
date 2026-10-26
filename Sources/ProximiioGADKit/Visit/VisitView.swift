@@ -113,7 +113,7 @@ struct VisitView: View {
             sdk: venue.sdk,
             // The leg keeps its shape until the arrival; the walked part is translucent (PM review
             // 2026-10-12). No separate trail.
-            options: MapStyle.options(routeMarkers: false, followZoom: settings.followZoom)
+            options: MapStyle.options(routeMarkers: false, settings: settings)
         )
         var rules = JourneyRules.visit
         #if DEBUG
@@ -175,6 +175,9 @@ struct VisitView: View {
                 // The map ignores the safe area; the card starts below the status bar as in the design.
                 .padding(.top, geometry.safeAreaInsets.top + 8)
                 .padding(.bottom, max(geometry.safeAreaInsets.bottom - 14, 4))
+                if hasStops {
+                    StartingSpinner(navigator: controller.navigator)
+                }
                 if case .changing(let change) = floorGuide.phase {
                     FloorChangeView(change: change)
                         .onTapGesture { floorGuide.showFloor() }
@@ -217,6 +220,7 @@ struct VisitView: View {
             monitor.start()
             await loadVenueData()
             await MapStyle.waitForCanvas(of: controller.session)
+            MapStyle.applyZoomLimits(settings, to: controller.session)
             controller.session.journeyStopMarkerStyle = MapStyle.journeyStops
             if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }
             // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).
@@ -302,7 +306,7 @@ struct VisitView: View {
             }
         }
         .onChange(of: controller.navigator.isFinished) { _, isFinished in
-            if isFinished && options.contains(.prompts) { isShowingWrapUp = true }
+            if isFinished && options.contains(.journeyComplete) { isShowingWrapUp = true }
         }
         .onChange(of: incoming) { _, incoming in
             guard let incoming else { return }
@@ -968,8 +972,27 @@ private struct VisitCard: View {
             } else {
                 Image(systemName: "arrow.up")
             }
-        case .starting: ProgressView()
+        case .starting: Image(systemName: "arrow.up")
         case .finished: Image(systemName: "checkmark").font(.system(size: 16, weight: .semibold))
+        }
+    }
+}
+
+/// The spinner in the middle of the screen while the first leg is routed (PM, Monday "Spinner on map
+/// loading center", 2026-10-26). The stop card shows "Your journey" meanwhile.
+private struct StartingSpinner: View {
+    @ObservedObject var navigator: JourneyNavigator
+
+    var body: some View {
+        if navigator.activeStop == nil && !navigator.isFinished {
+            ProgressView()
+                .controlSize(.large)
+                .tint(Palette.ink)
+                .padding(24)
+                .glassSurface(RoundedRectangle(cornerRadius: 16), strength: .frosted)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false)
+                .transition(.opacity)
         }
     }
 }

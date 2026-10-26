@@ -96,4 +96,28 @@ struct ExploreCatalogTests {
         #expect(ExploreItem.symbol(for: "Learning & Engagement") == "star.circle.fill")
         #expect(ExploreItem.symbol(for: nil) == "building.columns.fill")
     }
+
+    @Test func theLegendSplitsGalleriesFromFacilitiesAndLeavesOutOtherBuildings() {
+        var art = Self.place("art", "Untitled", level: 1, amenity: "org:artwork")
+        art.isArtwork = true
+        let places = [
+            Self.place("p303", "G303 Language", level: 3, amenity: Self.thematic),
+            Self.place("perf", "Performance hall", level: 1, amenity: "org:performance"),
+            Self.place("lift", "Elevator 1", level: 1, amenity: "org:elevator"),
+            Self.place("wc", "Women's Restroom", level: 2, amenity: "org:women"),
+            Self.place("dctShop", "DCT shop", level: 1, amenity: "org:shop", placeID: Self.office),
+            art,
+        ]
+        let catalog = ExploreCatalog(
+            places: places,
+            destinations: ["g303": Self.destination("g303", name: "G303 Language", level: 3, poi: "p303")],
+            categories: [Self.thematic: "Thematic Gallery", "org:performance": "Performance Gallery", "org:elevator": "Elevator",
+                         "org:women": "Women's Restroom", "org:shop": "Shop", "org:artwork": "Artwork"],
+            levelChangerTypes: ["elevator", "staircase"]
+        )
+        #expect(catalog.legendGalleries.map(\.title) == ["Performance Gallery", "Thematic Gallery"])
+        // The POI "Elevator" names the lift already; the staircases add "Stairs".
+        #expect(catalog.legendFacilities.map(\.title) == ["Elevator", "Stairs", "Women's Restroom"])
+        #expect(catalog.spaces.first?.amenityID == Self.thematic)
+    }
 }

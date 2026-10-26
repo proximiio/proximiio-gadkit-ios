@@ -10,6 +10,10 @@
 //    "Thematic Gallery") and the description (`Gallery.destinations`).
 //  - Highlights: the artworks that list the highlight amenity in `included_amenities`.
 //  - Amenities: the POIs of an `AmenityKind` other than stairs and lifts.
+//  - The map legend: each amenity a museum POI uses, other than artworks. Galleries are the amenities
+//    of the spaces and the amenities named "… Gallery", "… Exhibition" or "Learning …"; the others are
+//    facilities, with "Elevator" and "Stairs" when the venue has lifts or staircases
+//    (`LevelChangerPlace`, features of their own, not POIs).
 //
 //  The GAD organisation also holds the DCT office. Only the POIs with the `place_id` of the gallery
 //  POIs are listed.
@@ -38,6 +42,8 @@ struct ExploreItem: Identifiable, Equatable, Sendable {
     var gallery: Gallery?
     /// A space's category, the title of its POI's amenity.
     var category: String?
+    /// The POI's amenity, for its icon in the venue data.
+    var amenityID: String?
 
     /// The points the map frames for this item: the outline of a space, else the POI.
     var framedPoints: [ProximiioCoordinate] {
@@ -56,14 +62,26 @@ struct ExploreItem: Identifiable, Equatable, Sendable {
     }
 }
 
+/// An amenity of the map legend.
+struct ExploreLegendEntry: Identifiable, Equatable, Sendable {
+    let amenityID: String
+    let title: String
+
+    var id: String { amenityID }
+}
+
 /// The Explore Museum lists of the museum.
 struct ExploreCatalog: Equatable, Sendable {
     var spaces: [ExploreItem] = []
     var highlights: [ExploreItem] = []
     var amenities: [ExploreItem] = []
+    var legendGalleries: [ExploreLegendEntry] = []
+    var legendFacilities: [ExploreLegendEntry] = []
 
-    /// `categories` maps an amenity id to its title. Pure; covered by tests.
-    init(places: [VenuePlace], destinations: [String: GalleryDestination], categories: [String: String]) {
+    /// `categories` maps an amenity id to its title; `levelChangerTypes` are the feature types of the
+    /// venue's lifts and staircases. Pure; covered by tests.
+    init(places: [VenuePlace], destinations: [String: GalleryDestination], categories: [String: String],
+         levelChangerTypes: Set<String> = []) {
         let byID = Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let museum = Self.museumPlaceID(destinations: destinations, places: byID)
         let inMuseum = { (place: VenuePlace) in museum == nil || place.placeID == museum }
@@ -74,7 +92,8 @@ struct ExploreCatalog: Equatable, Sendable {
             let line = [category, poi.details].compactMap { $0 }.joined(separator: ". ")
             return ExploreItem(
                 id: poi.id, kind: .space, title: destination.gallery.name, lines: line.isEmpty ? [] : [line],
-                level: poi.level, coordinate: destination.entry, gallery: destination.gallery, category: category
+                level: poi.level, coordinate: destination.entry, gallery: destination.gallery, category: category,
+                amenityID: poi.amenityID
             )
         }
         .sorted(by: Self.order)
@@ -95,9 +114,26 @@ struct ExploreCatalog: Equatable, Sendable {
                   let kind = AmenityKind.allCases.first(where: { $0.matches(place) }),
                   kind != .stairs, kind != .elevator else { return nil }
             return ExploreItem(id: place.id, kind: .amenity(kind), title: place.title, lines: [],
-                               level: place.level, coordinate: place.coordinate)
+                               level: place.level, coordinate: place.coordinate, amenityID: place.amenityID)
         }
         .sorted(by: Self.order)
+
+        let galleryAmenities = Set(spaces.compactMap(\.amenityID))
+        let used = Set(places.filter { !$0.isArtwork && inMuseum($0) }.compactMap(\.amenityID))
+        let entries = used.compactMap { id in categories[id].map { ExploreLegendEntry(amenityID: id, title: $0) } }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        let isGallery = { (entry: ExploreLegendEntry) in
+            galleryAmenities.contains(entry.amenityID)
+                || entry.title.range(of: #"gallery|exhibition|learning"#, options: [.regularExpression, .caseInsensitive]) != nil
+        }
+        legendGalleries = entries.filter(isGallery)
+        let titles = Set(entries.map { $0.title.lowercased() })
+        let changers = [("elevator", String(localized: "Elevator", bundle: .module)),
+                        ("staircase", String(localized: "Stairs", bundle: .module))]
+            .filter { levelChangerTypes.contains($0.0) && !titles.contains($0.1.lowercased()) }
+            .map { ExploreLegendEntry(amenityID: "level-changer-\($0.0)", title: $0.1) }
+        legendFacilities = (entries.filter { !isGallery($0) } + changers)
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     init() {}

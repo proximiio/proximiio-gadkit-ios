@@ -640,6 +640,16 @@
         }
       }
     },
+    "Facilities" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "الخدمات"
+          }
+        }
+      }
+    },
     "Floor %@" : {
       "localizations" : {
         "ar" : {
@@ -656,6 +666,16 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "اتبع طابقي"
+          }
+        }
+      }
+    },
+    "Galleries" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "القاعات"
           }
         }
       }
@@ -933,6 +953,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "الخريطة"
+          }
+        }
+      }
+    },
+    "Map legend" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "مفتاح الخريطة"
           }
         }
       }

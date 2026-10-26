@@ -19,6 +19,7 @@
 //  The gradient runs per floor: on the floor after a lift, it starts at the lift.
 //
 import Proximiio
+import MapLibre
 import ProximiioMap
 import UIKit
 
@@ -42,8 +43,9 @@ enum MapStyle {
     /// With `walkedTrail`, the route behind the visitor is not drawn. On arrival the SDK marks
     /// the whole leg as traveled, and the computed leg differs from the path the visitor
     /// walked; the trail shows the walked path instead.
-    static func options(routeMarkers: Bool = true, walkedTrail: Bool = false, followZoom: Double = GADSettings.standard.followZoom) -> MapOptions {
+    static func options(routeMarkers: Bool = true, walkedTrail: Bool = false, settings: GADSettings = .standard) -> MapOptions {
         var position = PositionStyle.venue
+        position.smoothing = settings.smoothsPosition ? .adaptive : .none
         position.dot.color = location
         position.dot.radiusPoints = 15
         // The library sizes the arrow at about 1.1 × the dot radius.
@@ -68,14 +70,14 @@ enum MapStyle {
         // The MapLibre attribution is hidden until the app has a place for licence notices
         // (DAILY-CALL R16).
         .with(chrome: MapOptions.Chrome(showsAttribution: false, allowsTilting: false))
-        options.recentreZoom = followZoom
+        options.recentreZoom = settings.followZoom
         return options
     }
 
     /// The Explore Museum map: no position dot and a camera that never follows. The visitor is not
     /// at the museum there (user, 2026-10-23).
-    static func exploreOptions() -> MapOptions {
-        var options = options(routeMarkers: false)
+    static func exploreOptions(settings: GADSettings = .standard) -> MapOptions {
+        var options = options(routeMarkers: false, settings: settings)
         options.camera = .free
         let clear = MapColor(hex: 0xFFFFFF, alpha: 0)
         options.position.dot.color = clear
@@ -165,5 +167,13 @@ enum MapStyle {
         for _ in 0..<50 where session.canvas == nil {
             try? await Task.sleep(for: .milliseconds(100))
         }
+    }
+
+    /// Applies `GADSettings.minimumZoom` and `maximumZoom` to the canvas of `session`. The map
+    /// library has no zoom limit of its own; MapLibre keeps the camera inside these levels.
+    @MainActor static func applyZoomLimits(_ settings: GADSettings, to session: ProximiioMapSession) {
+        guard let mapView = session.canvas?.mapView else { return }
+        if let minimum = settings.minimumZoom { mapView.minimumZoomLevel = minimum }
+        if let maximum = settings.maximumZoom { mapView.maximumZoomLevel = maximum }
     }
 }

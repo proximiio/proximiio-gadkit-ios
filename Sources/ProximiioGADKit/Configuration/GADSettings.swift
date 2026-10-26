@@ -61,6 +61,15 @@ public struct GADSettings: Equatable, Sendable {
 
     /// Zoom of "Centre on me" and of the first position.
     public var followZoom: Double = 21
+    /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
+    /// levels; the maps apply it once their canvas exists.
+    public var minimumZoom: Double?
+    /// The farthest the visitor can zoom in, or `nil` for the map library's limit.
+    public var maximumZoom: Double?
+    /// `false` draws the position dot on each fix. `true` slides it toward each fix (the map
+    /// library's adaptive smoothing), which shows a fix a moment later (PM, Monday "Visual delay",
+    /// 2026-10-23).
+    public var smoothsPosition = false
     /// The smallest width and height in metres of the area the map shows for an amenity picked in
     /// the menu, so a near amenity does not zoom the map in further than this.
     public var amenityFramingMinimumMeters: Double = 40
@@ -119,6 +128,9 @@ public struct GADSettings: Equatable, Sendable {
     /// authorization once a wristband is connected. `ProximiMap` then sets the delegate of
     /// `UNUserNotificationCenter`; a host app with its own delegate turns this off.
     public var postsGeofenceNotifications = true
+    /// With `postsGeofenceNotifications`: `false` posts no geofence notification, while the
+    /// authorization and the foreground banners of the host app's own notifications stay.
+    public var notifiesGeofenceEvents = true
 
     // MARK: Venue data
 

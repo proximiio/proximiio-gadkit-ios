@@ -157,6 +157,8 @@ public enum ProximiMapEvent: Equatable, Sendable {
     case skipRequested(ProximiStop)
     case stopSkipped(ProximiStop)
     case skipCancelled(ProximiStop)
+    /// Not sent since 1.13.0: the list has no "Undo skip" (PM, Monday "Undo skip removed", 2026-10-23).
+    @available(*, deprecated, message: "Not sent since 1.13.0: the list has no Undo skip.")
     case skipUndone(ProximiStop)
     /// The visitor picked an amenity on the map. A card shows it with "Go here".
     case amenitySelected(ProximiStop)

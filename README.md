@@ -220,9 +220,10 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 |---|---|---|
 | `.bottomBar` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
 | `.background` | The package's background image around the map card. | Transparent. |
-| `.prompts` | "Skip this artwork?" ("Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it), "You've left your route" (the route stays until "Show the route from here"), "Probably at …", "Change your route?", "Leave the tour here" (with `onClose`) and Journey Complete. | No prompt. A swipe reports `skipRequested`; the route follows a visitor who left it and `offRoute` reports it; an uncertain position reports `positionUncertain`; "Go here" on an amenity starts the detour; `journeyFinished` reports the end. |
+| `.prompts` | "Skip this artwork?" ("Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it), "You've left your route" (the route stays until "Show the route from here"), "Probably at …", "Change your route?" and "Leave the tour here" (with `onClose`). | No prompt. A swipe reports `skipRequested`; the route follows a visitor who left it and `offRoute` reports it; an uncertain position reports `positionUncertain`; "Go here" on an amenity starts the detour; `journeyFinished` reports the end. |
 | `.progress` | The view moves the journey on and writes it to the binding: an artwork is visited when the visitor enters its geofence (`artworkReached`) or, in a personalised journey, stays at it out of order (`artworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and writes nothing. |
 | `.liveActivity` | The journey's Live Activity. The widget extension needs `ProximiioGADLiveActivity`. | No Live Activity. |
+| `.journeyComplete` | Journey Complete when the last stop is done. | `journeyFinished` reports the end; nothing shows. |
 
 ### ProximiJourney
 
@@ -271,7 +272,7 @@ With `.progress` the view also writes:
 `nextStop`, `stopNearby`, `positionUncertain`, `stopPlaceDeleted`, `skipRequested`, the amenity and
 detour events, `journeyResumed`, `offRoute`, `backOnRoute`, `journeyFinished`, the floor without
 positioning events, `modeChanged`, `recentred` and `accessibleRoutesChanged`; with `.prompts` also
-`stopSkipped` and `skipCancelled`; with `.prompts` and `.progress` also `skipUndone`; with `.progress`
+`stopSkipped` and `skipCancelled`; with `.progress`
 also `artworkReached` and `artworkVisitedOutOfOrder`; with `.bottomBar`, `.prompts` and `onClose` also
 the exit events. Screen, wristband,
 arrival, geofence and `journeyChanged` events come only from `ProximiMap`; geofence enter and exit
@@ -492,9 +493,13 @@ is not at the museum there: the map has no position dot, no route, and its camer
   lists the museum's levels. The map opens on the lowest level with a gallery, framed on the museum.
 - The galleries of the shown level are filled with the level colour (`Palette.level(_:)`). Artworks
   have no marker.
-- At the bottom: the list button and the tabs Spaces, Highlights and Amenities. A tab opens its list
-  over the map, grouped by level; the list button opens the last one. A second tap, or a drag down on
-  the list's top, closes it.
+- At the bottom: the legend button and the tabs Spaces, Highlights and Amenities. A tab opens its list
+  over the map, grouped by level. The legend button opens the map legend: the facilities and the
+  galleries the museum's POIs use, with their map icons, and "Elevator" and "Stairs" when the venue
+  has lifts or staircases. A second tap, or a drag down on the panel's
+  top, closes it.
+- Icons: the design's glyph of an amenity kind (restrooms, café, help desk, prayer room, shop,
+  stairs, lift), else the icon of the POI's amenity in the venue data, the icon the map draws.
   - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline, the POI
     with the same `remote_id` the name, the level, the category (its amenity, such as "Thematic
     Gallery") and the description.
@@ -531,13 +536,13 @@ position, search and routes.
 | `positionUncertain(ProximiStop)` | `ProximiMapView` without `.prompts`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.prompts` the view asks "Probably at …" instead. |
 | `artworkReached(ProximiStop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, or a fix lies in it, or the SDK counts the visitor inside it (`enteredGeofenceIds`, also for a journey opened inside it): the stop is done and the route leads to the next stop. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
 | `artworkVisitedOutOfOrder(ProximiStop)` | Personalised journeys only: the visitor stayed at an artwork further down the journey. It counts as visited, and the stops ahead are ordered again. A curated tour ignores such an artwork. |
-| `skipRequested`, `stopSkipped`, `skipCancelled`, `skipUndone` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it", "Undo skip". `ProximiMapView` without `.prompts` sends only `skipRequested`. |
+| `skipRequested`, `stopSkipped`, `skipCancelled` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it". `ProximiMapView` without `.prompts` sends only `skipRequested`. `skipUndone` is not sent since 1.13.0. |
 | `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
 | `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Change your route?" confirmed; the detour reached (`completed`) or left. |
 | `journeyResumed` | "Resume your Journey" or "Show the route from here". |
 | `offRoute(duration:)`, `backOnRoute` | The visitor has been off the route for `offRouteSeconds`; the visitor is on the route again. |
-| `journeyFinished` | Every stop is visited or skipped. Journey Complete shows. |
+| `journeyFinished` | Every stop is visited or skipped. Journey Complete shows with `ProximiMap` and with `ProximiMapView.Options.journeyComplete`. |
 | `floorWithoutPositioningEntered(level:)`, `floorWithoutPositioningLeft(level:)` | See "Floors without positioning". |
 | `modeChanged(VisitMode)`, `recentred`, `accessibleRoutesChanged(Bool)` | The Map / List toggle, "Centre on me", the accessible routes button. |
 | `exitRequested`, `exitConfirmed`, `exitCancelled` | Back during a journey in progress (a stop visited or skipped, not finished), "Leave the tour", "Carry on". |
@@ -574,6 +579,8 @@ let configuration = GADConfiguration(
 | `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
+| `minimumZoom`, `maximumZoom` | `nil` | The zoom levels the visitor cannot go beyond on every map of the package, or the map library's limits. |
+| `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
 | `galleryFirstMarginMeters` | 50 m | Gallery first: an artwork farther than this outside its gallery's geofence, or on another floor, is routed to directly. |
 | `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
@@ -585,6 +592,7 @@ let configuration = GADConfiguration(
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
 | `liveActivityMinimumInterval` | 5 s | The shortest gap between two Live Activity updates of the instruction. |
 | `postsGeofenceNotifications` | `true` | A notification for every enter and exit of a geofence with a name, and the notification authorization request once a wristband is connected. The package posts no "next stop" notification; a host app can post one for `ProximiMapEvent.stopNearby`. It sets the `UNUserNotificationCenter` delegate, which shows them in the foreground. A host app with its own delegate turns it off. |
+| `notifiesGeofenceEvents` | `true` | With `postsGeofenceNotifications`: `false` posts no geofence notification; the authorization and the foreground banners stay. |
 | `venueDataRefreshInterval` | 300 s | Deprecated, no effect since 1.8.0. The SDK's `ProximiioConfiguration.syncInterval` sets how often changes arrive. See "Venue data changes". |
 
 ## Artwork details in the list
@@ -756,6 +764,33 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.13.0 (2026-10-26)
+
+No change for host apps' code. The behaviour changes below need a look.
+
+Added:
+
+- `ProximiMapView.Options.journeyComplete`: Journey Complete when the last stop is done. Before, it came
+  with `.prompts` (Nagarro, Monday "Journey finished view", 2026-10-26). `.all` includes it.
+- `GADSettings.minimumZoom` and `maximumZoom` (default `nil`): zoom limits for every map of the package.
+- `GADSettings.smoothsPosition` (default `false`) and `notifiesGeofenceEvents` (default `true`).
+- The Explore Museum map legend: the button left of the tabs opens it (PM, Monday "Explore Museum: Map
+  legend missing"). The lists, the cards and the legend use the amenity icons of the venue data, the
+  icons the map draws (PM, Monday "Explore Museum: thematic gallery icon").
+
+Changed:
+
+- `.prompts` no longer shows Journey Complete; add `.journeyComplete` to keep it.
+- The position dot is drawn on each fix, not slid toward it (PM, Monday "Visual delay", 2026-10-23).
+  `smoothsPosition = true` restores the sliding.
+- While the first leg is routed, a spinner shows in the middle of the screen; the stop card shows an
+  arrow (PM, Monday "Spinner on map loading center", 2026-10-26).
+
+Removed:
+
+- "Undo skip" in the journey list (PM, Monday "Undo skip removed", 2026-10-23).
+  `ProximiMapEvent.skipUndone` is deprecated and not sent.
 
 ### 1.12.0 (2026-10-24)
 
