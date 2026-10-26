@@ -173,7 +173,7 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// The visitor is on the route again after `offRoute`.
     case backOnRoute
     /// Every stop is visited or skipped. `ProximiMap`, and `ProximiMapView` with
-    /// `Options.prompts`, show Journey Complete.
+    /// `Options.journeyComplete`, show Journey Complete.
     case journeyFinished
     /// The map shows a floor without positioning and does not follow the visitor.
     case floorWithoutPositioningEntered(level: Int)
