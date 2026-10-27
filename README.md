@@ -602,7 +602,7 @@ follow.
   - Amenities: restrooms, café, help desk, prayer room and shop. Stairs and lifts are not listed.
   - Only the museum's POIs are listed: the `place_id` of the gallery POIs. The GAD organisation also
     holds the DCT office.
-- The map draws no amenity icons: the Amenities list and the red marker show them. A gallery's icon
+- The map draws no amenity icons: the Amenities list and the callout show them. A gallery's icon
   is on a circle of white at 30 % with a white border; an icon in the venue data without a circle of
   its own shows the design best. The circle has the data icon's size in points, which the style's
   `icon-size` scales: a 120 px icon at 0.2 is 24 pt, as in MapTap.
@@ -612,8 +612,7 @@ follow.
   31 % of the width and 75 % of the height of the map. A card over the map names it, with its icon,
   its description (else a gallery's category) and its level; a line leads from the card to the place,
   drawn as a black dot in a ring with its title. The line follows the place when the visitor moves the
-  map. With a gallery's card open, the other galleries are lighter. An amenity gets the red marker
-  with its icon.
+  map. With a gallery's card open, the other galleries are lighter. An amenity gets the same black dot.
 - The map labels follow `AppleLanguages` at once when the app changes it while it runs.
 - The design's About the Building and Collections tabs are not in the package: their content is not in
   the venue data.
@@ -881,6 +880,15 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.15.4 (2026-10-27)
+
+No change for host apps' code.
+
+Changed:
+
+- Explore Museum: a selected amenity is the black dot in a ring, as a gallery and an artwork, not the
+  red marker with its icon (PM, Monday "Explore Museum view: gallery POI view", 2026-10-27).
 
 ### 1.15.3 (2026-10-27)
 

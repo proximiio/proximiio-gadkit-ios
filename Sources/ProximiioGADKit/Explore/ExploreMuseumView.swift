@@ -378,7 +378,7 @@ struct ExploreMuseumView: View {
                                  facilities: .facilities(amenities))
         mapLayers.updateLevelChangers(levelChangers)
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
-        // amenities: the Amenities list and the red marker show them (PM, Monday "Explore museum view:
+        // amenities: the Amenities list and the callout show them (PM, Monday "Explore museum view:
         // default map view", 2026-10-26).
         let amenityPlaces = places.filter { place in !place.isArtwork && AmenityKind.allCases.contains { $0.matches(place) } }
         hiddenFeatureIDs = Set(levelChangers.map(\.id)).union(places.filter(\.isArtwork).map(\.id)).union(amenityPlaces.map(\.id))
@@ -423,18 +423,14 @@ struct ExploreMuseumView: View {
         session.hiddenFeatureIDs = hiddenFeatureIDs.union(selected.map { [$0.id] } ?? [])
     }
 
-    /// The galleries of the shown floor and the marker of a selected amenity.
+    /// The galleries of the shown floor. A selected place, an amenity too, is the callout's black dot
+    /// (PM, Monday "Explore Museum view: gallery POI view", 2026-10-27: no red marker).
     private func applyMapLayers() {
         let focus = selected?.kind == .space ? selected?.id : nil
         let fills = catalog.spaces.compactMap { item -> JourneyMapLayers.GalleryFill? in
             item.gallery.map { JourneyMapLayers.GalleryFill(gallery: $0, isDestination: focus == nil || focus == item.id) }
         }
         mapLayers.update(fills: fills, level: level)
-        if let selected, case .amenity(let kind) = selected.kind {
-            mapLayers.updateHighlight(JourneyMapLayers.Highlight(coordinate: selected.coordinate, level: selected.level, icon: kind.icon))
-        } else {
-            mapLayers.updateHighlight(nil)
-        }
     }
 }
 
