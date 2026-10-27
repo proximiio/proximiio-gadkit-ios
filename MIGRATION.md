@@ -1,8 +1,8 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.10.0 uses SDK
-6.0.0-beta.64 and Map 6.0.0-beta.51.
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.15.0 uses SDK
+6.0.0-beta.66 and Map 6.0.0-beta.54.
 
 Each change has a mark:
 
@@ -20,7 +20,7 @@ Each change has a mark:
 | SDK 6.0.0-beta.59 | `BlueiotBindingError` has three new cases (relay-api 0.11): `swapBandsApart(requestID:)` (code 18), `swapAtReception(requestID:)` (code 19) and `signingUnavailable(retryAfter:requestID:)` (code 20). Before, the first two arrived as `.unexpected(code:status:message:requestID:)` and the third as `.server(status: 503, requestID:)`. | An exhaustive `switch` over `BlueiotBindingError` without `default` does not compile. Add the three cases. The SDK's texts: "Hold your current wristband next to the new one and scan again.", "Your wristband isn't reachable. Please swap it at the reception desk." and, for `signingUnavailable`, a retry after `retryAfter` seconds. | **Required** with an exhaustive `switch` |
 | SDK 6.0.0-beta.64, Map 6.0.0-beta.51 | New cases `BlueiotBindingSignal.privacyZone(since:)`, `ProximiioDiagnostics.NoPositionReason.privacyZone` and `PositionStage.privacyZone`. | An exhaustive `switch` over these enums without `default` does not compile. Add the case. | **Required** with an exhaustive `switch` |
 
-The other versions up to SDK 6.0.0-beta.64 and Map 6.0.0-beta.51 have no source break.
+The other versions up to SDK 6.0.0-beta.66 and Map 6.0.0-beta.54 have no source break.
 `ProximiioConfiguration.init` gains the defaulted `geofenceExitDelay:` in SDK 6.0.0-beta.63; existing
 calls compile unchanged.
 
@@ -46,6 +46,11 @@ calls compile unchanged.
 | Map 6.0.0-beta.48 | A venue feature whose coordinates are not in degrees is not drawn. Map 6.0.0-beta.45 ended the app on such a feature when it framed the venue. | | Info |
 | SDK 6.0.0-beta.64 | The binding reads relay-api's `private` (a band silent in a privacy zone) as `.privacyZone(since:)`; older SDKs read it as `.ok`. With `withholdsPositionsInPrivacyZones` on, `positions()` yields no fix while private and positioning stays available. | Turn the option on and pass the binding's signal with `setPositioningSourcePrivate(since:)` (README "Privacy zones"). | **Required** for the privacy zones |
 | Map 6.0.0-beta.51 | While the SDK is private, the dot stays grey at the last fix before the zone, and `JourneyNavigator` takes no fix: no off-route, re-route, deviation, passed stop or arrival. | | Info |
+| SDK 6.0.0-beta.65 | `authenticate()` returns without a connection on a phone where the API accepted the token before (`allowsOfflineStart`, on by default). `tokenStatus` is then `.unverified`: positioning runs on the stored data, nothing is synced or uploaded. `loadRouteNetwork()` still needs the network. | A "no connection" screen tied to the `authenticate()` error no longer shows on such a phone. Install the route network with `loadCachedRouteNetwork()` when `tokenStatus` is not `.verified`. | **Check** |
+| SDK 6.0.0-beta.65 | `authenticate()` gives up after 30 s (before: up to about 2 min on a network that does not answer). | | Info |
+| SDK 6.0.0-beta.66 | When the API has refused the token for at least two hours (three checks), the SDK emits `syncFailed(reason: "unauthorized")`, stops, returns to `.idle`, deletes the venue data, the map style, the amenities and the waiting uploads, and sets `tokenStatus` to `.rejected`. `start()` throws until an `authenticate()` with an accepted token succeeds. A shorter refusal keeps the data (`.unverified`). | Close `ProximiMapView` and show the app's failure screen. After a new `authenticate()` and `start()`, open a new view. | **Required** |
+| Map 6.0.0-beta.54 | On that refusal the map drops the venue, the route, the stops and the dot, and a running `JourneyNavigator` ends. Its `journey` stays. | | Info |
+| SDK 6.0.0-beta.66 | Two amenities that differ only in `metadata` or `title_i18n` are no longer equal. A refresh that changes only them names `.amenities` in `venueDataChanges()`. | | Info |
 
 ### Added
 
@@ -63,6 +68,12 @@ All Info.
   `Proximiio.setPositioningSourcePrivate(since:)`, `privacyZoneStateChanges()`, `privacyZoneState` and
   `PrivacyZoneState`.
 - Map 6.0.0-beta.51: `PositionStyle.privacy` and `PositionPrivacyStyle`.
+- Map 6.0.0-beta.52: `MapOptions.minimumZoom`, `maximumZoom` and `with(minimumZoom:maximumZoom:)`.
+  ProximiioGADKit sets them from `GADSettings.minimumZoom` and `maximumZoom`.
+- SDK 6.0.0-beta.65: `ProximiioConfiguration.allowsOfflineStart`, `Proximiio.tokenStatus` and
+  `Proximiio.TokenStatus`, data-only bundled seeds from `proximiio-offline-fetch`.
+- SDK 6.0.0-beta.66: `ProximiioAmenity.metadata`, `title(language:)`, `titleTranslations` and
+  `init(id:title:category:icon:details:metadata:titleTranslations:)`.
 - Map 6.0.0-beta.46: `JourneyNavigator.remove(stopID:)`, `replace(_:)`, `update(to:)`,
   `routeNetworkChanged()` and the initialisers with `hostJourney:`; the same on `JourneyPlan`;
   `JourneyUpdate`; `ProximiioMapSession.reloadVenueData()`.
@@ -86,6 +97,9 @@ All Info.
 - Map 6.0.0-beta.46: a leg still being routed is no longer dropped by an edit that routes nothing.
 - Map 6.0.0-beta.48: a floor level that is NaN, an infinity or beyond about 4.6 × 10¹⁶ no longer ends
   the app.
+- Map 6.0.0-beta.52: a map opened after the last fix shows the dot.
+- SDK 6.0.0-beta.65: `requestPermissions(always: true)` always returns. A missing Info.plist usage key
+  no longer ends the app; the SDK leaves that input off and logs the key.
 
 The SDK and Map changelogs of these versions have the full entries.
 
@@ -106,10 +120,10 @@ The SDK and Map changelogs of these versions have the full entries.
 
 ### Step 1: Dependencies (Required)
 
-- Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.10.0`,
+- Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.15.0`,
   and the product `ProximiioGADKit` to the app target.
-- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.64` and `proximiio-map-ios-binary` to exactly
-  `6.0.0-beta.51`. ProximiioGADKit pins these versions; with other versions the packages do not
+- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.66` and `proximiio-map-ios-binary` to exactly
+  `6.0.0-beta.54`. ProximiioGADKit pins these versions; with other versions the packages do not
   resolve.
 - ProximiioGADKit does not re-export the SDK and the Map. Files that use their types keep
   `import Proximiio` and `import ProximiioMap`. The file that shows the map adds
@@ -118,8 +132,9 @@ The SDK and Map changelogs of these versions have the full entries.
 ### Step 2: SDK and Map changes (Required / Check)
 
 Section 1: the `BlueiotBindingError` and privacy-zone cases (**Required** with an exhaustive `switch`),
-the headers on the on-premises proxy, the privacy details and the privacy zones (**Required**), `.sessionLost`, `levelChanges`,
-`mapStyle()`, the `syncEvents()` burst, `journeys()` and the geofence exit delay (**Check**).
+the headers on the on-premises proxy, the privacy details, the privacy zones and the refused token
+(**Required**), `.sessionLost`, `levelChanges`, `mapStyle()`, the `syncEvents()` burst, `journeys()`,
+the geofence exit delay and the offline start (**Check**).
 
 ### Step 3: Languages (Check)
 

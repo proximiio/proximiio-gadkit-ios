@@ -334,7 +334,6 @@ struct ExploreMuseumView: View {
 
     private func start() async {
         await MapStyle.waitForCanvas(of: session)
-        MapStyle.applyZoomLimits(venue.settings, to: session)
         session.onFeatureTap = { identifiers, coordinate in
             tapped(identifiers, at: ProximiioCoordinate(latitude: coordinate.latitude, longitude: coordinate.longitude))
         }

@@ -218,7 +218,6 @@ struct VisitView: View {
             monitor.start()
             await loadVenueData()
             await MapStyle.waitForCanvas(of: controller.session)
-            MapStyle.applyZoomLimits(settings, to: controller.session)
             controller.session.journeyStopMarkerStyle = MapStyle.journeyStops
             if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }
             // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).

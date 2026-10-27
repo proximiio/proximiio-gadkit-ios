@@ -35,8 +35,8 @@ repository. From 1.0.0 a minor or patch version does not break the public API. N
 cases come in minor versions; a `switch` with `default` keeps compiling. The [Changelog](#changelog)
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.64 and `proximiio-map-ios-binary`
-6.0.0-beta.51 exactly. The host app needs no dependency on them. A host app that also depends on
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.66 and `proximiio-map-ios-binary`
+6.0.0-beta.54 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 A host app that draws its journey with the map library's `ProximiioMapView` and its own
@@ -146,6 +146,16 @@ starts positioning, loads the route network and attaches the wristband's positio
 reporting is on. Call it at launch: the map style and the venue data are then loaded before the first
 map screen. The package contacts only `apiBaseURL` and the relay-api host.
 
+Without a connection, `start()` succeeds on a phone where the API accepted the token before
+(`ProximiioConfiguration.allowsOfflineStart`, SDK 6.0.0-beta.65). The route network then comes from
+the features stored on the phone. The SDK syncs and uploads nothing until the API accepts the token
+again. On a first launch without a connection, `start()` throws `startFailed`.
+
+When the API has refused the token for at least two hours, the SDK stops and deletes the venue data
+on the phone (SDK 6.0.0-beta.66). `ProximiMap` then closes its screens and `status` becomes
+`.failed(.startFailed)`. The stored journey is kept. `start()` starts again once the API accepts the
+token.
+
 ## ProximiMapView
 
 `ProximiMapView` is the journey map as a UI component on an SDK the host app has started: the Map /
@@ -200,7 +210,10 @@ The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
-- uses `proximiio-sdk-ios-binary` 6.0.0-beta.64, the version this package pins;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.66, the version this package pins;
+- closes the view when the SDK stops on a refused token (`syncFailed(reason: "unauthorized")`,
+  `tokenStatus == .rejected`). The map drops the venue and the navigator ends. After a new successful
+  `authenticate()` and `start()`, a new view draws the journey again;
 - turns on the SDK's privacy-zone option and passes the wristband's privacy signal to the SDK (see
   [Privacy zones](#privacy-zones));
 - lays the view out and closes it; draws the background and the bottom bar (for example the audio
@@ -487,11 +500,11 @@ prayer room. These rooms have no positioning anchors, so the wristband falls sil
   silent with its last position inside a privacy zone, or within the site's `privacy_margin_m` (3 m by
   default), gets the signal `private` instead of `lost`. While private, relay-api does not close the
   binding for silence (`TIMEOUT`) or for leaving the venue (`LEFT_VENUE`). The other end reasons stay.
-- The SDK (6.0.0-beta.64) is private (`Proximiio.privacyZoneState`, `privacyZoneStateChanges()`)
+- The SDK (since 6.0.0-beta.64) is private (`Proximiio.privacyZoneState`, `privacyZoneStateChanges()`)
   while its last fix is inside a privacy zone or the relay says `private`. With
   `ProximiioConfiguration.withholdsPositionsInPrivacyZones`, `positions()` yields no fix while private,
   and positioning stays available.
-- The map (6.0.0-beta.51) holds the dot at the last fix before the zone, grey
+- The map (since 6.0.0-beta.51) holds the dot at the last fix before the zone, grey
   (`PositionStyle.privacy`), with the accuracy ring of that fix. While private the journey reports no
   off-route, re-route or arrival.
 - The journey screen reports `trackingChanged(.privacyZone)` and no `lostPlace` or
@@ -608,7 +621,7 @@ let configuration = GADConfiguration(
 | `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
-| `minimumZoom`, `maximumZoom` | `nil` | The zoom levels the visitor cannot go beyond on every map of the package, or the map library's limits. |
+| `minimumZoom`, `maximumZoom` | `nil` | The zoom levels the visitor cannot go beyond on every map of the package, or the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
 | `mapLoadingTimeout` | 20 s | The longest time a map shows its spinner while the venue's features are not on the map. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
@@ -795,13 +808,35 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
-### Unreleased
+### 1.15.0 (2026-10-27)
+
+Breaking:
+
+- SDK 6.0.0-beta.66 and Map 6.0.0-beta.54. A host app that depends on these packages moves to the
+  same versions. No source change: the SDK and the map add API only. SDK 6.0.0-beta.65 is not for end
+  users (it deletes the venue data at the first refused token); 6.0.0-beta.66 replaces it.
 
 Added:
 
 - `ProximiMapEvent.stopOrderChanged(ProximiJourney)`: `ProximiMapView` with `.progress` reports a new order
   of the stops (Nagarro, 2026-10-26). A `switch` over `ProximiMapEvent` with `default` keeps compiling.
 - README "The navigator" → "Any change of the journey": `stopOrderChanged` and the navigator's `journey`.
+- `ProximiMap.start()` without a connection, on a phone where the API accepted the token before. The
+  route network comes from the stored features. See [ProximiMap](#proximimap).
+
+Changed:
+
+- A token the API has refused for at least two hours: the SDK deletes the venue data, `ProximiMap`
+  closes its screens and `status` becomes `.failed(.startFailed)`. `start()` starts again.
+  `ProximiMapView`: the host app closes the view (see [ProximiMapView](#proximimapview)).
+- `GADSettings.minimumZoom` and `maximumZoom` are `MapOptions.minimumZoom` and `maximumZoom`. The
+  opening frame, "Centre on me", the follow and the journey's leg frames keep to them too.
+
+From SDK 6.0.0-beta.65 and 6.0.0-beta.66, without a change in this package:
+
+- `authenticate()` gives up after 30 s.
+- `ProximiioAmenity.metadata`, `title(language:)` and `titleTranslations` (`title_i18n`). The package
+  does not read them yet.
 
 ### 1.14.0 (2026-10-26)
 

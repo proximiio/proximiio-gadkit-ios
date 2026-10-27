@@ -62,7 +62,7 @@ public struct GADSettings: Equatable, Sendable {
     /// Zoom of "Centre on me" and of the first position.
     public var followZoom: Double = 21
     /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
-    /// levels; the maps apply it once their canvas exists.
+    /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
     public var minimumZoom: Double?
     /// The farthest the visitor can zoom in, or `nil` for the map library's limit.
     public var maximumZoom: Double?

@@ -161,9 +161,16 @@ public final class ProximiMap {
         status = .starting
         runSession()
         do {
-            let venue = try await VenueService.start(configuration: configuration, binding: session.binding)
-            self.venue = venue
-            await session.forwardPrivacy(to: venue.sdk)
+            let venue: VenueService
+            if let stopped = self.venue {
+                // The SDK stopped on a refused token (`tokenRefused()`).
+                try await stopped.restart()
+                venue = stopped
+            } else {
+                venue = try await VenueService.start(configuration: configuration, binding: session.binding)
+                self.venue = venue
+                await session.forwardPrivacy(to: venue.sdk)
+            }
             await loadPlaces(from: venue)
             reconcileStoredJourney()
             arrival.check(places: places)
@@ -181,6 +188,12 @@ public final class ProximiMap {
                 for await event in await venue.sdk.geofenceEvents() {
                     guard let self else { return }
                     if let mapped = Self.event(for: event) { self.emit(mapped) }
+                }
+            })
+            tasks.append(Task { [weak self] in
+                for await event in await venue.sdk.syncEvents() where Self.isTokenRefusal(event) {
+                    self?.tokenRefused()
+                    return
                 }
             })
             if configuration.settings.postsGeofenceNotifications {
@@ -204,6 +217,29 @@ public final class ProximiMap {
         let features = await venue.sdk.features()
         places = VenuePlace.all(in: features)
         galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
+    }
+
+    /// The API kept refusing the token for at least two hours. The SDK has stopped and deleted the
+    /// venue data, and the maps have dropped the venue (SDK 6.0.0-beta.66, map 6.0.0-beta.54).
+    /// Closes the screens and reports `startFailed`. The stored journey is kept; `start()` starts
+    /// the same SDK again once the API accepts the token.
+    private func tokenRefused() {
+        FieldLog.log("map: the API refused the token; the SDK stopped and deleted the venue data")
+        tasks.forEach { $0.cancel() }
+        tasks = []
+        venue?.data.onChange = nil
+        close()
+        places = []
+        galleries = []
+        startTask = nil
+        status = .failed(.startFailed("The API refused the application token."))
+    }
+
+    /// `true` for the SDK's announcement of a refused token: `syncFailed` with `"unauthorized"`.
+    /// Pure; covered by tests.
+    nonisolated static func isTokenRefusal(_ event: SyncEvent) -> Bool {
+        if case .syncFailed(let reason) = event { return reason == "unauthorized" }
+        return false
     }
 
     /// The venue data changed on the backend.

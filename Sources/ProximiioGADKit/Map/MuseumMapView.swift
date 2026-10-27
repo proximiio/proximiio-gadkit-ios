@@ -70,7 +70,6 @@ struct MuseumMapView: View {
                 session.recentre()
             }
             await MapStyle.waitForCanvas(of: session)
-            MapStyle.applyZoomLimits(venue.settings, to: session)
             session.guidanceRules = .venueWalk
             session.onFeatureTap = { identifiers, _ in
                 if let place = VenuePlace.place(under: identifiers, in: places) {

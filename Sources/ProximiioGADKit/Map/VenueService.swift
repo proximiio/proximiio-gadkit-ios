@@ -74,12 +74,13 @@ final class VenueService {
     ///
     /// The provider is attached once. It follows whichever session `binding` holds, so a
     /// bind, a take-over or an ended visit needs no re-attach.
+    ///
+    /// Without a connection the SDK starts on the data stored on the phone when the API accepted
+    /// the token on this phone before (`tokenStatus == .unverified`, SDK 6.0.0-beta.65).
     static func start(configuration backend: GADConfiguration, binding: BlueiotWristbandBinding) async throws -> VenueService {
         let sdk = try Proximiio(configuration: configuration(for: backend))
         _ = await sdk.requestPermissions()
-        _ = try await sdk.authenticate()
-        try await sdk.start()
-        _ = try await sdk.loadRouteNetwork()
+        try await authenticateAndStart(sdk)
         let venue = VenueService(sdk: sdk, binding: binding, settings: backend.settings)
         await venue.attachBinding()
         venue.cacheMapStyle()
@@ -102,6 +103,36 @@ final class VenueService {
             }
         }
         return venue
+    }
+
+    /// Authenticates, starts positioning and installs the route network. Before the API has
+    /// accepted the token in this run, the network comes from the stored features first; otherwise
+    /// it is downloaded, and the stored features are the fallback.
+    private static func authenticateAndStart(_ sdk: Proximiio) async throws {
+        _ = try await sdk.authenticate()
+        try await sdk.start()
+        let token = await sdk.tokenStatus
+        if token != .verified, await sdk.loadCachedRouteNetwork() > 0 {
+            FieldLog.log("venue: started on the stored data · token \(token)")
+            return
+        }
+        do {
+            _ = try await sdk.loadRouteNetwork()
+        } catch {
+            guard await sdk.loadCachedRouteNetwork() > 0 else { throw error }
+            FieldLog.log("venue: route network from the stored features: \(error.localizedDescription)")
+        }
+    }
+
+    /// Starts the SDK again after it stopped on a refused token (`tokenStatus == .rejected`). It
+    /// throws until the API accepts the token again. The binding's provider is attached again.
+    func restart() async throws {
+        try await Self.authenticateAndStart(sdk)
+        await attachBinding()
+        cacheMapStyle()
+        // The stop ended the stream of the venue data changes.
+        data.stop()
+        await data.start()
     }
 
     /// A venue on the host app's started SDK. Installs the route network from the SDK's feature

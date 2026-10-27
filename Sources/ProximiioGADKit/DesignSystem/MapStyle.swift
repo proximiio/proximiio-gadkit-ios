@@ -71,7 +71,7 @@ enum MapStyle {
         // (DAILY-CALL R16).
         .with(chrome: MapOptions.Chrome(showsAttribution: false, allowsTilting: false))
         options.recentreZoom = settings.followZoom
-        return options
+        return options.with(minimumZoom: settings.minimumZoom, maximumZoom: settings.maximumZoom)
     }
 
     /// The Explore Museum map: no position dot and a camera that never follows. The visitor is not
@@ -167,13 +167,5 @@ enum MapStyle {
         for _ in 0..<50 where session.canvas == nil {
             try? await Task.sleep(for: .milliseconds(100))
         }
-    }
-
-    /// Applies `GADSettings.minimumZoom` and `maximumZoom` to the canvas of `session`. The map
-    /// library has no zoom limit of its own; MapLibre keeps the camera inside these levels.
-    @MainActor static func applyZoomLimits(_ settings: GADSettings, to session: ProximiioMapSession) {
-        guard let mapView = session.canvas?.mapView else { return }
-        if let minimum = settings.minimumZoom { mapView.minimumZoomLevel = minimum }
-        if let maximum = settings.maximumZoom { mapView.maximumZoomLevel = maximum }
     }
 }

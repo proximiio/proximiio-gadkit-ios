@@ -50,6 +50,22 @@ struct ProximiMapTests {
         #expect(notice.contains("another phone"))
     }
 
+    @Test func onlyAnUnauthorizedSyncFailureIsATokenRefusal() {
+        #expect(ProximiMap.isTokenRefusal(.syncFailed(reason: "unauthorized")))
+        #expect(!ProximiMap.isTokenRefusal(.syncFailed(reason: "timeout")))
+        #expect(!ProximiMap.isTokenRefusal(.syncCompleted(applied: 3)))
+    }
+
+    @Test func mapOptionsKeepToTheZoomRangeOfTheSettings() {
+        var settings = GADSettings.standard
+        settings.minimumZoom = 16
+        settings.maximumZoom = 20
+        #expect(MapStyle.options(settings: settings).minimumZoom == 16)
+        #expect(MapStyle.options(settings: settings).maximumZoom == 20)
+        #expect(MapStyle.exploreOptions(settings: settings).maximumZoom == 20)
+        #expect(MapStyle.options().minimumZoom == nil)
+    }
+
     @Test func visitEventsBecomeHostEventsWithTheArtworkID() {
         let reached = ProximiMap.event(for: .artworkReached(stop("poi-a")), places: Self.places)
         #expect(reached == .artworkReached(ProximiStop(id: "poi-a", title: "poi-a", artworkID: "GAD.2010.00033", level: 1)))
