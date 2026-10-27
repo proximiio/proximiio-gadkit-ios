@@ -44,6 +44,13 @@
 //  curated tour, and a journey without `ProximiMapView.Options.offRoutePrompt`, is routed again from
 //  the visitor (`.automatic`).
 //
+//  The warning stays open for `GADSettings.offRouteWarningSeconds`, unless the visitor closes it; the
+//  routing after it does not close it (PM, Monday "Personalized tour: off-route and re-route behaviour",
+//  2026-10-27). A visitor on a floor the route does not take for `GADSettings.wrongFloorSeconds` is
+//  off the route too: the warning shows, and the journey is routed again from the visitor, a
+//  personalised journey to the nearest open artwork, a curated tour to its next stop (PM, Monday
+//  "Wrong floor to trigger off-route and re-routing", 2026-10-27).
+//
 //  An artwork visited out of order moves before the stops still to visit, so the numbers in the list
 //  and on the map follow the visit order (PM, Monday "Personalized tour: renumbering artworks",
 //  2026-10-26).
@@ -66,9 +73,14 @@ import ProximiioMap
 final class VisitController {
     let session: ProximiioMapSession
     let navigator: JourneyNavigator
-    /// `true` after `farFromRoute` or `offRouteTooLong`, until the visitor returns to the route
-    /// or answers the warning.
+    /// `true` for `GADSettings.offRouteWarningSeconds` after `farFromRoute`, `offRouteTooLong` or a
+    /// wrong floor, until the visitor closes the warning, resumes the journey or adds a stop.
     private(set) var isOffRoute = false
+    @ObservationIgnored private var offRouteWarning: Task<Void, Never>?
+    /// Since when the fixes have been on a floor the route does not take.
+    @ObservationIgnored private var wrongFloorSince: Date?
+    /// The journey was routed again for the wrong floor the visitor is still on.
+    @ObservationIgnored private var isRoutedForWrongFloor = false
     /// `true` while the controller routes the journey again: the order after an artwork visited out
     /// of order or a closer artwork, the leg from the visitor, the end of a detour.
     private(set) var isRerouting = false
@@ -260,10 +272,9 @@ final class VisitController {
                 }
             })
         case .farFromRoute, .offRouteTooLong:
-            isOffRoute = true
             isOffRouteEpisode = true
+            showOffRouteWarning()
         case .returnedToRoute:
-            isOffRoute = false
             isOffRouteEpisode = false
         case .legChanged, .rerouted:
             isOffRouteEpisode = false
@@ -351,7 +362,6 @@ final class VisitController {
         tasks.append(Task { [weak self] in
             await self?.serially { [weak self] in
                 guard let self else { return }
-                self.isOffRoute = false
                 await self.rerouting { await self.navigator.resumeJourney() }
             }
         })
@@ -373,10 +383,76 @@ final class VisitController {
                 else { return }
                 FieldLog.log("off route: \(first) is nearer than \(active.title) · journey ordered again")
                 self.isOffRouteEpisode = false
-                self.isOffRoute = false
                 await self.rerouting { await self.apply(proposal) }
             }
         })
+    }
+
+    /// Called on every fix. A visitor on a floor the route ahead does not take for
+    /// `GADSettings.wrongFloorSeconds` is off the route: the warning shows, and the leg is drawn again
+    /// from the visitor. A personalised journey is ordered again first, so the leg leads to the
+    /// nearest open artwork; a curated tour keeps its next stop. Once per wrong floor: the next check
+    /// starts when a fix is on a floor of the route again. Off on a floor without positioning
+    /// (`isFloorGuideActive`).
+    func checkWrongFloor(isFloorGuideActive: Bool) {
+        guard isNavigating, !isFloorGuideActive, navigator.activeStop != nil, !navigator.hasArrived,
+              let level = session.position?.floor?.level,
+              let legs = session.routeRenderer?.geometry?.legs,
+              !Self.isOnRouteFloor(level: level, legs: legs)
+        else {
+            wrongFloorSince = nil
+            isRoutedForWrongFloor = false
+            return
+        }
+        guard !isRoutedForWrongFloor else { return }
+        let since = wrongFloorSince ?? .now
+        wrongFloorSince = since
+        guard Date.now.timeIntervalSince(since) >= settings.wrongFloorSeconds else { return }
+        isRoutedForWrongFloor = true
+        wrongFloorSince = nil
+        FieldLog.log("wrong floor: L\(Int(level.rounded())) is not on the route · journey routed again from the visitor")
+        isOffRouteEpisode = true
+        showOffRouteWarning()
+        let reorders = managesProgress && !keepsOrder
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self else { return }
+                await self.rerouting {
+                    if reorders, let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
+                       proposal.isImprovement {
+                        await self.apply(proposal)
+                    }
+                    await self.navigator.resumeJourney()
+                }
+                self.persist(self.navigator.journey)
+            }
+        })
+    }
+
+    /// Whether a route still to walk takes the floor at `level`. No route still to walk counts as on
+    /// the route. Pure; covered by tests.
+    nonisolated static func isOnRouteFloor(level: Double, legs: [RouteGeometry.Leg]) -> Bool {
+        let ahead = legs.filter { !$0.isCompleted }
+        return ahead.isEmpty || ahead.contains { VenueLevel.same($0.floor.level, level) }
+    }
+
+    /// Opens the off-route warning for `GADSettings.offRouteWarningSeconds`. A new episode while it
+    /// is open starts the time again.
+    private func showOffRouteWarning() {
+        isOffRoute = true
+        offRouteWarning?.cancel()
+        let seconds = settings.offRouteWarningSeconds
+        offRouteWarning = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.isOffRoute = false
+        }
+    }
+
+    private func closeOffRouteWarning() {
+        offRouteWarning?.cancel()
+        offRouteWarning = nil
+        isOffRoute = false
     }
 
     /// Runs `body` with `isRerouting` on.
@@ -433,7 +509,6 @@ final class VisitController {
                 await self.orderRemaining()
                 if let activeStopID, self.navigator.activeStop?.id == activeStopID {
                     FieldLog.log("leg to \(activeStopID) drawn again from the visitor")
-                    self.isOffRoute = false
                     await self.navigator.resumeJourney()
                 }
                 self.persist(self.navigator.journey)
@@ -593,6 +668,7 @@ final class VisitController {
         var stop = VisitPlan.stop(for: place)
         if navigator.journey.stops.contains(where: { $0.id == stop.id }) { stop.id = "detour:\(place.id)" }
         stop.iconName = AmenityKind.allCases.first { $0.matches(place) }?.icon.rawValue
+        closeOffRouteWarning()
         // The navigator applies guidance rules to each new leg: the detour leg is reached by
         // distance, the legs after it by the artwork geofence only.
         navigator.guidanceRules = detourGuidanceRules
@@ -615,7 +691,7 @@ final class VisitController {
     /// A detour reached is recorded as visited; one not reached is dropped. After a detour the
     /// stops still ahead are ordered again from the visitor. The leg is drawn from here.
     func resumeJourney() async {
-        isOffRoute = false
+        closeOffRouteWarning()
         await serially { [weak self] in
             guard let self else { return }
             let hadDetour = self.navigator.detourStop != nil
@@ -630,10 +706,11 @@ final class VisitController {
     /// "Dismiss" on the off-route warning. The leg is not drawn again. The warning opens again on the
     /// next episode.
     func dismissOffRoute() {
-        isOffRoute = false
+        closeOffRouteWarning()
     }
 
     func end() {
+        closeOffRouteWarning()
         tasks.forEach { $0.cancel() }
         tasks = []
         navigator.end()

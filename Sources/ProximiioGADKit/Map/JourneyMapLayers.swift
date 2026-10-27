@@ -78,6 +78,8 @@ final class JourneyMapLayers {
     private static let gallerySource = "gad-journey-galleries"
     private static let destinationLayer = "gad-gallery-destination"
     private static let visitedLayer = "gad-gallery-visited"
+    /// The organisation style's inner walls, above its artworks and furniture.
+    private static let innerWallLayer = "proximiio-inner_wall"
     private static let connectorSource = "gad-route-connector"
     private static let connectorLayer = "gad-route-connector"
     private static let changerSource = "gad-level-changer"
@@ -159,14 +161,17 @@ final class JourneyMapLayers {
         if style.source(withIdentifier: Self.gallerySource) == nil {
             let source = MLNShapeSource(identifier: Self.gallerySource, shape: nil)
             style.addSource(source)
-            // Over the floor plan, under walls, labels, POI icons, the route and the stop markers.
-            // `.aboveVenueFills` puts each layer directly over the venue fills, so the destination
-            // layer is anchored to the visited layer.
-            for (id, isDestination) in [(Self.visitedLayer, false), (Self.destinationLayer, true)] {
-                let layer = MLNFillStyleLayer(identifier: id, source: source)
-                layer.predicate = NSPredicate(format: "destination == %@", NSNumber(value: isDestination))
-                canvas.addLayer(layer, at: isDestination ? .above(layerID: Self.visitedLayer) : .aboveVenueFills)
-            }
+            // The visited galleries over the floor plan, under walls, labels, POI icons, the route and
+            // the stop markers. The destination gallery over the venue's artworks, furniture and inner
+            // walls too (PM, Monday "Navigation to a gallery", 2026-10-27), or over the visited layer
+            // on a style without inner walls.
+            let visited = MLNFillStyleLayer(identifier: Self.visitedLayer, source: source)
+            visited.predicate = NSPredicate(format: "destination == %@", NSNumber(value: false))
+            canvas.addLayer(visited, at: .aboveVenueFills)
+            let destination = MLNFillStyleLayer(identifier: Self.destinationLayer, source: source)
+            destination.predicate = NSPredicate(format: "destination == %@", NSNumber(value: true))
+            let anchor = style.layer(withIdentifier: Self.innerWallLayer) == nil ? Self.visitedLayer : Self.innerWallLayer
+            canvas.addLayer(destination, at: .above(layerID: anchor))
         }
         if style.source(withIdentifier: Self.connectorSource) == nil {
             let source = MLNShapeSource(identifier: Self.connectorSource, shape: nil)
@@ -250,7 +255,7 @@ final class JourneyMapLayers {
 
     /// The design's icon of a level changer type.
     private static func icon(featureType: String) -> GADIcon {
-        featureType == "elevator" ? .elevator : .stairs
+        GADIcon.levelChanger(featureType: featureType)
     }
 
     /// The 30 pt red marker of the journey's active stop and detour (`MapStyle.journeyStops`) with

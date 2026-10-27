@@ -79,9 +79,10 @@ struct ExploreCatalog: Equatable, Sendable {
     var legendFacilities: [ExploreLegendEntry] = []
 
     /// `categories` maps an amenity id to its title; `levelChangerTypes` are the feature types of the
-    /// venue's lifts and staircases. Pure; covered by tests.
+    /// venue's lifts and staircases. `facilities` chooses and orders the Amenities list and the
+    /// legend's facilities (`in_facilities`, `facilities_order`). Pure; covered by tests.
     init(places: [VenuePlace], destinations: [String: GalleryDestination], categories: [String: String],
-         levelChangerTypes: Set<String> = []) {
+         levelChangerTypes: Set<String> = [], facilities: AmenityListing = .all) {
         let byID = Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let museum = Self.museumPlaceID(destinations: destinations, places: byID)
         let inMuseum = { (place: VenuePlace) in museum == nil || place.placeID == museum }
@@ -117,11 +118,17 @@ struct ExploreCatalog: Equatable, Sendable {
         amenities = places.compactMap { place in
             guard !place.isArtwork, inMuseum(place),
                   let kind = AmenityKind.allCases.first(where: { $0.matches(place) }),
-                  kind != .stairs, kind != .elevator else { return nil }
+                  kind != .stairs, kind != .elevator, facilities.rank(of: place.amenityID) != nil else { return nil }
             return ExploreItem(id: place.id, kind: .amenity(kind), title: place.title, lines: place.details.map { [$0] } ?? [],
                                level: place.level, coordinate: place.coordinate, amenityID: place.amenityID)
         }
-        .sorted(by: Self.order)
+        .sorted { a, b in
+            // Level, then the data's order, then title.
+            if a.level != b.level { return a.level < b.level }
+            let rankA = facilities.rank(of: a.amenityID) ?? 0, rankB = facilities.rank(of: b.amenityID) ?? 0
+            if rankA != rankB { return rankA < rankB }
+            return Self.order(a, b)
+        }
 
         let galleryAmenities = Set(spaces.compactMap(\.amenityID))
         let used = Set(places.filter { !$0.isArtwork && inMuseum($0) }.compactMap(\.amenityID))
@@ -133,12 +140,15 @@ struct ExploreCatalog: Equatable, Sendable {
         }
         legendGalleries = entries.filter(isGallery)
         let titles = Set(entries.map { $0.title.lowercased() })
+        // A lift or staircase entry ranks as the amenity named after its feature type.
         let changers = [("elevator", String(localized: "Elevator", bundle: .module)),
                         ("staircase", String(localized: "Stairs", bundle: .module))]
             .filter { levelChangerTypes.contains($0.0) && !titles.contains($0.1.lowercased()) }
-            .map { ExploreLegendEntry(amenityID: "level-changer-\($0.0)", title: $0.1) }
-        legendFacilities = (entries.filter { !isGallery($0) } + changers)
-            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            .compactMap { type, title in facilities.rank(ofTitle: type).map { (ExploreLegendEntry(amenityID: "level-changer-\(type)", title: title), $0) } }
+        let ranked = entries.filter { !isGallery($0) }.compactMap { entry in facilities.rank(of: entry.amenityID).map { (entry, $0) } }
+        legendFacilities = (ranked + changers)
+            .sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0.title.localizedStandardCompare($1.0.title) == .orderedAscending }
+            .map(\.0)
     }
 
     init() {}

@@ -74,6 +74,18 @@ struct AmenityKindTests {
         )
     }
 
+    /// Monday "Stairs&elevator icon disappeared from instructions", 2026-10-27: the card shows the
+    /// icon of the next level change from the visitor's floor.
+    @Test func theNextLevelChangeStartsOnTheVisitorsFloor() {
+        let markers = [Self.marker("staircase", from: 1, to: 3), Self.marker("elevator", from: 3, to: 4)]
+        #expect(GuidanceText.levelChange(markers: markers, visitorLevel: 3)?.featureType == "elevator")
+        #expect(GuidanceText.levelChange(markers: markers, visitorLevel: 2)?.featureType == "staircase")
+        #expect(GuidanceText.levelChange(markers: [Self.marker("staircase", from: 1, to: 3, completed: true)], visitorLevel: 1) == nil)
+        #expect(GADIcon.levelChanger(featureType: "elevator") == .elevator)
+        #expect(GADIcon.levelChanger(featureType: "staircase") == .stairs)
+        #expect(GADIcon.levelChanger(featureType: "escalator") == .stairs)
+    }
+
     /// PM 2026-10-15: the route from level 1 to level 4 takes the stairs to level 3, then the lift.
     @Test func levelChangeTitleNamesTheRoutesFirstChangeFromTheVisitorsFloor() {
         let markers = [Self.marker("staircase", from: 1, to: 3), Self.marker("elevator", from: 3, to: 4)]

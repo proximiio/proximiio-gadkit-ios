@@ -38,15 +38,22 @@ enum GuidanceText {
     /// level 4 can take the stairs to level 3 and then the lift. Without a level change on the
     /// route: "Go to level 4". Pure; covered by tests.
     static func levelChangeTitle(markers: [RouteGeometry.Marker], visitorLevel: Double?, stopLevel: Int) -> String {
+        guard let change = levelChange(markers: markers, visitorLevel: visitorLevel) else {
+            return String(localized: "Go to level \(stopLevel)", bundle: .module)
+        }
+        let pending = markers.filter { !$0.isCompleted }
+        let level = rideEnd(featureType: change.featureType, coordinate: change.coordinate, from: change.from.level, to: change.to.level, markers: pending)
+        return rideText(featureType: change.featureType, level: level)
+    }
+
+    /// The route's next level change: the first one still ahead that starts on the visitor's floor,
+    /// else the first one still ahead. Pure; covered by tests.
+    static func levelChange(markers: [RouteGeometry.Marker], visitorLevel: Double?) -> RouteGeometry.Marker? {
         let pending = markers.filter { !$0.isCompleted }
         let fromHere = visitorLevel.flatMap { level in
             pending.first { Int($0.from.level.rounded()) == Int(level.rounded()) }
         }
-        guard let change = fromHere ?? pending.first else {
-            return String(localized: "Go to level \(stopLevel)", bundle: .module)
-        }
-        let level = rideEnd(featureType: change.featureType, coordinate: change.coordinate, from: change.from.level, to: change.to.level, markers: pending)
-        return rideText(featureType: change.featureType, level: level)
+        return fromHere ?? pending.first
     }
 
     /// "Take the stairs to level 4".

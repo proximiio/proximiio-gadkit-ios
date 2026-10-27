@@ -374,7 +374,8 @@ struct ExploreMuseumView: View {
                                     uniquingKeysWith: { first, _ in first })
         let levelChangers = LevelChangerPlace.all(in: features)
         catalog = ExploreCatalog(places: places, destinations: Gallery.destinations(geofences: geofences, places: places, features: features),
-                                 categories: categories, levelChangerTypes: Set(levelChangers.map(\.featureType)))
+                                 categories: categories, levelChangerTypes: Set(levelChangers.map(\.featureType)),
+                                 facilities: .facilities(amenities))
         mapLayers.updateLevelChangers(levelChangers)
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
         // amenities: the Amenities list and the red marker show them (PM, Monday "Explore museum view:

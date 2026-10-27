@@ -236,7 +236,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `.bottomBar` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
 | `.background` | The package's background image around the map card. | Transparent. |
 | `.skipPrompt` | "Skip this artwork?" after a swipe on a stop. "Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it. | A swipe reports `skipRequested` only. |
-| `.offRoutePrompt` | "Looks like you've left your route" with "Dismiss", in place of the stop card. With `.progress` a personalised journey keeps the leg where the visitor left it until another open artwork is the nearest stop; then the stops ahead are ordered again from the visitor. A curated tour is routed again from the visitor. | The route follows a visitor who left it. `offRoute` reports it. |
+| `.offRoutePrompt` | "Looks like you've left your route" with "Dismiss", in place of the stop card, for `GADSettings.offRouteWarningSeconds` unless the visitor closes it. With `.progress` a personalised journey keeps the leg where the visitor left it until another open artwork is the nearest stop; then the stops ahead are ordered again from the visitor. A curated tour is routed again from the visitor. A visitor on a floor the route does not take for `GADSettings.wrongFloorSeconds` gets the warning too, and the leg is drawn again from the visitor: to the nearest open artwork in a personalised journey, to the next stop in a curated tour. | The route follows a visitor who left it. `offRoute` reports it. |
 | `.uncertainPositionPrompt` | "Probably at …" when the position is uncertain near the active stop. | `positionUncertain` reports it. |
 | `.leaveTourPrompt` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `.bottomBar` and `onClose`). | Back calls `onClose` at once. |
 | `.prompts` | All four prompts above. | |
@@ -467,7 +467,9 @@ at the POI. The map fills the gallery's polygon feature (else the geofence's out
 colour and marks the POI with a red label, the first word of its title ("G303"); the POI's own icon is
 hidden, and so are the numbered artwork markers. The stop card names the POI ("G303 Language") with a
 gallery icon and no stop number. The POI of the gallery the visitor is in is not drawn (PM, Monday
-"Navigation to a gallery", 2026-10-26).
+"Navigation to a gallery", 2026-10-26). The numbered artwork markers also stay hidden while the
+visitor is outside every gallery, unless the active artwork is outside every gallery too. The
+destination gallery is filled over the venue's artworks, furniture and inner walls (2026-10-27).
 
 The first fix inside the gallery geofence routes the leg again from the visitor, to the artwork. A
 leg that starts in the artwork's gallery ends at the artwork. An artwork without `gallery_id`, or
@@ -601,8 +603,9 @@ follow.
   - Only the museum's POIs are listed: the `place_id` of the gallery POIs. The GAD organisation also
     holds the DCT office.
 - The map draws no amenity icons: the Amenities list and the red marker show them. A gallery's icon
-  is 30 pt, on a circle of white at 30 % with a white border; an icon in the venue data without a
-  circle of its own shows the design best.
+  is on a circle of white at 30 % with a white border; an icon in the venue data without a circle of
+  its own shows the design best. The circle has the data icon's size in points, which the style's
+  `icon-size` scales: a 120 px icon at 0.2 is 24 pt, as in MapTap.
 - A gallery is filled on its polygon feature (`type` `gallery`): the one whose `metadata.gallery_id`
   is the gallery's id, else the one around the gallery's POI. Without one, its geofence is filled.
 - A row, or a tap on a gallery or a listed POI on the map, shows its level and frames the place at
@@ -680,6 +683,8 @@ let configuration = GADConfiguration(
 | `geofenceExitDelay` | 5 s | Time outside an entered geofence or privacy zone before the SDK reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK default 3 s). Enters are reported at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. 0 reports the exit at the first position outside. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
 | `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "Looks like you've left your route": this far from the route, or off it this long. |
+| `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
+| `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 19 | Zoom of "Centre on me", of the first position and of the follow. |
 | `galleryFollowZoom` | 20 | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
@@ -876,6 +881,52 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.15.3 (2026-10-27)
+
+No change for host apps' code.
+
+Added:
+
+- `GADSettings.offRouteWarningSeconds` (10 s): "Looks like you've left your route" stays open this
+  long, unless the visitor closes it. The routing after it no longer closes it (PM, Monday
+  "Personalized tour: off-route and re-route behaviour" and "Curated tour: off-route and
+  recalculation", 2026-10-27).
+- `GADSettings.wrongFloorSeconds` (10 s): a visitor on a floor the route ahead does not take counts as
+  off the route. The warning shows, and the leg is drawn again from the visitor: to the nearest open
+  artwork in a personalised journey, to the next stop in a curated tour (PM, Monday "Wrong floor to
+  trigger off-route and re-routing").
+
+- The amenity's `metadata` chooses and orders the lists (PM, Monday "Amenity search & Map legend
+  views", 2026-10-27): `in_search` and `search_order` the search shortcuts of the journey map and the
+  museum map, `in_facilities` and `facilities_order` the Explore Museum map's Amenities list (within a
+  level) and the legend's facilities. Metadata and both keys are optional: a flag `false` leaves an
+  amenity out, `true` puts in one the list does not show by itself, and an amenity without an order
+  comes after the ordered ones in the list's own order. The legend's galleries keep the data's order.
+
+Changed:
+
+- Gallery first: the numbers of the artworks are hidden while the visitor is outside every gallery and
+  the active artwork is in a gallery, as well as while the leg ends at a gallery. A detour keeps its
+  marker (PM, Monday "Navigation to a gallery", 2026-10-27).
+- The destination gallery is filled over the venue's artworks, furniture and inner walls
+  (`proximiio-inner_wall`), not only over the floor fills (same item).
+- "Add a stop" takes the map back to the visitor (PM, Monday "Adding amenity -> focus back on my
+  location").
+- While the next stop is on another floor, the stop card shows the lift or stairs icon of the next
+  level change (PM, Monday "Stairs&elevator icon disappeared from instructions").
+- Map icons from the venue data take one point per pixel, as MapTap and the portal draw them, so the
+  style's `icon-size` gives the same size on both: a 120 px icon at `icon-size` 0.2 is 24 pt. Before,
+  the icon took the screen's scale and was a third of that size (PM, 2026-10-27: gallery icons at 0.2
+  were dots). The design's amenity markers and the Explore Museum circles take the size of the data
+  icon they replace.
+
+Fixed:
+
+- The artworks' numbers showed on every floor after the leg had once ended at a gallery (PM, Monday
+  "Artwork numbers shown on all the floors"). The view no longer sets the map's stop marker style to
+  `nil`: map 6.0.0-beta.54 then keeps the marker layer on the map with the floor it showed. It hides
+  the markers with an invisible style instead.
 
 ### 1.15.2 (2026-10-27)
 

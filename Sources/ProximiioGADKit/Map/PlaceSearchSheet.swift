@@ -9,6 +9,8 @@ import SwiftUI
 
 struct PlaceSearchSheet: View {
     let places: [VenuePlace]
+    /// The amenity shortcuts, in order (`AmenityListing.shortcuts(places:)`).
+    let shortcuts: [AmenityKind]
     let onPick: (VenuePlace) -> Void
     let onPickAmenity: (AmenityKind) -> Void
 
@@ -21,7 +23,7 @@ struct PlaceSearchSheet: View {
                     Section {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                ForEach(AmenityKind.shortcuts.filter { kind in places.contains(where: kind.matches) }) { kind in
+                                ForEach(shortcuts) { kind in
                                     Button { onPickAmenity(kind) } label: {
                                         Label(kind.title, systemImage: kind.symbol)
                                             .textStyle(.bodySmallRegular)

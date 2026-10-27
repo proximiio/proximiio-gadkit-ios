@@ -126,6 +126,19 @@ enum MapStyle {
         )
     }()
 
+    /// `journeyStops` with the artworks' markers invisible; the detour keeps its marker. The map
+    /// library keeps a marker layer whose style is set to `nil` on the map, with the floor it showed
+    /// (map 6.0.0-beta.54), so the markers are hidden with this style instead.
+    static let journeyStopsHidden: JourneyStopMarkerStyle = {
+        var style = journeyStops
+        style.done.opacity = 0
+        style.active.opacity = 0
+        style.pending.opacity = 0
+        style.passed.opacity = 0
+        style.skipped.opacity = 0
+        return style
+    }()
+
     /// Route line. It replaces the organisation style's route line layers on any style.
     static let route = RouteLineStyle(
         remaining: .gradient(from: location, to: marker),
@@ -168,40 +181,60 @@ enum MapStyle {
         return session
     }
 
-    /// The map icon of an amenity. A kind the design draws (`AmenityKind`) gets its 30 pt marker,
-    /// the size of the stop markers and the position arrow (PM 2026-10-14, "Amenity icons
-    /// larger"): the data's icons are 30 px, which the map library draws at the screen scale, 10 pt
-    /// on a 3x screen. Other amenities, such as artworks and gallery labels, keep their icon.
+    /// The map icon of an amenity, one point per pixel of the venue data's icon, as the portal and
+    /// MapTap draw it (MapLibre GL JS registers an image at pixel ratio 1). The style's `icon-size`
+    /// then gives the same size here and in MapTap: 120 px at 0.2 is 24 pt (PM, 2026-10-27: the
+    /// gallery icons were 8 pt at 0.2, with the icon at the screen's scale).
+    ///
+    /// A kind the design draws (`AmenityKind`) gets its marker (PM 2026-10-14, "Amenity icons
+    /// larger") at the size of the data's icon it replaces. Other amenities, such as artworks and
+    /// galleries, keep their icon.
     static func amenityImage(for amenity: ProximiioAmenity, scale: CGFloat) -> UIImage? {
+        let icon = amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: 1) }
         if let kind = AmenityKind.kind(forAmenityID: amenity.id, title: amenity.title),
            let name = kind.icon.markerImageName,
-           let image = UIImage(named: name, in: .module, compatibleWith: nil) {
-            return image
+           let marker = UIImage(named: name, in: .module, compatibleWith: nil) {
+            let size = styleIconSize(of: icon)
+            return render(size: size, scale: scale) { marker.draw(in: CGRect(origin: .zero, size: size)) }
         }
-        return amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }
+        return icon
     }
 
-    /// The map icon of an amenity on the Explore Museum map. A gallery's icon from the venue data is
-    /// as large as the amenity markers, 30 pt: the icon at 22 pt on a circle of white at 30 % with a
-    /// white border (PM, Monday "Explore museum view: default map view", 2026-10-26). An icon without
-    /// a circle of its own shows the design best.
+    /// The map icon of an amenity on the Explore Museum map. A gallery's icon from the venue data on
+    /// a circle of white at 30 % with a white border, the icon at 22/30 of the circle (PM, Monday
+    /// "Explore museum view: default map view", 2026-10-26). The circle has the data icon's size in
+    /// points, as `amenityImage(for:scale:)`. An icon without a circle of its own shows the design
+    /// best.
     static func exploreAmenityImage(for amenity: ProximiioAmenity, scale: CGFloat) -> UIImage? {
         if AmenityKind.kind(forAmenityID: amenity.id, title: amenity.title) != nil {
             return amenityImage(for: amenity, scale: scale)
         }
-        guard let icon = amenity.icon.flatMap({ AmenityIcon.rasterImage($0, scale: scale) }) else { return nil }
-        let size = CGSize(width: 30, height: 30)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            let circle = UIBezierPath(ovalIn: CGRect(origin: .zero, size: size).insetBy(dx: 0.5, dy: 0.5))
+        guard let icon = amenity.icon.flatMap({ AmenityIcon.rasterImage($0, scale: 1) }) else { return nil }
+        let side = max(icon.size.width, icon.size.height)
+        let size = CGSize(width: side, height: side)
+        let unit = side / 30
+        return render(size: size, scale: scale) {
+            let circle = UIBezierPath(ovalIn: CGRect(origin: .zero, size: size).insetBy(dx: unit / 2, dy: unit / 2))
             UIColor.white.withAlphaComponent(0.3).setFill()
             circle.fill()
             UIColor.white.setStroke()
-            circle.lineWidth = 1
+            circle.lineWidth = unit
             circle.stroke()
-            icon.draw(in: CGRect(x: 4, y: 4, width: 22, height: 22))
+            icon.draw(in: CGRect(x: 4 * unit, y: 4 * unit, width: 22 * unit, height: 22 * unit))
         }
+    }
+
+    /// The size in points of a map icon made from the data's `icon`: its size in pixels, 120 × 120
+    /// without one (the venue data's icons on 2026-10-27). Pure; covered by tests.
+    static func styleIconSize(of icon: UIImage?) -> CGSize {
+        guard let icon else { return CGSize(width: 120, height: 120) }
+        return CGSize(width: icon.size.width * icon.scale, height: icon.size.height * icon.scale)
+    }
+
+    private static func render(size: CGSize, scale: CGFloat, _ draw: () -> Void) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in draw() }
     }
 
     /// Registers the design's glyphs under their `GADIcon` raw value, the `iconName` of an amenity

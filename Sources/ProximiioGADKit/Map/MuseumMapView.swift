@@ -27,6 +27,8 @@ struct MuseumMapView: View {
         RouteAccessibility.effective(hostNeeds: hostAccessibility, accessibleRoutes: accessibleRoutes)
     }
     @State private var places: [VenuePlace] = []
+    /// The search shortcuts' choice and order (`in_search`, `search_order`).
+    @State private var searchListing = AmenityListing.all
     @State private var selectedPlace: VenuePlace?
     @State private var destination: VenuePlace?
     @State private var routeError: String?
@@ -143,7 +145,7 @@ struct MuseumMapView: View {
             .presentationCornerRadius(50)
         }
         .sheet(isPresented: $isSearching) {
-            PlaceSearchSheet(places: places) { place in
+            PlaceSearchSheet(places: places, shortcuts: availableAmenities) { place in
                 isSearching = false
                 selectedPlace = place
             } onPickAmenity: { kind in
@@ -252,7 +254,7 @@ struct MuseumMapView: View {
     }
 
     private var availableAmenities: [AmenityKind] {
-        AmenityKind.shortcuts.filter { kind in places.contains(where: kind.matches) }
+        searchListing.shortcuts(places: places)
     }
 
     /// The route's next step. On a floor without positioning the guidance follows fixes from
@@ -272,6 +274,7 @@ struct MuseumMapView: View {
     private func loadPlaces() async {
         let features = await venue.sdk.features()
         places = VenuePlace.all(in: features)
+        searchListing = .search((try? await venue.sdk.amenities()) ?? [])
         let levelChangers = LevelChangerPlace.all(in: features)
         mapLayers.updateLevelChangers(levelChangers)
         session.hiddenFeatureIDs = Set(levelChangers.map(\.id))

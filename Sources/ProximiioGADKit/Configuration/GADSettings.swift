@@ -53,6 +53,10 @@ public struct GADSettings: Equatable, Sendable {
     public var offRouteMeters: Double = 30
     /// Seconds off the route before "Looks like you've left your route", at any distance.
     public var offRouteSeconds: TimeInterval = 300
+    /// Seconds "Looks like you've left your route" stays open, unless the visitor closes it.
+    public var offRouteWarningSeconds: TimeInterval = 10
+    /// Seconds on a floor the route does not take before the visitor counts as off the route.
+    public var wrongFloorSeconds: TimeInterval = 10
     /// The position dot is drawn on the route while it is within this many metres of it. Display
     /// only; guidance and arrival use the real position.
     public var routeSnapMeters: Double = 0.5

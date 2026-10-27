@@ -30,6 +30,8 @@ struct VisitView: View {
     @State private var stopToSkip: JourneyStop?
     @State private var monitor: TrackingMonitor
     @State private var places: [VenuePlace] = []
+    /// The search shortcuts' choice and order (`in_search`, `search_order`).
+    @State private var searchListing = AmenityListing.all
     /// Name of the geofence (gallery) the visitor is in, from `sdk.geofenceEvents()`.
     @State private var currentGallery: String?
     @State private var liveActivity: VisitLiveActivity
@@ -434,6 +436,7 @@ struct VisitView: View {
                 Task { @MainActor in
                     checkArrival()
                     controller.checkCloserArtwork()
+                    controller.checkWrongFloor(isFloorGuideActive: floorGuide.isActive)
                     updateVisitorGallery(controller.session.position)
                     if let fix = controller.session.position { floorGuide.positionReceived(at: fix.timestamp) }
                 }
@@ -444,6 +447,7 @@ struct VisitView: View {
             .onChange(of: controller.navigator.activeStop?.id) { _, _ in
                 checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
                 checkArrival()
+                applyStopMarkers()
             }
             .onChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
             .onChange(of: venue.data.version) { _, _ in
@@ -547,6 +551,7 @@ struct VisitView: View {
     private func loadVenueData() async {
         let features = await venue.sdk.features()
         places = VenuePlace.all(in: features)
+        searchListing = .search((try? await venue.sdk.amenities()) ?? [])
         controller.artworkRemoteIDs = Dictionary(
             places.compactMap { place in place.remoteID.map { (place.id, $0) } },
             uniquingKeysWith: { first, _ in first }
@@ -603,10 +608,23 @@ struct VisitView: View {
         if controller.session.hiddenFeatureIDs != hidden { controller.session.hiddenFeatureIDs = hidden }
     }
 
-    /// The numbered stop markers, except while the leg ends at a gallery: the artworks are not shown
-    /// then (PM, Monday "Navigation to a gallery", 2026-10-26).
+    /// The numbered stop markers. With gallery first they are hidden while the leg ends at a
+    /// gallery, and while the visitor is outside every gallery and the active artwork is in one
+    /// (PM, Monday "Navigation to a gallery", 2026-10-26 and 2026-10-27).
     private func applyStopMarkers() {
-        controller.session.journeyStopMarkerStyle = controller.galleryAhead == nil ? MapStyle.journeyStops : nil
+        let style = Self.showsArtworkMarkers(
+            guidesToGalleryFirst: kind.guidesToGalleryFirst && !galleryDestinations.isEmpty,
+            hasGalleryAhead: controller.galleryAhead != nil,
+            isInGallery: visitorGalleryPlaceID != nil,
+            isActiveStopInGallery: controller.navigator.activeStop?.group != nil
+        ) ? MapStyle.journeyStops : MapStyle.journeyStopsHidden
+        if controller.session.journeyStopMarkerStyle != style { controller.session.journeyStopMarkerStyle = style }
+    }
+
+    /// Whether the artworks' markers show. Pure; covered by tests.
+    static func showsArtworkMarkers(guidesToGalleryFirst: Bool, hasGalleryAhead: Bool, isInGallery: Bool, isActiveStopInGallery: Bool) -> Bool {
+        guard guidesToGalleryFirst else { return true }
+        return !hasGalleryAhead && (isInGallery || !isActiveStopInGallery)
     }
 
     /// Finds the gallery the visitor is in, on every fix.
@@ -617,6 +635,7 @@ struct VisitView: View {
         guard placeID != visitorGalleryPlaceID else { return }
         visitorGalleryPlaceID = placeID
         applyHiddenFeatures()
+        applyStopMarkers()
     }
 
     /// Reports `stopNearby` once per stop.
@@ -830,7 +849,7 @@ struct VisitView: View {
                     }
                     .accessibilityLabel(Text("Search", bundle: .module))
                     if isShowingAmenities {
-                        AmenityChipList(kinds: AmenityKind.shortcuts.filter { kind in places.contains(where: kind.matches) }) { kind in
+                        AmenityChipList(kinds: searchListing.shortcuts(places: places)) { kind in
                             isShowingAmenities = false
                             detour(to: kind)
                         }
@@ -865,7 +884,8 @@ struct VisitView: View {
                 }
                 if let place = selectedAmenity {
                     // During a journey "Add a stop" starts the detour at once (PM, Monday "Add stop
-                    // confirmation", 2026-10-26: no second confirmation).
+                    // confirmation", 2026-10-26: no second confirmation), and the map goes back to
+                    // the visitor (Monday "Adding amenity -> focus back on my location", 2026-10-27).
                     PlaceInfoCard(
                         title: place.title,
                         subtitle: place.cardSubtitle,
@@ -877,6 +897,8 @@ struct VisitView: View {
                             } else {
                                 Task { await controller.detour(to: place) }
                                 emit(.detourStarted(place))
+                                controller.session.followMyFloor()
+                                recentre(reason: "stop added")
                             }
                         },
                         onClose: { selectedAmenity = nil }
@@ -1221,7 +1243,24 @@ private struct VisitCard: View {
         }
     }
 
+    /// The lift or stairs of the next level change, while the next stop is on another floor (PM,
+    /// Monday "Stairs&elevator icon disappeared from instructions", 2026-10-27).
+    private var levelChangeIcon: GADIcon? {
+        guard case .nextStopOnOtherLevel = state,
+              let change = GuidanceText.levelChange(markers: markers, visitorLevel: session.position?.floor?.level)
+        else { return nil }
+        return GADIcon.levelChanger(featureType: change.featureType)
+    }
+
     @ViewBuilder private var icon: some View {
+        if let levelChangeIcon {
+            levelChangeIcon.image.resizable().scaledToFit().frame(width: 20, height: 20)
+        } else {
+            stateIcon
+        }
+    }
+
+    @ViewBuilder private var stateIcon: some View {
         switch state {
         case .walking, .atStop, .nextStopOnOtherLevel:
             if let stopNumber, showsStopNumber {

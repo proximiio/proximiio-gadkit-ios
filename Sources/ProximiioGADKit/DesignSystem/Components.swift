@@ -129,6 +129,11 @@ enum GADIcon: String, CaseIterable {
     /// The glyph, tinted with the foreground style.
     var image: Image { Image(rawValue, bundle: .module).renderingMode(.template) }
 
+    /// The icon of a lift, staircase or escalator, from the route's feature type.
+    static func levelChanger(featureType: String) -> GADIcon {
+        featureType == "elevator" ? .elevator : .stairs
+    }
+
     /// The white circle variant used as a map marker, or `nil` for icons without one.
     var markerImageName: String? {
         switch self {
