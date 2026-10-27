@@ -31,6 +31,8 @@ enum VisitEvent: Sendable, Equatable {
     case amenitySelected(VenuePlace)
     /// The amenity is now a detour of the journey: the visitor confirmed "Change your route?".
     case detourStarted(VenuePlace)
+    /// The host app's destination (`ProximiMapView`'s `destination`) gets no route.
+    case destinationUnavailable(poiID: String, reason: ProximiDestination.Failure)
     /// The visitor tapped "Resume your Journey" or "Show the route from here".
     case journeyResumed
     /// The visitor tapped "Centre on me".
@@ -52,7 +54,7 @@ enum VisitEvent: Sendable, Equatable {
     /// app decides.
     case stopPlaceDeleted(JourneyStop)
     /// The position is uncertain near the active stop ("Probably at …"). Without
-    /// `ProximiMapView.Options.prompts` the view reports it instead of asking. At most once per
+    /// `ProximiMapView.Options.uncertainPositionPrompt` the view reports it instead of asking. At most once per
     /// `GADSettings.locationQuestionQuietPeriod`.
     case positionUncertain(JourneyStop)
     /// The visitor reached the artwork of the active stop: they entered its geofence or stand in

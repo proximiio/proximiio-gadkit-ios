@@ -13,11 +13,12 @@ The host app uses one of two entry points:
   `connectWristband(code:)`. The Proximi GAD app uses the package this way.
 - **`ProximiMapView`** is the journey map alone, as a UI component on an SDK the host app has
   started. The host app owns the SDK, the wristband session and the journey, and moves the journey on.
-  See [ProximiMapView](#proximimapview).
+  See [ProximiMapView](#proximimapview). **`ProximiExploreView`** is the Explore Museum map as a UI
+  component on the same SDK (see [Explore Museum](#explore-museum)).
 
 | Product | Add to | Content |
 |---|---|---|
-| `ProximiioGADKit` | The app target | `ProximiMap`, `ProximiMapView` and their types, `GADConfiguration`, `GADSettings`, `FieldLog`. |
+| `ProximiioGADKit` | The app target | `ProximiMap`, `ProximiMapView`, `ProximiExploreView` and their types, `GADConfiguration`, `GADSettings`, `FieldLog`. |
 | `ProximiioGADLiveActivity` | The widget extension | `VisitActivityAttributes` and `VisitActivityWidget`. |
 
 ## Requirements
@@ -198,6 +199,7 @@ journey.stops[0].state = .visited
 |---|---|
 | `sdk` | The host app's `Proximiio`, started, with the position provider of its wristband session attached. |
 | `journey` | `Binding<ProximiJourney>`. The view applies every change to the open screen. It writes to the binding only with `.progress`. |
+| `destination` | `Binding<ProximiDestination?>`, default `.constant(nil)`. A place to route the visitor to at once. See [Routing to a place](#routing-to-a-place). |
 | `options` | `ProximiMapView.Options`, default none. See below. The view reads them when it opens; a change applies to the next view. |
 | `settings` | `GADSettings`, default `.standard`. The view reads them when it opens. `postsGeofenceNotifications` does not apply. |
 | `routeAccessibility` | The visitor's accessibility needs for routes, default `.none`. See "Accessibility". |
@@ -233,7 +235,12 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 |---|---|---|
 | `.bottomBar` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
 | `.background` | The package's background image around the map card. | Transparent. |
-| `.prompts` | "Skip this artwork?" ("Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it), "You've left your route" (the route stays until "Show the route from here"), "Probably at …", "Change your route?" and "Leave the tour here" (with `onClose`). | No prompt. A swipe reports `skipRequested`; the route follows a visitor who left it and `offRoute` reports it; an uncertain position reports `positionUncertain`; "Go here" on an amenity starts the detour; `journeyFinished` reports the end. |
+| `.skipPrompt` | "Skip this artwork?" after a swipe on a stop. "Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it. | A swipe reports `skipRequested` only. |
+| `.offRoutePrompt` | "You've left your route": the route stays until "Show the route from here". | The route follows a visitor who left it. `offRoute` reports it. |
+| `.uncertainPositionPrompt` | "Probably at …" when the position is uncertain near the active stop. | `positionUncertain` reports it. |
+| `.changeRoutePrompt` | "Change your route?" after "Go here" on an amenity during a journey. | "Go here" starts the detour at once. |
+| `.leaveTourPrompt` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `.bottomBar` and `onClose`). | Back calls `onClose` at once. |
+| `.prompts` | All five prompts above. | |
 | `.progress` | The view moves the journey on and writes it to the binding: an artwork is visited when the visitor enters its geofence (`artworkReached`) or, in a personalised journey, stays at it out of order (`artworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and writes nothing. |
 | `.liveActivity` | The journey's Live Activity. The widget extension needs `ProximiioGADLiveActivity`. | No Live Activity. |
 | `.journeyComplete` | Journey Complete when the last stop is done. | `journeyFinished` reports the end; nothing shows. |
@@ -283,13 +290,45 @@ With `.progress` the view also writes:
 
 `onEvent` receives the journey screen's events of the [Events](#events) table: `trackingChanged`,
 `nextStop`, `stopNearby`, `positionUncertain`, `stopPlaceDeleted`, `skipRequested`, the amenity and
-detour events, `journeyResumed`, `offRoute`, `backOnRoute`, `journeyFinished`, the floor without
-positioning events, `modeChanged`, `recentred` and `accessibleRoutesChanged`; with `.prompts` also
-`stopSkipped` and `skipCancelled`; with `.progress`
-also `artworkReached`, `artworkVisitedOutOfOrder` and `stopOrderChanged`; with `.bottomBar`, `.prompts` and `onClose` also
-the exit events. Screen, wristband,
+detour events, `destinationUnavailable`, `journeyResumed`, `offRoute`, `backOnRoute`,
+`journeyFinished`, the floor without positioning events, `modeChanged`, `recentred` and
+`accessibleRoutesChanged`; with `.skipPrompt` also `stopSkipped` and `skipCancelled`; with `.progress`
+also `artworkReached`, `artworkVisitedOutOfOrder` and `stopOrderChanged`; with `.bottomBar`,
+`.leaveTourPrompt` and `onClose` also the exit events. Screen, wristband,
 arrival, geofence and `journeyChanged` events come only from `ProximiMap`; geofence enter and exit
 events are on the host app's SDK (`geofenceEvents()`).
+
+### Routing to a place
+
+The host app sets `destination` to route the visitor to a place at once, for example the place of the
+audio guide's proximiio-mcp answer (`route_to_place`, `route_to_nearest_amenity`). The visitor agreed
+in the conversation, so no card and no prompt show.
+
+```swift
+@State private var destination: ProximiDestination?
+
+ProximiMapView(sdk: sdk, journey: $journey, destination: $destination, routeAccessibility: needs) { event in
+    if case .destinationUnavailable(let poiID, let reason) = event {
+        guide.say(poiID, reason)            // .unknownPlace, .noRoute or .noPosition
+    }
+}
+
+// The audio guide's "show the way", with the id of the MCP result:
+destination = ProximiDestination(poiID: target.id)
+```
+
+- `poiID` is the feature id or its `properties.id`. On Proximi.io data the feature id is
+  `<organisation id>:<properties.id>`, and proximiio-mcp returns `properties.id`. The events carry the
+  feature id (`ProximiStop.id`).
+- During a journey the place is a detour, as after "Go here": `detourStarted`, then `detourEnded`. A
+  stop of the journey still to visit becomes the next stop instead (`nextStop`).
+- Without a journey the map draws the route from the visitor, as "Go here" does. It needs a position
+  (`.noPosition`).
+- The route avoids what `routeAccessibility` and the accessible routes button avoid. Pass the same
+  needs to proximiio-mcp (`avoid`), so the spoken route and the map's route match.
+- The view sets `destination` back to `nil` when the route ends: "Resume your Journey", "Close",
+  another place picked on the map, or `destinationUnavailable`. The host app sets it to `nil` to end
+  the route; another destination replaces it.
 
 ### The navigator
 
@@ -527,8 +566,19 @@ for await state in binding.stateChanges() {
 
 ## Explore Museum
 
-`open(.museumMap)` shows the Explore Museum map (Figma "Explore Museum", node 12129:102006). The visitor
-is not at the museum there: the map has no position dot, no route, and its camera does not follow.
+`open(.museumMap)` shows the Explore Museum map (Figma "Explore Museum", node 12129:102006) with the
+package's title "Explore Museum" and Back. `ProximiExploreView` is the same map as a UI component on
+the host app's started SDK, without title, Back and background: the host app draws them.
+
+```swift
+ProximiExploreView(sdk: sdk)                           // settings: GADSettings, default .standard
+```
+
+`ProximiExploreView` reads the venue data the SDK holds and follows its `venueDataChanges()`. It does
+not start, stop or configure the SDK and reports no event.
+
+The visitor is not at the museum there: the map has no position dot, no route, and its camera does not
+follow.
 
 - At the top: "Level N" and the floor changer (the level in a tile of the level colour). The changer
   lists the museum's levels. The map opens on the lowest level with a gallery, framed on the museum.
@@ -574,14 +624,15 @@ position, search and routes.
 | `journeyChanged(JourneySummary?)` | A new, planned, edited or deleted (`nil`) journey, and the progress after the journey screen closed. |
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
 | `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The package posts no notification for it. |
-| `positionUncertain(ProximiStop)` | `ProximiMapView` without `.prompts`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.prompts` the view asks "Probably at …" instead. |
+| `positionUncertain(ProximiStop)` | `ProximiMapView` without `.uncertainPositionPrompt`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.uncertainPositionPrompt` the view asks "Probably at …" instead. |
 | `artworkReached(ProximiStop)` | `artworkAdvanceDelay` after the visitor entered the artwork geofence of the active stop, or a fix lies in it, or the SDK counts the visitor inside it (`enteredGeofenceIds`, also for a journey opened inside it): the stop is done and the route leads to the next stop. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
 | `artworkVisitedOutOfOrder(ProximiStop)` | Personalised journeys only: the visitor stayed at an artwork further down the journey. It counts as visited, and the stops ahead are ordered again. A curated tour ignores such an artwork. |
 | `stopOrderChanged(ProximiJourney)` | `ProximiMapView` with `.progress`: the view ordered the stops again, from the visitor's first position, after `artworkVisitedOutOfOrder` or after a detour. The journey in the host app's ids and its new order; the `journey` binding already holds it. A change of the states alone does not send it. |
-| `skipRequested`, `stopSkipped`, `skipCancelled` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it". `ProximiMapView` without `.prompts` sends only `skipRequested`. `skipUndone` is not sent since 1.13.0. |
+| `skipRequested`, `stopSkipped`, `skipCancelled` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it". `ProximiMapView` without `.skipPrompt` sends only `skipRequested`. `skipUndone` is not sent since 1.13.0. |
 | `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
-| `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Change your route?" confirmed; the detour reached (`completed`) or left. |
+| `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Go here" on an amenity (after "Change your route?" with `.changeRoutePrompt`) or the host app's `destination`; the detour reached (`completed`) or left. |
+| `destinationUnavailable(poiID:reason:)` | `ProximiMapView` does not route to the host app's `destination`: `.unknownPlace`, `.noRoute` or `.noPosition`. `poiID` is the id the host app gave. The view sets the binding back to `nil`. |
 | `journeyResumed` | "Resume your Journey" or "Show the route from here". |
 | `offRoute(duration:)`, `backOnRoute` | The visitor has been off the route for `offRouteSeconds`; the visitor is on the route again. |
 | `journeyFinished` | Every stop is visited or skipped. Journey Complete shows with `ProximiMap` and with `ProximiMapView.Options.journeyComplete`. |
@@ -753,6 +804,8 @@ In the Debug configuration `start()` reads these launch arguments:
 | `-visitList` | The journey opens in List mode. |
 | `-visitAutoAdvance` | The journey advances 5 m after the visitor leaves a stop. |
 | `-openMap` | Opens the Explore Museum map. |
+| `-hostedMap` | With `-visit` or alone: the journey in `ProximiMapView` with the default options and a debug bar. With `-openMap`: `ProximiExploreView`. |
+| `-hostedDestination <title>` | With `-hostedMap`: after 5 s sets `destination` to the place with this title, else the first whose title contains it, by its `properties.id`. |
 | `-routeTo <title>` | With `-openMap`: routes to the first place whose title matches, after the first position. |
 | `-routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths` | Sets `routeAccessibility`. |
 
@@ -823,6 +876,15 @@ Added:
 - README "The navigator" → "Any change of the journey": `stopOrderChanged` and the navigator's `journey`.
 - `ProximiMap.start()` without a connection, on a phone where the API accepted the token before. The
   route network comes from the stored features. See [ProximiMap](#proximimap).
+- One `ProximiMapView.Options` per prompt (Nagarro, 2026-10-27): `.skipPrompt`, `.offRoutePrompt`,
+  `.uncertainPositionPrompt`, `.changeRoutePrompt` and `.leaveTourPrompt`. `.prompts` is all five; code
+  that passes it keeps compiling and works as before.
+- `ProximiMapView(destination:)`: the host app routes the visitor to a place at once, for example from
+  the audio guide's proximiio-mcp answer, and `ProximiMapEvent.destinationUnavailable(poiID:reason:)`.
+  The place's id can be the feature id or its `properties.id`, which proximiio-mcp returns. See
+  [Routing to a place](#routing-to-a-place).
+- `ProximiExploreView`: the Explore Museum map as a UI component on the host app's SDK, without title,
+  Back and background (Nagarro, 2026-10-27). See [Explore Museum](#explore-museum).
 
 Changed:
 

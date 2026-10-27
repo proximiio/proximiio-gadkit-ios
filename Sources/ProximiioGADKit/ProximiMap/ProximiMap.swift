@@ -492,7 +492,8 @@ public final class ProximiMap {
     private func runDebugLaunch(venue: VenueService) async {
         let launch = DebugLaunch.current
         await launch.run(with: venue, wristband: session)
-        if launch.openMap { open(.museumMap) }
+        // With `-hostedMap` the museum map is `ProximiExploreView`.
+        if launch.openMap { return open(.museumMap) }
         let ids = launch.visitStops.compactMap { VenuePlace.matching($0, in: places).first?.id }
         if launch.hostedMap {
             // Without `-visit` the view shows the map alone.
@@ -589,6 +590,7 @@ extension ProximiMap {
         case .skipCancelled(let s): return .skipCancelled(stop(s))
         case .amenitySelected(let p): return .amenitySelected(place(p))
         case .detourStarted(let p): return .detourStarted(place(p))
+        case .destinationUnavailable(let id, let reason): return .destinationUnavailable(poiID: id, reason: reason)
         case .journeyResumed: return .journeyResumed
         case .recentred: return .recentred
         case .accessibleRoutesChanged(let on): return .accessibleRoutesChanged(on)

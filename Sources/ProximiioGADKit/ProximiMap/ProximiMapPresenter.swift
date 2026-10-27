@@ -38,7 +38,18 @@ struct ProximiMapPresenter: ViewModifier {
         if let venue = map.venue {
             switch cover {
             case .museumMap:
+                #if DEBUG
+                if DebugLaunch.current.hostedMap {
+                    ProximiExploreView(sdk: venue.sdk, settings: venue.settings)
+                        .overlay(alignment: .topTrailing) {
+                            Button("Close map") { map.cover = nil }.font(.caption2).padding(.top, 60)
+                        }
+                } else {
+                    MuseumMapScreen(venue: venue) { map.cover = nil }
+                }
+                #else
                 MuseumMapScreen(venue: venue) { map.cover = nil }
+                #endif
             case .ready:
                 if let journey = VisitStore.load() {
                     JourneyReadyFlow(map: map, venue: venue, meta: storedMeta(for: journey))
@@ -130,11 +141,14 @@ private struct HostedMapCheck: View {
     @State private var navigatorTask: Task<Void, Never>?
     /// The navigators `onNavigator` got. The screen starts again with a new one.
     @State private var navigators = 0
+    /// `-hostedDestination`.
+    @State private var destination: ProximiDestination?
 
     var body: some View {
         ProximiMapView(
             sdk: sdk,
             journey: $map.hostedJourney,
+            destination: $destination,
             routeAccessibility: map.routeAccessibility,
             onEvent: { event in
                 FieldLog.log("hosted map → host app: \(event)")
@@ -168,7 +182,23 @@ private struct HostedMapCheck: View {
                 Text("navigator \(navigators): \(navigatorEvents.suffix(6).joined(separator: " "))")
                     .font(.caption2)
                     .accessibilityIdentifier("hostedNavigatorEvents")
+                Text("destination \(destination?.poiID ?? "none")")
+                    .font(.caption2)
+                    .accessibilityIdentifier("hostedDestination")
             }
+        }
+        .task {
+            guard let title = DebugLaunch.current.hostedDestination else { return }
+            try? await Task.sleep(for: .seconds(5))
+            guard let place = map.places.first(where: { $0.title == title })
+                    ?? map.places.first(where: { $0.title.localizedCaseInsensitiveContains(title) }) else {
+                FieldLog.log("hosted map: no place matches \(title)")
+                return
+            }
+            // proximiio-mcp returns `properties.id`: the feature id after the organisation id.
+            let id = place.id.split(separator: ":").last.map(String.init) ?? place.id
+            FieldLog.log("hosted map: destination \(place.title) · \(id)")
+            destination = ProximiDestination(poiID: id)
         }
     }
 

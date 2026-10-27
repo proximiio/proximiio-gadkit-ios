@@ -68,6 +68,13 @@ struct VisitView: View {
     /// The amenity routed to from search on a map without a journey (no navigator).
     @State private var routedAmenity: VenuePlace?
     @State private var amenityRouteError: String?
+    /// The host app's destination (`ProximiMapView`'s `destination`). The view sets it back to `nil`
+    /// when the route to it ends.
+    private let destination: Binding<ProximiDestination?>
+    /// The destination the view routes to.
+    @State private var routedDestination: RoutedDestination?
+    /// The places are loaded and the journey started: a destination can be routed to.
+    @State private var isReady = false
     /// `venue.settings` when the view was created.
     private let settings: GADSettings
     /// Back, "Leave the tour" and the close button of Journey Complete. `nil`: no Back and no "Leave
@@ -84,6 +91,7 @@ struct VisitView: View {
     ///   - options: What the screen does beyond drawing the journey.
     ///   - mode: Map or List when the screen opens.
     ///   - incoming: The host app's journey after a change (`ProximiMapView`).
+    ///   - destination: See `destination`.
     ///   - onClose: See `onClose`.
     ///   - persist: Stores the journey after each change (`VisitController.persist`).
     ///   - onNavigator: See `onNavigator`.
@@ -94,6 +102,7 @@ struct VisitView: View {
         options: ProximiMapView.Options = .all,
         mode: VisitMode = .map,
         incoming: IncomingJourney? = nil,
+        destination: Binding<ProximiDestination?> = .constant(nil),
         persist: @escaping @MainActor (Journey?) -> Void = VisitStore.persist,
         onClose: (() -> Void)?,
         onNavigator: (@MainActor (JourneyNavigator) -> Void)? = nil
@@ -102,6 +111,7 @@ struct VisitView: View {
         self.kind = kind
         self.options = options
         self.incoming = incoming
+        self.destination = destination
         _mode = State(initialValue: mode)
         let settings = venue.settings
         self.settings = settings
@@ -123,7 +133,7 @@ struct VisitView: View {
             session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder,
             countsOutOfOrder: kind.countsOutOfOrder,
             managesProgress: options.contains(.progress),
-            deviationPolicy: options.contains(.prompts) ? .askApp : .automatic,
+            deviationPolicy: options.contains(.offRoutePrompt) ? .askApp : .automatic,
             settings: settings, persist: persist
         ))
         self.onClose = onClose
@@ -207,6 +217,9 @@ struct VisitView: View {
             }
             for await event in controller.navigator.events {
                 emit(.journey(event))
+                if case .detourEnded(let stop, _) = event, routedDestination?.placeID == (stop.poiID ?? stop.id) {
+                    clearDestination()
+                }
             }
         }
         .task {
@@ -232,7 +245,10 @@ struct VisitView: View {
             // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
             // map did not turn until "Centre on me").
             if controller.session.position != nil { recentre(withHeading: true, reason: "journey started") }
+            isReady = true
+            destinationChanged(destination.wrappedValue)
         }
+        .onChange(of: destination.wrappedValue) { _, destination in destinationChanged(destination) }
         .task {
             let events = await venue.sdk.geofenceEvents()
             // The stream does not repeat the geofences entered before it started.
@@ -428,7 +444,7 @@ struct VisitView: View {
     /// The off-route warning, unless another prompt is up.
     private var isShowingOffRouteWarning: Binding<Bool> {
         Binding(
-            get: { options.contains(.prompts) && controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !floorGuide.isActive },
+            get: { options.contains(.offRoutePrompt) && controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !floorGuide.isActive },
             set: { if !$0 { controller.dismissOffRoute() } }
         )
     }
@@ -584,17 +600,17 @@ struct VisitView: View {
     /// List mode with a journey. Without stops the map shows, whatever `mode` is.
     private var showsList: Bool { mode == .list && hasStops }
 
-    /// A swipe on a stop in the list: "Skip this artwork?" with `prompts`, else only the event.
+    /// A swipe on a stop in the list: "Skip this artwork?" with `skipPrompt`, else only the event.
     private func requestSkip(_ stop: JourneyStop) {
-        if options.contains(.prompts) { stopToSkip = stop }
+        if options.contains(.skipPrompt) { stopToSkip = stop }
         emit(.skipRequested(stop))
     }
 
-    /// Back: a visit in progress asks first (03.10) with `prompts`; otherwise Back closes.
+    /// Back: a visit in progress asks first (03.10) with `leaveTourPrompt`; otherwise Back closes.
     private func requestClose() {
         let journey = controller.navigator.journey
         let started = journey.stops.contains { $0.state == .done || $0.state == .skipped }
-        if options.contains(.prompts) && started && !controller.navigator.isFinished {
+        if options.contains(.leaveTourPrompt) && started && !controller.navigator.isFinished {
             isConfirmingExit = true
             emit(.exitRequested)
         } else {
@@ -605,9 +621,9 @@ struct VisitView: View {
     // MARK: Ambiguous location (EC04)
 
     private var isPresentingSomething: Bool {
-        // Without prompts the off-route state shows nothing and does not hold the report back.
+        // Without `offRoutePrompt` the off-route state shows nothing and does not hold the report back.
         lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit
-            || (options.contains(.prompts) && controller.isOffRoute)
+            || (options.contains(.offRoutePrompt) && controller.isOffRoute)
             || amenityToConfirm != nil || isShowingWrapUp || floorGuide.isActive
     }
 
@@ -627,7 +643,7 @@ struct VisitView: View {
         FieldLog.log("ambiguous location: \(ambiguity.kind)")
         switch ambiguity {
         case .lowConfidence(let stop):
-            if options.contains(.prompts) {
+            if options.contains(.uncertainPositionPrompt) {
                 lowConfidenceStop = stop
             } else {
                 // Reported once per quiet period, as an answered prompt.
@@ -710,7 +726,7 @@ struct VisitView: View {
                             selectedAmenity = nil
                             if !hasStops {
                                 Task { await route(to: place) }
-                            } else if options.contains(.prompts) {
+                            } else if options.contains(.changeRoutePrompt) {
                                 amenityToConfirm = place
                             } else {
                                 Task { await controller.detour(to: place) }
@@ -751,6 +767,7 @@ struct VisitView: View {
     /// "Go here" on a map without a journey: the route from the visitor to `place`, as on the museum
     /// map. There is no navigator to add a detour to.
     private func route(to place: VenuePlace) async {
+        if let routed = routedDestination, routed.placeID != place.id { clearDestination() }
         routedAmenity = place
         guard let here = controller.session.position else {
             amenityRouteError = String(localized: "Waiting for your position.", bundle: .module)
@@ -783,6 +800,91 @@ struct VisitView: View {
         routedAmenity = nil
         amenityRouteError = nil
         controller.session.clearRoute()
+        if routedDestination != nil { clearDestination() }
+    }
+
+    // MARK: Destination
+
+    /// The host app set `destination`, or set it back to `nil`. A new destination replaces the route
+    /// of the previous one; `nil` ends it.
+    private func destinationChanged(_ destination: ProximiDestination?) {
+        guard isReady, destination?.poiID != routedDestination?.requested else { return }
+        if routedDestination != nil, destination == nil {
+            routedDestination = nil
+            Task { await endDestinationRoute() }
+            return
+        }
+        guard let destination else { return }
+        Task { await route(to: destination) }
+    }
+
+    /// Routes to the host app's destination at once, as "Go here" does without "Change your
+    /// route?": the visitor agreed with the host app (the audio guide). A stop of the journey still
+    /// to visit becomes the next stop instead.
+    private func route(to destination: ProximiDestination) async {
+        guard let place = VenuePlace.place(withID: destination.poiID, in: places) else {
+            return destinationFailed(destination.poiID, .unknownPlace)
+        }
+        // The feature id; the host app can give `properties.id`.
+        let id = place.id
+        let routed = RoutedDestination(requested: destination.poiID, placeID: id)
+        FieldLog.log("destination: \(place.title)")
+        selectedAmenity = nil
+        amenityToConfirm = nil
+        isShowingAmenities = false
+        routedDestination = routed
+        guard hasStops else {
+            await route(to: place)
+            guard routedDestination == routed, routedAmenity?.id == id else { return }
+            if controller.session.position == nil {
+                endAmenityRoute()
+                destinationFailed(routed.requested, .noPosition)
+            } else if amenityRouteError != nil {
+                endAmenityRoute()
+                destinationFailed(routed.requested, .noRoute)
+            }
+            return
+        }
+        if let stop = controller.navigator.journey.stops.first(where: { ($0.poiID ?? $0.id) == id && $0.kind != .detour }),
+           stop.state == .pending || stop.state == .active || stop.state == .reached {
+            if stop.state == .pending { await controller.activate(stopID: stop.id) }
+            clearDestination()
+            return
+        }
+        let stopID = await controller.detour(to: place)
+        emit(.detourStarted(place))
+        guard routedDestination == routed else { return }
+        if controller.navigator.noRouteReasons[stopID] != nil {
+            await controller.cancelDetour()
+            destinationFailed(routed.requested, .noRoute)
+        }
+    }
+
+    /// Ends the route the destination started, after the host app set it to `nil`.
+    private func endDestinationRoute() async {
+        if hasStops {
+            if controller.navigator.detourStop != nil { await controller.cancelDetour() }
+        } else {
+            endAmenityRoute()
+        }
+    }
+
+    private func destinationFailed(_ id: String, _ reason: ProximiDestination.Failure) {
+        FieldLog.log("destination \(id) unavailable: \(reason)")
+        clearDestination()
+        emit(.destinationUnavailable(poiID: id, reason: reason))
+    }
+
+    /// A destination the view routes to: the id the host app gave and the place's feature id.
+    private struct RoutedDestination: Equatable {
+        let requested: String
+        let placeID: String
+    }
+
+    /// The route to the destination ended: the binding goes back to `nil`.
+    private func clearDestination() {
+        routedDestination = nil
+        if destination.wrappedValue != nil { destination.wrappedValue = nil }
     }
 
     private func changeRouteText(to place: VenuePlace) -> String {

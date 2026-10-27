@@ -66,6 +66,33 @@ struct ProximiMapTests {
         #expect(MapStyle.options().minimumZoom == nil)
     }
 
+    @Test func promptsIsEveryPromptAndEachPromptIsItsOwnOption() {
+        let each: [ProximiMapView.Options] = [.skipPrompt, .offRoutePrompt, .uncertainPositionPrompt, .changeRoutePrompt, .leaveTourPrompt]
+        #expect(ProximiMapView.Options(each) == .prompts)
+        #expect(ProximiMapView.Options.all.isSuperset(of: .prompts))
+        for option in each {
+            #expect(ProximiMapView.Options.prompts.subtracting(option).isDisjoint(with: option))
+            #expect(option.isDisjoint(with: [.bottomBar, .background, .progress, .liveActivity, .journeyComplete]))
+        }
+    }
+
+    @Test func aDestinationMatchesTheFeatureIDOrItsPropertiesID() {
+        let places = [
+            VenuePlace(id: "org-1:poi-wc", title: "Restrooms", coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1),
+            VenuePlace(id: "org-1:poi-cafe", title: "Café", coordinate: .init(latitude: 24.5, longitude: 54.4), level: 0),
+        ]
+        #expect(VenuePlace.place(withID: "org-1:poi-cafe", in: places)?.title == "Café")
+        // proximiio-mcp returns `properties.id`, the part after the organisation id.
+        #expect(VenuePlace.place(withID: "poi-wc", in: places)?.title == "Restrooms")
+        #expect(VenuePlace.place(withID: "wc", in: places) == nil)
+        #expect(VenuePlace.place(withID: "poi-shop", in: places) == nil)
+    }
+
+    @Test func anUnavailableDestinationReachesTheHostApp() {
+        let event = ProximiMap.event(for: .destinationUnavailable(poiID: "poi-x", reason: .unknownPlace), places: Self.places)
+        #expect(event == .destinationUnavailable(poiID: "poi-x", reason: .unknownPlace))
+    }
+
     @Test func visitEventsBecomeHostEventsWithTheArtworkID() {
         let reached = ProximiMap.event(for: .artworkReached(stop("poi-a")), places: Self.places)
         #expect(reached == .artworkReached(ProximiStop(id: "poi-a", title: "poi-a", artworkID: "GAD.2010.00033", level: 1)))

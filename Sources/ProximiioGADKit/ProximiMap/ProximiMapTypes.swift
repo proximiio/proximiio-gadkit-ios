@@ -78,6 +78,27 @@ public struct ProximiStop: Equatable, Sendable, Identifiable {
     }
 }
 
+/// A place the host app routes the visitor to on `ProximiMapView`, for example the place of the audio
+/// guide's proximiio-mcp answer (`route_to_place`, `route_to_nearest_amenity`).
+public struct ProximiDestination: Equatable, Sendable {
+    /// The Proximi.io POI id: the feature id, as in `ProximiStop.id`.
+    public var poiID: String
+
+    public init(poiID: String) {
+        self.poiID = poiID
+    }
+
+    /// Why `ProximiMapView` does not route to a destination (`ProximiMapEvent.destinationUnavailable`).
+    public enum Failure: Equatable, Sendable {
+        /// The id is not a place of the venue.
+        case unknownPlace
+        /// No route from the visitor to the place with the route accessibility needs.
+        case noRoute
+        /// A map without a journey has no position of the visitor yet.
+        case noPosition
+    }
+}
+
 /// A geofence of the venue, in `ProximiMapEvent.geofenceEntered` and `geofenceExited`.
 public struct ProximiGeofence: Equatable, Sendable, Identifiable {
     /// The Proximi.io geofence id.
@@ -137,7 +158,7 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// per stop. The package posts no notification for it.
     case stopNearby(ProximiStop)
     /// The position is uncertain near the active stop: the accuracy is worse than
-    /// `GADSettings.uncertainAccuracyMeters` and the stop is within it. Sent by `ProximiMapView` without `Options.prompts`,
+    /// `GADSettings.uncertainAccuracyMeters` and the stop is within it. Sent by `ProximiMapView` without `Options.uncertainPositionPrompt`,
     /// which otherwise asks "Probably at …". At most once per
     /// `GADSettings.locationQuestionQuietPeriod`.
     case positionUncertain(ProximiStop)
@@ -156,8 +177,8 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// first position, after `artworkVisitedOutOfOrder` or after a detour. The journey in the host
     /// app's ids and its new order; the `journey` binding already holds it.
     case stopOrderChanged(ProximiJourney)
-    /// The visitor swiped a stop in the list. With `ProximiMapView.Options.prompts` a dialog asks
-    /// "Skip artwork?"; without them the host app decides.
+    /// The visitor swiped a stop in the list. With `ProximiMapView.Options.skipPrompt` a dialog asks
+    /// "Skip artwork?"; without it the host app decides.
     case skipRequested(ProximiStop)
     case stopSkipped(ProximiStop)
     case skipCancelled(ProximiStop)
@@ -170,6 +191,9 @@ public enum ProximiMapEvent: Equatable, Sendable {
     case detourStarted(ProximiStop)
     /// The detour ended: reached (`completed`) or left.
     case detourEnded(ProximiStop, completed: Bool)
+    /// `ProximiMapView` does not route to the `destination` the host app set, and sets it back to
+    /// `nil`.
+    case destinationUnavailable(poiID: String, reason: ProximiDestination.Failure)
     /// "Resume your Journey" or "Show the route from here".
     case journeyResumed
     /// The visitor has been off the route for `GADSettings.offRouteSeconds`.

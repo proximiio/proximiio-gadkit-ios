@@ -32,16 +32,27 @@ public struct ProximiMapView: View {
         }
 
         /// The bar at the bottom with Back and the Map / List button. Back shows with `onClose` and
-        /// calls it, after "Leave the tour here" with `prompts`.
+        /// calls it, after "Leave the tour here" with `leaveTourPrompt`.
         public static let bottomBar = Options(rawValue: 1 << 0)
         /// The package's background image around the map card. Without it the view is transparent.
         public static let background = Options(rawValue: 1 << 1)
-        /// The view's own prompts: "Skip this artwork?", "You've left your route", "Probably at …",
-        /// "Change your route?" and "Leave the tour here". Without them the view
-        /// reports `skipRequested`, `offRoute`, `positionUncertain` and `journeyFinished` and shows
-        /// nothing, the route follows the visitor who left it, and "Go here" on an amenity starts the
-        /// detour at once.
-        public static let prompts = Options(rawValue: 1 << 2)
+        /// "Skip this artwork?" after a swipe on a stop in the list. Without it the view reports
+        /// `skipRequested` only, and the host app decides.
+        public static let skipPrompt = Options(rawValue: 1 << 6)
+        /// "You've left your route": the leg stays where the visitor left it until "Show the route
+        /// from here". Without it the route follows the visitor who left it.
+        public static let offRoutePrompt = Options(rawValue: 1 << 7)
+        /// "Probably at …" when the position is uncertain near the active stop. Without it the view
+        /// reports `positionUncertain`.
+        public static let uncertainPositionPrompt = Options(rawValue: 1 << 8)
+        /// "Change your route?" after "Go here" on an amenity during a journey. Without it "Go here"
+        /// starts the detour at once.
+        public static let changeRoutePrompt = Options(rawValue: 1 << 9)
+        /// "Leave the tour here" after Back on the bottom bar during a journey in progress. Without it
+        /// Back calls `onClose` at once.
+        public static let leaveTourPrompt = Options(rawValue: 1 << 10)
+        /// All five prompts.
+        public static let prompts: Options = [.skipPrompt, .offRoutePrompt, .uncertainPositionPrompt, .changeRoutePrompt, .leaveTourPrompt]
         /// The view moves the journey on and writes it to the binding: an artwork is visited when the
         /// visitor enters its geofence or stays at it out of order, a personalised journey is ordered
         /// floor by floor and gallery by gallery, and a stop whose POI is deleted is skipped. Without
@@ -57,6 +68,7 @@ public struct ProximiMapView: View {
     }
 
     @Binding private var journey: ProximiJourney
+    private let destination: Binding<ProximiDestination?>
     private let sdk: Proximiio
     private let options: Options
     private let settings: GADSettings
@@ -74,6 +86,12 @@ public struct ProximiMapView: View {
     ///   - journey: The journey to show. A journey without stops, or without a stop on the map, shows
     ///     the map alone. The view applies every change of the host app to the open screen. It
     ///     writes to the binding only with `Options.progress`.
+    ///   - destination: A place to route the visitor to at once, for example from the audio guide. With
+    ///     a journey it is a detour, as after "Go here" on an amenity, with no card and no prompt; a
+    ///     stop of the journey still to visit becomes the next stop instead. Without a journey the map
+    ///     shows the route from the visitor. The view sets it back to `nil` when the route ends:
+    ///     "Resume your Journey", "Close", another place picked on the map, or
+    ///     `ProximiMapEvent.destinationUnavailable`. Setting it to `nil` ends the route.
     ///   - options: What the view does beyond drawing the journey. None by default. The view reads
     ///     them when it opens.
     ///   - settings: Times and distances of the screen. The view reads them when it opens.
@@ -96,6 +114,7 @@ public struct ProximiMapView: View {
     public init(
         sdk: Proximiio,
         journey: Binding<ProximiJourney>,
+        destination: Binding<ProximiDestination?> = .constant(nil),
         options: Options = [],
         settings: GADSettings = .standard,
         routeAccessibility: RouteAccessibility = .none,
@@ -105,6 +124,7 @@ public struct ProximiMapView: View {
         onNavigator: @escaping @MainActor (JourneyNavigator) -> Void = { _ in }
     ) {
         _journey = journey
+        self.destination = destination
         self.sdk = sdk
         self.options = options
         self.settings = settings
@@ -125,6 +145,7 @@ public struct ProximiMapView: View {
                     options: loaded.options,
                     mode: mode,
                     incoming: model.incoming,
+                    destination: destination,
                     persist: { [model, binding = $journey, generation = loaded.generation] journey in
                         model.write(journey, generation: generation, to: binding)
                     },

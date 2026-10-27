@@ -70,6 +70,13 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
         return nil
     }
 
+    /// The place with `id`: the feature id, or the feature's `properties.id`. On Proximi.io data the
+    /// feature id is `<organisation id>:<properties.id>`; proximiio-mcp returns `properties.id`
+    /// (GAD data, 2026-10-27). Pure; covered by tests.
+    static func place(withID id: String, in places: [VenuePlace]) -> VenuePlace? {
+        places.first { $0.id == id } ?? places.first { $0.id.hasSuffix(":" + id) }
+    }
+
     /// Case- and diacritic-insensitive substring match on the title. An empty query matches all.
     static func matching(_ query: String, in places: [VenuePlace]) -> [VenuePlace] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)

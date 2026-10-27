@@ -36,10 +36,10 @@
 //  again while no stop is reached. A restored journey keeps its order. After a detour the stops
 //  still ahead are ordered again from the visitor. A curated tour (`keepsOrder`) is never ordered.
 //
-//  With prompts (`ProximiMapView.Options.prompts`), leaving the route does not re-route the leg
+//  With `ProximiMapView.Options.offRoutePrompt`, leaving the route does not re-route the leg
 //  (`JourneyDeviationPolicy.askApp`): the visitor gets a warning (`isOffRoute`) once they are far
 //  from the route or off it for too long, and "Show the route from here" re-routes from where they
-//  are. Without prompts the navigator re-routes from the visitor (`.automatic`).
+//  are. Without it the navigator re-routes from the visitor (`.automatic`).
 //
 //  Without `managesProgress` (`ProximiMapView.Options.progress`) the host app moves the journey on:
 //  no arrival by geofence, no ordering, and `apply(_:)` takes the host app's changes.
@@ -129,7 +129,7 @@ final class VisitController {
     /// `ProximiMapView.Options.progress`: artwork geofences mark stops visited, the journey is
     /// ordered, and a stop whose POI is deleted is skipped. Off, only `apply(_:)` changes the stops.
     private let managesProgress: Bool
-    /// `ProximiMapView.Options.prompts`: the leg stays where the visitor left it until "Show the
+    /// `ProximiMapView.Options.offRoutePrompt`: the leg stays where the visitor left it until "Show the
     /// route from here" (`.askApp`). Off, the navigator routes again from the visitor.
     private let deviationPolicy: JourneyDeviationPolicy
 
@@ -519,14 +519,30 @@ final class VisitController {
     /// Inserts `place` as a detour before the active stop. The journey continues after it.
     /// The map marker shows the app's glyph for the amenity (an asset catalog name). The style's
     /// amenity sprite is a filled circle and drew a white disk once tinted (PM review 2026-10-12).
-    func detour(to place: VenuePlace) async {
+    ///
+    /// A place that is already a stop of the journey (a visited artwork) gets another stop id, so the
+    /// journey has no two stops with one id; `poiID` stays the place's id.
+    /// - Returns: The id of the detour stop.
+    @discardableResult
+    func detour(to place: VenuePlace) async -> String {
         var stop = VisitPlan.stop(for: place)
+        if navigator.journey.stops.contains(where: { $0.id == stop.id }) { stop.id = "detour:\(place.id)" }
         stop.iconName = AmenityKind.allCases.first { $0.matches(place) }?.icon.rawValue
         // The navigator applies guidance rules to each new leg: the detour leg is reached by
         // distance, the legs after it by the artwork geofence only.
         navigator.guidanceRules = detourGuidanceRules
         await navigator.detour(to: stop)
         navigator.guidanceRules = Self.artworkGuidanceRules
+        return stop.id
+    }
+
+    /// Drops the detour without recording it, and the leg to the next stop follows.
+    func cancelDetour() async {
+        await serially { [weak self] in
+            guard let self else { return }
+            await self.navigator.cancelDetour()
+            self.persist(self.navigator.journey)
+        }
     }
 
     /// "Resume your Journey" after a detour and "Back to my route" after leaving the route.

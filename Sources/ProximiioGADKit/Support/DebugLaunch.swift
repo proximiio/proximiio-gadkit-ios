@@ -16,7 +16,11 @@
 //    -visitList                           with -visit: open the journey in List mode
 //    -visitKind personalised|curated      with -visit: the kind of journey, default personalised
 //    -visitAutoAdvance                    with -visit: advance 5 m after leaving a stop
-//    -hostedMap                           with -visit: open the visit in ProximiMapView on the app's SDK
+//    -hostedMap                           with -visit: open the visit in ProximiMapView on the app's SDK;
+//                                         with -openMap: open ProximiExploreView
+//    -hostedDestination <title>           with -hostedMap: after 5 s set the destination to the place with
+//                                         this title, else the first whose title contains it, by its
+//                                         properties.id (as proximiio-mcp)
 //    -routeTo <title>                     with -openMap: route to the first place whose title matches
 //    -routeAvoid stairs,escalators,revolvingDoors,inaccessiblePaths   accessibility needs for routes
 //    -visit "<title>,<title>,…"            start a visit through the first place matching each title
@@ -41,6 +45,8 @@ import Foundation
     public var visitList = false
     /// `-hostedMap`: `ProximiMap` opens the visit in `ProximiMapView` instead of its journey screen.
     public var hostedMap = false
+    /// `-hostedDestination`: the title of the place `ProximiMapView` gets as its destination.
+    public var hostedDestination: String?
     /// `-visitKind`. The host app passes it to `VisitView`.
     public var visitKind = JourneyKind.personalised
 
@@ -73,6 +79,7 @@ import Foundation
         visitAutoAdvance = arguments.contains("-visitAutoAdvance")
         visitList = arguments.contains("-visitList")
         hostedMap = arguments.contains("-hostedMap")
+        hostedDestination = value(after: "-hostedDestination")
         visitKind = value(after: "-visitKind").flatMap(JourneyKind.init(rawValue:)) ?? .personalised
         visitStops = value(after: "-visit")?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
     }
