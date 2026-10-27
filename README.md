@@ -876,6 +876,16 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.15.1 (2026-10-27)
+
+No change for host apps' code.
+
+Fixed:
+
+- Arabic texts of the strings added in 1.15.0: "Add a stop", "Looks like you've left your route", "Your
+  next stop is …", "Head back to your route.", "Rerouting you…", "NEXT STOP IS LEVEL n" and "Head to
+  Level n by lift or stairs". In 1.15.0 they showed in English in Arabic.
+
 ### 1.15.0 (2026-10-27)
 
 Breaking:
