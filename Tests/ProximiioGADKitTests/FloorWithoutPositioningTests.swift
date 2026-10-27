@@ -3,6 +3,7 @@
 //  ProximiioGADKitTests
 //
 import Foundation
+import Proximiio
 import ProximiioMap
 import Testing
 @testable import ProximiioGADKit
@@ -88,4 +89,19 @@ struct FloorWithoutPositioningTests {
         guide.update(coordinate: Self.north(2), level: 1, markers: toCafe, destinationID: "prayer")
         #expect(guide.isActive)
     }
+
+    /// PM, Monday "POIs on floors with no positioning", 2026-10-26: on the way back the lift or stairs
+    /// to the next stop's floor nearest the destination is highlighted.
+    @Test func theWayBackTakesTheNearestLiftOrStairsToTheNextFloor() {
+        let origin = ProximiioCoordinate(latitude: 24.5, longitude: 54.4)
+        let changers = [
+            LevelChangerPlace(id: "far-lift", featureType: "elevator", coordinate: ProximiioCoordinate(latitude: 24.502, longitude: 54.4), levels: [0, 1, 2]),
+            LevelChangerPlace(id: "near-stairs", featureType: "staircase", coordinate: ProximiioCoordinate(latitude: 24.5001, longitude: 54.4), levels: [0, 1]),
+            LevelChangerPlace(id: "nearest-other", featureType: "elevator", coordinate: ProximiioCoordinate(latitude: 24.50001, longitude: 54.4), levels: [2, 3]),
+        ]
+        #expect(FloorWithoutPositioningGuide.exitChanger(from: origin, level: 0, to: 1, in: changers)?.id == "near-stairs")
+        #expect(FloorWithoutPositioningGuide.exitChanger(from: origin, level: 0, to: 2, in: changers)?.id == "far-lift")
+        #expect(FloorWithoutPositioningGuide.exitChanger(from: origin, level: 0, to: 4, in: changers) == nil)
+    }
 }
+

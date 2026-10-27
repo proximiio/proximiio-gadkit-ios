@@ -49,6 +49,15 @@ struct VisitView: View {
     /// The artworks and level changers, which the map draws itself. The gallery that a leg leads to
     /// first is hidden too (gallery first).
     @State private var hiddenFeatureIDs: Set<String> = []
+    /// The galleries of gallery first (`Gallery.destinations`).
+    @State private var galleryDestinations: [GalleryDestination] = []
+    /// The lifts and stairs, for the way back from a floor without positioning.
+    @State private var levelChangerPlaces: [LevelChangerPlace] = []
+    /// The destination on the floor without positioning, where the way back starts.
+    @State private var returnOrigin: ProximiioCoordinate?
+    /// The POI of the gallery the visitor is in, which the map does not draw (PM, Monday "Navigation
+    /// to a gallery", 2026-10-26).
+    @State private var visitorGalleryPlaceID: String?
     /// Galleries the visitor has been in during this visit.
     @State private var visitedGalleries: Set<String> = []
     @State private var mapLayers = JourneyMapLayers()
@@ -199,6 +208,7 @@ struct VisitView: View {
         }
         .animation(.default, value: mode)
         .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
+        .onChange(of: floorGuide.phase) { _, _ in floorGuidePhaseChanged() }
         .onChange(of: mode) { _, mode in emit(.modeChanged(mode)) }
         .onChange(of: accessibility) { _, accessibility in
             Task { await controller.setAccessibility(accessibility) }
@@ -236,7 +246,7 @@ struct VisitView: View {
             monitor.start()
             await loadVenueData()
             await MapStyle.waitForCanvas(of: controller.session)
-            controller.session.journeyStopMarkerStyle = MapStyle.journeyStops
+            applyStopMarkers()
             if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }
             // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).
             mapLayers.attach(to: controller.session)
@@ -400,6 +410,8 @@ struct VisitView: View {
             Task { @MainActor in
                 checkArrival()
                 controller.checkCloserArtwork()
+                updateVisitorGallery(controller.session.position)
+                if let fix = controller.session.position { floorGuide.positionReceived(at: fix.timestamp) }
             }
         }
         .onReceive(controller.navigator.$guidance) { guidance in
@@ -518,12 +530,14 @@ struct VisitView: View {
         // galleries and level changers stay (PM review 2026-10-12). `mapLayers` draws the
         // level changers on every floor they serve.
         let levelChangers = LevelChangerPlace.all(in: features)
+        levelChangerPlaces = levelChangers
         mapLayers.updateLevelChangers(levelChangers)
         hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
-        controller.session.hiddenFeatureIDs = hiddenFeatureIDs.union(controller.galleryAhead.map { [$0.placeID] } ?? [])
         let geofences = await venue.sdk.geofences()
         controller.artworkAreas = VisitController.artworkAreas(of: geofences)
         let destinations = Gallery.destinations(geofences: geofences, places: places, features: features)
+        galleryDestinations = Array(destinations.values)
+        applyHiddenFeatures()
         controller.setGalleryFirst(isEnabled: kind.guidesToGalleryFirst, places: places, destinations: destinations)
         galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
         galleryNames = Gallery.names(places: places)
@@ -549,9 +563,35 @@ struct VisitView: View {
     /// The leg now ends at `gallery`, or at the artwork for `nil` (gallery first).
     private func galleryAheadChanged(_ gallery: GalleryDestination?) {
         refreshMapLayers()
-        // The red gallery marker takes the place of the gallery's own POI.
-        controller.session.hiddenFeatureIDs = hiddenFeatureIDs.union(gallery.map { [$0.placeID] } ?? [])
+        applyHiddenFeatures()
+        applyStopMarkers()
         FieldLog.log("gallery first: \(gallery.map { "route ends at \($0.gallery.name)" } ?? "route ends at the artwork")")
+    }
+
+    /// The features the map does not draw: the artworks and level changers (`hiddenFeatureIDs`), the
+    /// POI of the gallery the leg ends at (the red gallery marker takes its place) and the POI of the
+    /// gallery the visitor is in.
+    private func applyHiddenFeatures() {
+        var hidden = hiddenFeatureIDs
+        if let gallery = controller.galleryAhead { hidden.insert(gallery.placeID) }
+        if let visitorGalleryPlaceID { hidden.insert(visitorGalleryPlaceID) }
+        if controller.session.hiddenFeatureIDs != hidden { controller.session.hiddenFeatureIDs = hidden }
+    }
+
+    /// The numbered stop markers, except while the leg ends at a gallery: the artworks are not shown
+    /// then (PM, Monday "Navigation to a gallery", 2026-10-26).
+    private func applyStopMarkers() {
+        controller.session.journeyStopMarkerStyle = controller.galleryAhead == nil ? MapStyle.journeyStops : nil
+    }
+
+    /// Finds the gallery the visitor is in, on every fix.
+    private func updateVisitorGallery(_ position: VenuePosition?) {
+        let placeID = position.flatMap { position in
+            galleryDestinations.first { $0.gallery.contains(position.coordinate.proximiio, level: position.floor?.level) }?.placeID
+        }
+        guard placeID != visitorGalleryPlaceID else { return }
+        visitorGalleryPlaceID = placeID
+        applyHiddenFeatures()
     }
 
     /// Reports `stopNearby` once per stop.
@@ -606,12 +646,59 @@ struct VisitView: View {
     private func refreshLevelChanger() {
         let session = controller.session
         let level = session.selectedFloor.level
+        if case .returning(let change) = floorGuide.phase {
+            mapLayers.updateLevelChanger(exitChanger(from: change).map {
+                .init(coordinate: $0.coordinate, level: Double(change.level), featureType: $0.featureType)
+            })
+            return
+        }
         let next = session.routeRenderer?.geometry?.markers.first {
             !$0.isCompleted && VenueLevel.same($0.from.level, level)
         }
         mapLayers.updateLevelChanger(next.map {
             .init(coordinate: $0.coordinate.proximiio, level: level, featureType: $0.featureType)
         })
+    }
+
+    // MARK: Floor without positioning
+
+    /// The leg's destination: the detour's place, else the active stop's.
+    private var floorDestination: VenuePlace? {
+        let navigator = controller.navigator
+        guard let stop = navigator.detourStop ?? navigator.activeStop else { return nil }
+        return places.first { $0.id == (stop.poiID ?? stop.id) }
+    }
+
+    /// The next stop's floor on the way back.
+    private var returningToLevel: Int? {
+        guard case .returning = floorGuide.phase, let level = controller.navigator.activeStop?.floor?.level else { return nil }
+        return Int(level.rounded())
+    }
+
+    /// The lift or stairs to the next stop's floor, nearest the destination the visitor went to.
+    private func exitChanger(from change: FloorWithoutPositioningGuide.Change) -> LevelChangerPlace? {
+        guard let origin = returnOrigin, let target = returningToLevel else { return nil }
+        return FloorWithoutPositioningGuide.exitChanger(from: origin, level: change.level, to: target, in: levelChangerPlaces)
+    }
+
+    /// On a floor without positioning the route is not drawn (PM, Monday "POIs on floors with no
+    /// positioning", 2026-10-26). On the way there the destination is highlighted; on the way back
+    /// the lift or stairs to take.
+    private func floorGuidePhaseChanged() {
+        let hidesRoute: Bool
+        switch floorGuide.phase {
+        case .onFloor:
+            hidesRoute = true
+            mapLayers.updateHighlight(JourneyMapLayers.highlight(of: floorDestination))
+        case .returning:
+            hidesRoute = true
+            mapLayers.updateHighlight(nil)
+        case .idle, .changing:
+            hidesRoute = false
+            mapLayers.updateHighlight(JourneyMapLayers.highlight(of: amenityOnMap))
+        }
+        controller.session.options.routeLineStyle = hidesRoute ? MapStyle.hiddenRoute : MapStyle.route
+        refreshLevelChanger()
     }
 
     /// `recentre` with a field-log line naming the caller.
@@ -792,7 +879,12 @@ struct VisitView: View {
                         galleryAhead: controller.galleryAhead?.gallery,
                         places: places,
                         isOnFloorWithoutPositioning: floorGuide.isActive,
+                        returningToLevel: returningToLevel,
                         onResume: {
+                            if case .onFloor = floorGuide.phase {
+                                returnOrigin = floorDestination?.coordinate
+                                floorGuide.returnFromFloor()
+                            }
                             Task { await controller.resumeJourney() }
                             emit(.journeyResumed)
                         }
@@ -964,6 +1056,9 @@ private struct VisitCard: View {
     /// The map shows a floor without positioning: the card names the stop, with no instruction
     /// from fixes of another floor.
     var isOnFloorWithoutPositioning = false
+    /// The next stop's floor on the way back from a floor without positioning: "NEXT STOP IS LEVEL 1"
+    /// and "Head to Level 1 by lift or stairs".
+    var returningToLevel: Int?
     let onResume: () -> Void
 
     private var visitorGallery: Gallery? {
@@ -1028,6 +1123,7 @@ private struct VisitCard: View {
     }
 
     private var caption: LocalizedStringKey {
+        if let returningToLevel { return "NEXT STOP IS LEVEL \(returningToLevel)" }
         if isOnFloorWithoutPositioning { return "NEXT STOP" }
         switch state {
         case .nextStopOnOtherLevel(let stop, _):
@@ -1043,7 +1139,7 @@ private struct VisitCard: View {
     }
 
     private var title: String {
-        if isOnFloorWithoutPositioning, let stop = navigator.activeStop { return stop.title }
+        if isOnFloorWithoutPositioning, let stop = navigator.activeStop { return galleryAhead?.name ?? stop.title }
         return switch state {
         case .starting: String(localized: "Your journey", bundle: .module)
         case .walking(let stop): galleryAhead?.name ?? stop
@@ -1069,6 +1165,9 @@ private struct VisitCard: View {
     private var instruction: String? {
         // The navigator keeps a stop that no route with the visitor's accessibility needs reaches,
         // with no route line. In a personalised journey the visitor can skip it in the list.
+        if let returningToLevel {
+            return String(localized: "Head to Level \(returningToLevel) by lift or stairs", bundle: .module)
+        }
         if isOnFloorWithoutPositioning {
             return String(localized: "Your position is not shown on this level.", bundle: .module)
         }

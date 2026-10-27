@@ -463,9 +463,11 @@ The map and the background are the same for both.
 In a personalised journey, a leg to an artwork in a gallery the visitor is not in ends at that
 gallery. The artwork's `metadata.gallery_id` names the gallery: the gallery geofence
 (`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. The route ends
-at the POI. The map fills the geofence's outline with the floor's colour and marks the POI with a red
-label, the first word of its title ("G303"); the POI's own icon is hidden. The stop card names the
-POI ("G303 Language") with a gallery icon and no stop number.
+at the POI. The map fills the gallery's polygon feature (else the geofence's outline) with the floor's
+colour and marks the POI with a red label, the first word of its title ("G303"); the POI's own icon is
+hidden, and so are the numbered artwork markers. The stop card names the POI ("G303 Language") with a
+gallery icon and no stop number. The POI of the gallery the visitor is in is not drawn (PM, Monday
+"Navigation to a gallery", 2026-10-26).
 
 The first fix inside the gallery geofence routes the leg again from the visitor, to the artwork. A
 leg that starts in the artwork's gallery ends at the artwork. An artwork without `gallery_id`, or
@@ -730,12 +732,16 @@ Journey Complete:
 2. within `levelChangerReachedMeters` of the lift or stairs, shows the lift or stairs view ("Take the
    stairs to level 0", "Your position is not shown on this level.") for `levelChangeViewSeconds`; a tap
    ends it;
-3. shows that floor with the rest of the route. The map does not follow the visitor there, no
-   off-route warning shows, the position is not checked against artwork geofences (their enter events
-   still count), and the card says that the position is not shown.
+3. shows that floor without the route, with the destination highlighted. The map does not follow the
+   visitor there, no off-route warning shows, the position is not checked against artwork geofences
+   (their enter events still count), and the card says that the position is not shown;
+4. on the journey map, "Resume your Journey" there starts the way back: the map stays on that floor
+   without the route and highlights the lift or stairs to the next stop's floor nearest the destination.
+   The card reads "NEXT STOP IS LEVEL 1", the stop and "Head to Level 1 by lift or stairs". The first
+   new fix ends it.
 
-The map follows the visitor again when the destination changes ("Resume your Journey", another stop
-or route), on "Centre on me" or the floor button, or after `floorWithoutPositioningMaximumSeconds`.
+The map follows the visitor again when the destination changes (another stop or route), on "Centre on
+me" or the floor button, after the way back, or after `floorWithoutPositioningMaximumSeconds`.
 The journey screen sends `floorWithoutPositioningEntered(level:)` and `floorWithoutPositioningLeft(level:)`.
 The view shows the lift or stairs icon until the animation from the design team exists.
 
@@ -922,6 +928,13 @@ Changed:
   the legend's title is SemiBold 14.
 - The position dot disappears when the position is lost, and in a privacy zone, instead of turning
   grey (PM, Monday "Privacy zone to have the same position marker as position disappearing").
+- Floors without positioning (PM, Monday "POIs on floors with no positioning", 2026-10-26): the floor
+  shows no route, with the destination highlighted; "Resume your Journey" there starts the way back,
+  with the lift or stairs to the next stop's floor highlighted. See [Floors without
+  positioning](#floors-without-positioning).
+- Gallery first (PM, Monday "Navigation to a gallery", 2026-10-26): no numbered artwork markers while
+  the leg ends at a gallery, the gallery's polygon is filled, and the POI of the gallery the visitor is
+  in is not drawn.
 - The top 44 pt of the map card, around its handle, do not pan the map. With `.bottomBar` and
   `onClose`, a drag down there is Back; otherwise a sheet that holds the view can be pulled down
   there (PM, Monday "More space for the pull down functionality", 2026-10-26).

@@ -116,8 +116,9 @@ struct ExploreMuseumView: View {
 
     private var header: some View {
         HStack(alignment: .top) {
+            // Regular 24 as in the Figma frame 12129:102006 (PM, Monday "Font size and style", 2026-10-26).
             Text(String(localized: "Level \(Int(level.rounded()))", bundle: .module))
-                .textStyle(.cardTitle)
+                .textStyle(.h1Regular)
                 .padding(.top, 8)
                 .accessibilityIdentifier("exploreLevel")
             Spacer()
@@ -555,7 +556,7 @@ private struct ExploreCard: View {
             if item.kind != .highlight {
                 ExploreIcon(item: item, icons: icons)
             }
-            ExploreText(item: item)
+            ExploreText(item: item, isCard: true)
             Spacer(minLength: 8)
             Text(GuidanceText.floorLabel(item.level)).textStyle(.bodyBold)
         }
@@ -578,17 +579,19 @@ private struct ExploreCard: View {
     }
 }
 
-/// The title (italic for an artwork) and the lines under it.
+/// The title (italic for an artwork) and the lines under it. The card's text is larger than the
+/// list's: Bold 18 and Regular 16 (Figma frame 12129:102006).
 private struct ExploreText: View {
     let item: ExploreItem
+    var isCard = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.title)
                 .italic(item.kind == .highlight)
-                .textStyle(.bodyBold)
+                .textStyle(isCard ? .largeBodyBold : .bodyBold)
             ForEach(item.lines, id: \.self) { line in
-                Text(line).textStyle(.bodySmallRegular)
+                Text(line).textStyle(isCard ? .bodyRegular : .bodySmallRegular)
             }
         }
         .multilineTextAlignment(.leading)

@@ -18,7 +18,7 @@ import SwiftUI
     case cardTitle
     case h1Regular, h1Bold
     case largeBodyRegular, largeBodyBold
-    case bodyMedium, bodyBold
+    case bodyRegular, bodyMedium, bodyBold
     case bodySmallRegular, bodySmallBold
     /// The title of the Explore Museum map legend: SemiBold 14 (PM, Monday "Explore Museum: Map legend
     /// missing", 2026-10-26).
@@ -44,7 +44,7 @@ import SwiftUI
         case .cardTitle: 32
         case .h1Regular, .h1Bold: 24
         case .largeBodyRegular, .largeBodyBold: 18
-        case .bodyMedium, .bodyBold: 16
+        case .bodyRegular, .bodyMedium, .bodyBold: 16
         case .bodySmallRegular, .bodySmallBold, .bodySmallSemiBold: 14
         case .bodyExtraSmall, .caption: 12
         }
@@ -61,7 +61,7 @@ import SwiftUI
         case .cardTitle: .largeTitle
         case .h1Regular, .h1Bold: .title
         case .largeBodyRegular, .largeBodyBold: .title3
-        case .bodyMedium, .bodyBold: .body
+        case .bodyRegular, .bodyMedium, .bodyBold: .body
         case .bodySmallRegular, .bodySmallBold, .bodySmallSemiBold: .subheadline
         case .bodyExtraSmall: .footnote
         case .caption: .caption

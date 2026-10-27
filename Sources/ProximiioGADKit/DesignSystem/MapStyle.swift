@@ -136,6 +136,16 @@ enum MapStyle {
         cap: .round
     )
 
+    /// No route line: the map of a floor without positioning (`FloorWithoutPositioningGuide`).
+    static let hiddenRoute = RouteLineStyle(
+        remaining: .gradient(from: location, to: marker),
+        remainingOpacity: 0,
+        completedColor: location,
+        completedOpacity: 0,
+        widthPoints: 6,
+        cap: .round
+    )
+
     /// Route line without the traveled part, for a map that draws the walked trail.
     static let routeAhead = RouteLineStyle(
         remaining: .gradient(from: location, to: marker),
