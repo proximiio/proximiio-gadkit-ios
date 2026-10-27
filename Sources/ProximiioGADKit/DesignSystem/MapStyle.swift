@@ -146,11 +146,15 @@ enum MapStyle {
         cap: .round
     )
 
-    /// A map session that draws amenities with the design's icons (`amenityImage(for:scale:)`).
-    @MainActor static func session(sdk: Proximiio, options: MapOptions) -> ProximiioMapSession {
+    /// A map session that draws amenities with the design's icons (`amenityImage(for:scale:)`), or
+    /// with `galleryIcons` the icons of the Explore Museum map (`exploreAmenityImage(for:scale:)`).
+    @MainActor static func session(sdk: Proximiio, options: MapOptions, galleryIcons: Bool = false) -> ProximiioMapSession {
         let session = ProximiioMapSession(sdk: sdk, options: options)
         let scale = UIScreen.main.scale
-        session.amenityImageDecoder = { amenityImage(for: $0, scale: scale) }
+        session.amenityImageDecoder = galleryIcons
+            ? { exploreAmenityImage(for: $0, scale: scale) }
+            : { amenityImage(for: $0, scale: scale) }
+        AppLanguage.follow(session)
         return session
     }
 
@@ -165,6 +169,29 @@ enum MapStyle {
             return image
         }
         return amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }
+    }
+
+    /// The map icon of an amenity on the Explore Museum map. A gallery's icon from the venue data is
+    /// as large as the amenity markers, 30 pt: the icon at 22 pt on a circle of white at 30 % with a
+    /// white border (PM, Monday "Explore museum view: default map view", 2026-10-26). An icon without
+    /// a circle of its own shows the design best.
+    static func exploreAmenityImage(for amenity: ProximiioAmenity, scale: CGFloat) -> UIImage? {
+        if AmenityKind.kind(forAmenityID: amenity.id, title: amenity.title) != nil {
+            return amenityImage(for: amenity, scale: scale)
+        }
+        guard let icon = amenity.icon.flatMap({ AmenityIcon.rasterImage($0, scale: scale) }) else { return nil }
+        let size = CGSize(width: 30, height: 30)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            let circle = UIBezierPath(ovalIn: CGRect(origin: .zero, size: size).insetBy(dx: 0.5, dy: 0.5))
+            UIColor.white.withAlphaComponent(0.3).setFill()
+            circle.fill()
+            UIColor.white.setStroke()
+            circle.lineWidth = 1
+            circle.stroke()
+            icon.draw(in: CGRect(x: 4, y: 4, width: 22, height: 22))
+        }
     }
 
     /// Registers the design's glyphs under their `GADIcon` raw value, the `iconName` of an amenity

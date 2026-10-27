@@ -523,7 +523,7 @@ struct VisitView: View {
         controller.session.hiddenFeatureIDs = hiddenFeatureIDs.union(controller.galleryAhead.map { [$0.placeID] } ?? [])
         let geofences = await venue.sdk.geofences()
         controller.artworkAreas = VisitController.artworkAreas(of: geofences)
-        let destinations = Gallery.destinations(geofences: geofences, places: places)
+        let destinations = Gallery.destinations(geofences: geofences, places: places, features: features)
         controller.setGalleryFirst(isEnabled: kind.guidesToGalleryFirst, places: places, destinations: destinations)
         galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
         galleryNames = Gallery.names(places: places)
@@ -576,7 +576,7 @@ struct VisitView: View {
             if gallery.id == destination?.id, galleryAhead == nil { return .init(gallery: gallery, isDestination: true) }
             return visited.contains(gallery.id) ? .init(gallery: gallery, isDestination: false) : nil
         }
-        if let galleryAhead { fills.append(.init(gallery: galleryAhead.gallery, isDestination: true)) }
+        if let galleryAhead { fills.append(.init(gallery: galleryAhead.shown, isDestination: true)) }
         mapLayers.update(fills: fills, level: controller.session.selectedFloor.level)
         mapLayers.updateGalleryMarker(galleryAhead.map {
             .init(coordinate: $0.entry, level: $0.gallery.level, label: $0.label)

@@ -34,8 +34,14 @@ struct GalleryDestination: Identifiable, Equatable, Sendable {
     let entry: ProximiioCoordinate
     /// The id of the gallery's POI.
     let placeID: String
+    /// The gallery's polygon in the venue data, or `nil`. The map fills it; `gallery` (the geofence)
+    /// decides whether the visitor is in the gallery (PM, Monday "Explore Museum view: gallery
+    /// highlighting", 2026-10-26).
+    var polygon: Gallery? = nil
 
     var id: String { gallery.id }
+    /// The outline the map fills: the polygon, else the geofence.
+    var shown: Gallery { polygon ?? gallery }
 
     /// The text of the map marker: the first word of the name, such as "G303".
     var label: String {
@@ -81,7 +87,11 @@ struct Gallery: Identifiable, Equatable, Sendable {
 
     /// The galleries a personalised journey leads to first, by `gallery_id` (`GalleryDestination`). A
     /// gallery without a polygon geofence or a POI is left out. Pure; covered by tests.
-    static func destinations(geofences: [ProximiioGeofence], places: [VenuePlace]) -> [String: GalleryDestination] {
+    ///
+    /// Each destination gets the polygon feature (`type` starting with `gallery`) whose
+    /// `metadata.gallery_id` is the gallery's id, else the one on the POI's floor that contains the
+    /// POI (`features`).
+    static func destinations(geofences: [ProximiioGeofence], places: [VenuePlace], features: [ProximiioFeature] = []) -> [String: GalleryDestination] {
         let pois = Dictionary(
             places.compactMap { place -> (String, VenuePlace)? in
                 guard !place.isArtwork, let id = place.remoteID, !id.isEmpty else { return nil }
@@ -103,6 +113,14 @@ struct Gallery: Identifiable, Equatable, Sendable {
                 placeID: poi.id
             )
         }
+        let polygons = polygonOutlines(features: features)
+        for (id, destination) in destinations {
+            let polygon = polygons.first { $0.galleryID == id }
+                ?? polygons.first { $0.galleryID == nil && $0.outline.contains(destination.entry, level: destination.gallery.level) }
+            guard let polygon else { continue }
+            destinations[id]?.polygon = Gallery(id: polygon.outline.id, name: destination.gallery.name,
+                                                level: polygon.outline.level, ring: polygon.outline.ring)
+        }
         return destinations
     }
 
@@ -112,6 +130,20 @@ struct Gallery: Identifiable, Equatable, Sendable {
         guard outlines.isEmpty else { return outlines }
         let levels = Dictionary(await sdk.floors().map { ($0.id, $0.level) }, uniquingKeysWith: { first, _ in first })
         return all(geofences: await sdk.geofences(), levels: levels)
+    }
+
+    /// The polygon features whose type starts with `gallery`, with their `metadata.gallery_id`.
+    static func polygonOutlines(features: [ProximiioFeature]) -> [(outline: Gallery, galleryID: String?)] {
+        features.compactMap { feature in
+            guard (feature.propertyType ?? "").hasPrefix("gallery"),
+                  let geometry = feature.geometry, let level = feature.level,
+                  let ring = outerRing(type: geometry.type, coordinates: geometry.coordinates) else { return nil }
+            var galleryID: String?
+            if case .object(let metadata)? = feature.properties?["metadata"], let id = metadata["gallery_id"]?.stringValue, !id.isEmpty {
+                galleryID = id
+            }
+            return (Gallery(id: feature.id, name: "", level: level, ring: ring), galleryID)
+        }
     }
 
     /// Polygon features whose type starts with `gallery`. The name is the title of a place

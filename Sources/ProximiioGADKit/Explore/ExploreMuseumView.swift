@@ -13,6 +13,7 @@
 //  does not follow (`MapStyle.exploreOptions()`). The design's About the Building and Collections
 //  tabs have no content in the app (DAILY-CALL N14).
 //
+import MapLibre
 import Proximiio
 import ProximiioMap
 import SwiftUI
@@ -51,21 +52,34 @@ struct ExploreMuseumView: View {
     @State private var amenityIcons: [String: UIImage] = [:]
     /// The place whose card is open.
     @State private var selected: ExploreItem?
+    /// The features the map does not draw: artworks, level changers (drawn by `mapLayers`) and the
+    /// amenities of `AmenityKind`.
+    @State private var hiddenFeatureIDs: Set<String> = []
+    /// The size of the map.
+    @State private var mapSize: CGSize = .zero
 
     init(venue: VenueService) {
         self.venue = venue
-        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.exploreOptions(settings: venue.settings)))
+        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.exploreOptions(settings: venue.settings), galleryIcons: true))
     }
 
-    /// The map area under the level title, the card and the tab bar.
-    private let mapInsets = UIEdgeInsets(top: 130, left: 30, bottom: 220, right: 30)
+    /// The map area under the level title and above the tab bar.
+    private let mapInsets = UIEdgeInsets(top: 130, left: 30, bottom: 120, right: 30)
 
     var body: some View {
         ZStack {
             ProximiioMapView(session: session)
                 .softEdges(cornerRadius: 40)
                 .ignoresSafeArea(edges: .bottom)
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { mapSize = $0 }
             MapLoadingSpinner(session: session, timeout: venue.settings.mapLoadingTimeout)
+            if panel == nil, let selected {
+                ExploreCallout(item: selected, session: session, icons: amenityIcons, target: ExploreCalloutLayout.target(in: mapSize)) {
+                    self.selected = nil
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .transition(.opacity)
+            }
             VStack(spacing: 0) {
                 header
                 Spacer()
@@ -76,10 +90,6 @@ struct ExploreMuseumView: View {
             }
             VStack(spacing: 12) {
                 Spacer()
-                if panel == nil, let selected {
-                    ExploreCard(item: selected, icons: amenityIcons) { self.selected = nil }
-                        .transition(.opacity)
-                }
                 tabBar
             }
             .padding(.horizontal, 16)
@@ -96,7 +106,10 @@ struct ExploreMuseumView: View {
             level = floor.level
             applyMapLayers()
         }
-        .onChange(of: selected) { _, _ in applyMapLayers() }
+        .onChange(of: selected) { _, _ in
+            applyMapLayers()
+            applyHiddenFeatures()
+        }
     }
 
     // MARK: Top
@@ -209,7 +222,7 @@ struct ExploreMuseumView: View {
                             .fill(Palette.ink.opacity(0.25))
                             .frame(width: 44, height: 5)
                         HStack(alignment: .firstTextBaseline) {
-                            Text(title(of: panel)).textStyle(.cardTitle)
+                            Text(title(of: panel)).textStyle(panel == .legend ? .bodySmallSemiBold : .cardTitle)
                             Spacer()
                             if case .list(let tab) = panel {
                                 Text(summary(tab)).textStyle(.bodySmallRegular)
@@ -358,11 +371,15 @@ struct ExploreMuseumView: View {
         let categories = Dictionary(amenities.compactMap { amenity in amenity.title.map { (amenity.id, $0) } },
                                     uniquingKeysWith: { first, _ in first })
         let levelChangers = LevelChangerPlace.all(in: features)
-        catalog = ExploreCatalog(places: places, destinations: Gallery.destinations(geofences: geofences, places: places),
+        catalog = ExploreCatalog(places: places, destinations: Gallery.destinations(geofences: geofences, places: places, features: features),
                                  categories: categories, levelChangerTypes: Set(levelChangers.map(\.featureType)))
         mapLayers.updateLevelChangers(levelChangers)
-        // The artworks are not drawn: the galleries and the Highlights list show them.
-        session.hiddenFeatureIDs = Set(levelChangers.map(\.id)).union(places.filter(\.isArtwork).map(\.id))
+        // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
+        // amenities: the Amenities list and the red marker show them (PM, Monday "Explore museum view:
+        // default map view", 2026-10-26).
+        let amenityPlaces = places.filter { place in !place.isArtwork && AmenityKind.allCases.contains { $0.matches(place) } }
+        hiddenFeatureIDs = Set(levelChangers.map(\.id)).union(places.filter(\.isArtwork).map(\.id)).union(amenityPlaces.map(\.id))
+        applyHiddenFeatures()
         if let current = selected {
             selected = catalog.all.first { $0.id == current.id }
         }
@@ -376,22 +393,31 @@ struct ExploreMuseumView: View {
         applyMapLayers()
     }
 
-    /// Closes the list, shows `item`'s floor, frames it and opens its card.
+    /// Closes the list, shows `item`'s floor and opens its card. The place is framed around the
+    /// callout's target point (`ExploreCalloutLayout`).
     private func show(_ item: ExploreItem) {
         panel = nil
         show(level: item.level)
         selected = item
-        guard let bounds = PlaceFraming.bounds(of: item.framedPoints, minimumMeters: venue.settings.amenityFramingMinimumMeters) else { return }
-        session.camera.fit(bounds: bounds, padding: mapInsets, animated: true)
+        guard let bounds = PlaceFraming.bounds(of: ExploreCalloutLayout.framedPoints(of: item), minimumMeters: venue.settings.amenityFramingMinimumMeters) else { return }
+        session.camera.fit(bounds: bounds, padding: ExploreCalloutLayout.framingInsets(in: mapSize), animated: true)
     }
 
     /// A tap on a POI of the lists or inside a gallery opens its card; elsewhere it closes the card.
     private func tapped(_ identifiers: [String], at coordinate: ProximiioCoordinate) {
         let all = catalog.all
-        let item = identifiers.lazy.compactMap { id in all.first { $0.id == id } }.first
-            ?? catalog.space(at: coordinate, level: level)
-        panel = nil
-        selected = item
+        if let item = identifiers.lazy.compactMap({ id in all.first { $0.id == id } }).first
+            ?? catalog.space(at: coordinate, level: level) {
+            show(item)
+        } else {
+            panel = nil
+            selected = nil
+        }
+    }
+
+    /// The selected place's own POI is not drawn: the callout's dot marks it.
+    private func applyHiddenFeatures() {
+        session.hiddenFeatureIDs = hiddenFeatureIDs.union(selected.map { [$0.id] } ?? [])
     }
 
     /// The galleries of the shown floor and the marker of a selected amenity.
@@ -425,6 +451,96 @@ private struct ExploreRow: View {
         }
         .padding(.vertical, 14)
         .contentShape(Rectangle())
+    }
+}
+
+/// The card of a place picked on the map (PM, Monday "Explore Museum view: gallery POI view",
+/// 2026-10-26): over the map above the place, a line down to the place, and the place as a black dot
+/// in a translucent ring with its title under it. In the design's 402 × 874 pt frame the place is at
+/// (124.5, 657) and the card's bottom 55 pt above it, 32 pt from the sides. The map frames the place
+/// there (`ExploreCalloutLayout`); the line and the dot follow the place when the visitor moves the map.
+private struct ExploreCallout: View {
+    let item: ExploreItem
+    let session: ProximiioMapSession
+    let icons: [String: UIImage]
+    /// Where the place goes (`ExploreCalloutLayout.target(in:)`).
+    let target: CGPoint
+    let onClose: () -> Void
+
+    var body: some View {
+        TimelineView(.animation) { _ in
+            let point = projectedPoint ?? target
+            let cardBottom = target.y - 55
+            ZStack(alignment: .topLeading) {
+                Group {
+                    if point.y > cardBottom {
+                        Rectangle()
+                            .fill(Palette.ink)
+                            .frame(width: 1, height: point.y - cardBottom)
+                            .position(x: point.x, y: (cardBottom + point.y) / 2)
+                    }
+                    marker.position(point)
+                    Text(item.title)
+                        .textStyle(.bodySmallBold)
+                        .multilineTextAlignment(.center)
+                        .frame(width: 140)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .position(x: point.x, y: point.y + 30)
+                }
+                .foregroundStyle(Palette.ink)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+                ExploreCard(item: item, icons: icons, onClose: onClose)
+                    .padding(.horizontal, 32)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: max(0, cardBottom), alignment: .bottom)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    /// The black dot in a ring at 30 % with a white border.
+    private var marker: some View {
+        ZStack {
+            Circle().fill(Palette.ink.opacity(0.3)).frame(width: 21, height: 21)
+            Circle().strokeBorder(Palette.white.opacity(0.7), lineWidth: 1).frame(width: 23, height: 23)
+            Circle().fill(Palette.ink).frame(width: 8.27, height: 8.27)
+        }
+    }
+
+    /// The place on the map view.
+    private var projectedPoint: CGPoint? {
+        guard let mapView = session.canvas?.mapView else { return nil }
+        let coordinate = CLLocationCoordinate2D(latitude: item.coordinate.latitude, longitude: item.coordinate.longitude)
+        return mapView.convert(coordinate, toPointTo: mapView)
+    }
+}
+
+/// Where `ExploreCallout` puts the place.
+enum ExploreCalloutLayout {
+    /// Where the place goes on a map of `size`. Pure; covered by tests.
+    static func target(in size: CGSize) -> CGPoint {
+        CGPoint(x: size.width * 124.5 / 402, y: size.height * 657 / 874)
+    }
+
+    /// The item's framed points mirrored around its place, so the frame's centre is the place and the
+    /// fit puts the place on the target. Pure; covered by tests.
+    static func framedPoints(of item: ExploreItem) -> [ProximiioCoordinate] {
+        let place = item.coordinate
+        return item.framedPoints.flatMap { point in
+            [point, ProximiioCoordinate(latitude: 2 * place.latitude - point.latitude, longitude: 2 * place.longitude - point.longitude)]
+        }
+    }
+
+    /// The padding that frames the place in a box around `target(in:)`, clear of the level title
+    /// and the tab bar. Pure; covered by tests.
+    static func framingInsets(in size: CGSize) -> UIEdgeInsets {
+        guard size.width > 100, size.height > 400 else { return UIEdgeInsets(top: 130, left: 30, bottom: 120, right: 30) }
+        let point = target(in: size)
+        let halfWidth = point.x - 16
+        let halfHeight = max(40, min(point.y - 140, size.height - point.y - 110))
+        return UIEdgeInsets(top: point.y - halfHeight, left: point.x - halfWidth,
+                            bottom: size.height - point.y - halfHeight, right: size.width - point.x - halfWidth)
     }
 }
 

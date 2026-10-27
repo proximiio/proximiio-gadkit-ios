@@ -3,6 +3,7 @@
 //  ProximiioGADKitTests
 //
 import Foundation
+import UIKit
 import Proximiio
 import Testing
 @testable import ProximiioGADKit
@@ -55,7 +56,7 @@ struct ExploreCatalogTests {
     @Test func spacesAreTheGalleriesWithCategoryAndDescription() {
         let spaces = Self.catalog.spaces
         #expect(spaces.map(\.title) == ["G202 Yayoi Kusama", "G303 Language"])
-        #expect(spaces.map(\.lines) == [["Single Artist Gallery"], ["Thematic Gallery. Words and signs"]])
+        #expect(spaces.map(\.lines) == [["Single Artist Gallery"], ["Words and signs"]])
         #expect(spaces.first?.id == "p202")
         #expect(spaces.first?.gallery?.id == "g202")
     }
@@ -119,5 +120,30 @@ struct ExploreCatalogTests {
         // The POI "Elevator" names the lift already; the staircases add "Stairs".
         #expect(catalog.legendFacilities.map(\.title) == ["Elevator", "Stairs", "Women's Restroom"])
         #expect(catalog.spaces.first?.amenityID == Self.thematic)
+    }
+}
+
+/// PM, Monday "Explore Museum view: gallery POI view", 2026-10-26.
+struct ExploreCalloutTests {
+    @Test func thePlaceGoesWhereTheDesignHasItAndIsFramedAroundIt() {
+        let size = CGSize(width: 402, height: 874)
+        let target = ExploreCalloutLayout.target(in: size)
+        #expect(abs(target.x - 124.5) < 0.01 && abs(target.y - 657) < 0.01)
+        let insets = ExploreCalloutLayout.framingInsets(in: size)
+        // The padded box is centred on the target.
+        #expect(abs((insets.left + size.width - insets.right) / 2 - target.x) < 0.01)
+        #expect(abs((insets.top + size.height - insets.bottom) / 2 - target.y) < 0.01)
+        #expect(insets.bottom >= 110 && insets.top >= 140)
+    }
+
+    @Test func theFrameIsCentredOnThePlace() {
+        let ring = [ProximiioCoordinate(latitude: 24, longitude: 54), ProximiioCoordinate(latitude: 24.002, longitude: 54.004)]
+        let item = ExploreItem(id: "p", kind: .space, title: "G101", lines: [], level: 1,
+                               coordinate: ProximiioCoordinate(latitude: 24.0005, longitude: 54.001),
+                               gallery: Gallery(id: "g", name: "G101", level: 1, ring: ring))
+        let points = ExploreCalloutLayout.framedPoints(of: item)
+        let latitudes = points.map(\.latitude), longitudes = points.map(\.longitude)
+        #expect(abs((latitudes.min()! + latitudes.max()!) / 2 - 24.0005) < 1e-9)
+        #expect(abs((longitudes.min()! + longitudes.max()!) / 2 - 54.001) < 1e-9)
     }
 }

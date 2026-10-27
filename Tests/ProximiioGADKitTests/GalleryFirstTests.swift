@@ -162,6 +162,31 @@ struct GalleryDestinationTests {
         #expect(g303.gallery.ring.first == ProximiioCoordinate(latitude: 24, longitude: 54))
     }
 
+    private func polygon(_ id: String, level: Double, galleryID: String? = nil) -> ProximiioFeature {
+        let ring: JSONValue = .array([[54.02, 24.02], [54.08, 24.02], [54.08, 24.08], [54.02, 24.08]].map { .array($0.map { .number($0) }) })
+        var properties: [String: JSONValue] = ["type": .string("gallery"), "level": .number(level)]
+        properties["metadata"] = .object(galleryID.map { ["gallery_id": .string($0)] } ?? [:])
+        return ProximiioFeature(id: id, geometry: .init(type: "Polygon", coordinates: .array([ring])), properties: .object(properties))
+    }
+
+    /// PM, Monday "Explore Museum view: gallery highlighting", 2026-10-26: the map fills the gallery's
+    /// polygon, not its geofence.
+    @Test func theGalleryPolygonIsTheOneWithTheGalleryIDElseTheOneAroundThePOI() throws {
+        let poi = VenuePlace(id: "poi-g303", title: "G303 Language", coordinate: ProximiioCoordinate(latitude: 24.05, longitude: 54.05),
+                             level: 3, remoteID: "e1d2cd21")
+        let around = try #require(Gallery.destinations(geofences: [geofence(remoteID: "e1d2cd21")], places: [poi],
+                                                       features: [polygon("other-floor", level: 2), polygon("room", level: 3)])["e1d2cd21"])
+        #expect(around.polygon?.id == "room")
+        #expect(around.shown.id == "room")
+        #expect(around.gallery.id == "e1d2cd21")
+        let byID = try #require(Gallery.destinations(geofences: [geofence(remoteID: "e1d2cd21")], places: [poi],
+                                                     features: [polygon("room", level: 3), polygon("tagged", level: 2, galleryID: "e1d2cd21")])["e1d2cd21"])
+        #expect(byID.polygon?.id == "tagged")
+        let none = try #require(Gallery.destinations(geofences: [geofence(remoteID: "e1d2cd21")], places: [poi])["e1d2cd21"])
+        #expect(none.polygon == nil)
+        #expect(none.shown == none.gallery)
+    }
+
     @Test func aGeofenceWithoutAnOutlineIsLeftOut() {
         let poi = VenuePlace(id: "poi", title: "G303 Language", coordinate: ProximiioCoordinate(latitude: 24, longitude: 54), level: 3, remoteID: "e1d2cd21")
         #expect(Gallery.destinations(geofences: [geofence(remoteID: "e1d2cd21", polygon: nil)], places: [poi]).isEmpty)

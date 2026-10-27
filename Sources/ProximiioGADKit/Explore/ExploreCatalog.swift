@@ -38,7 +38,7 @@ struct ExploreItem: Identifiable, Equatable, Sendable {
     let lines: [String]
     let level: Double
     let coordinate: ProximiioCoordinate
-    /// A space's outline.
+    /// A space's outline: its polygon feature, else its geofence (`GalleryDestination.shown`).
     var gallery: Gallery?
     /// A space's category, the title of its POI's amenity.
     var category: String?
@@ -89,17 +89,22 @@ struct ExploreCatalog: Equatable, Sendable {
         spaces = destinations.values.compactMap { destination in
             guard let poi = byID[destination.placeID], inMuseum(poi) else { return nil }
             let category = poi.amenityID.flatMap { categories[$0] }
-            let line = [category, poi.details].compactMap { $0 }.joined(separator: ". ")
+            // The POI's description, else its category (PM, Monday "Explore Museum view: gallery POI
+            // view", 2026-10-26).
+            let line = poi.details ?? category
             return ExploreItem(
-                id: poi.id, kind: .space, title: destination.gallery.name, lines: line.isEmpty ? [] : [line],
-                level: poi.level, coordinate: destination.entry, gallery: destination.gallery, category: category,
+                id: poi.id, kind: .space, title: destination.gallery.name, lines: line.map { [$0] } ?? [],
+                level: poi.level, coordinate: destination.entry, gallery: destination.shown, category: category,
                 amenityID: poi.amenityID
             )
         }
         .sorted(by: Self.order)
 
-        let galleryNames = Dictionary(spaces.compactMap { item in item.gallery.map { ($0.id, item.title) } },
-                                      uniquingKeysWith: { first, _ in first })
+        // By the gallery's id (`gallery_id`): the outline can be the gallery's polygon feature.
+        let galleryNames = Dictionary(destinations.values.compactMap { destination -> (String, String)? in
+            guard let poi = byID[destination.placeID], inMuseum(poi) else { return nil }
+            return (destination.id, destination.gallery.name)
+        }, uniquingKeysWith: { first, _ in first })
         highlights = places.filter { $0.isHighlight && inMuseum($0) }.map { place in
             ExploreItem(
                 id: place.id, kind: .highlight, title: place.title,
@@ -113,7 +118,7 @@ struct ExploreCatalog: Equatable, Sendable {
             guard !place.isArtwork, inMuseum(place),
                   let kind = AmenityKind.allCases.first(where: { $0.matches(place) }),
                   kind != .stairs, kind != .elevator else { return nil }
-            return ExploreItem(id: place.id, kind: .amenity(kind), title: place.title, lines: [],
+            return ExploreItem(id: place.id, kind: .amenity(kind), title: place.title, lines: place.details.map { [$0] } ?? [],
                                level: place.level, coordinate: place.coordinate, amenityID: place.amenityID)
         }
         .sorted(by: Self.order)

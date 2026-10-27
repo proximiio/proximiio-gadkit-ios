@@ -598,9 +598,18 @@ follow.
   - Amenities: restrooms, café, help desk, prayer room and shop. Stairs and lifts are not listed.
   - Only the museum's POIs are listed: the `place_id` of the gallery POIs. The GAD organisation also
     holds the DCT office.
-- A row, or a tap on a gallery or a listed POI on the map, shows its level and a card with its icon,
-  title, lines and level. With a gallery's card open, the other galleries are lighter. An amenity gets
-  the red marker with its icon.
+- The map draws no amenity icons: the Amenities list and the red marker show them. A gallery's icon
+  is 30 pt, on a circle of white at 30 % with a white border; an icon in the venue data without a
+  circle of its own shows the design best.
+- A gallery is filled on its polygon feature (`type` `gallery`): the one whose `metadata.gallery_id`
+  is the gallery's id, else the one around the gallery's POI. Without one, its geofence is filled.
+- A row, or a tap on a gallery or a listed POI on the map, shows its level and frames the place at
+  31 % of the width and 75 % of the height of the map. A card over the map names it, with its icon,
+  its description (else a gallery's category) and its level; a line leads from the card to the place,
+  drawn as a black dot in a ring with its title. The line follows the place when the visitor moves the
+  map. With a gallery's card open, the other galleries are lighter. An amenity gets the red marker
+  with its icon.
+- The map labels follow `AppleLanguages` at once when the app changes it while it runs.
 - The design's About the Building and Collections tabs are not in the package: their content is not in
   the venue data.
 
@@ -883,6 +892,9 @@ Added:
   personalised journey (PM, Monday "Navigation to a gallery", 2026-10-27).
 - "Rerouting you…" in the middle of the map while the journey is routed again for longer than 0.5 s
   (PM, Monday "Rerouting calculation view").
+- The open maps take a new `AppleLanguages` at once, for an app that switches its language itself
+  (PM, Monday "Language switching option missing", 2026-10-26). The package's texts follow at the
+  next launch.
 - `ProximiMapView(destination:)`: the host app routes the visitor to a place at once, for example from
   the audio guide's proximiio-mcp answer, and `ProximiMapEvent.destinationUnavailable(poiID:reason:)`.
   The place's id can be the feature id or its `properties.id`, which proximiio-mcp returns. See
@@ -904,6 +916,10 @@ Changed:
   on the map follow the visit order (1 A, 2 C, 3 B; PM, Monday "Personalized tour: renumbering
   artworks", 2026-10-26). `nextStop` is not sent for the moment the navigator walks to that artwork.
 - `GADSettings.followZoom` is 19, was 21 (PM, Monday "Curated tours: zoom level", 2026-10-27).
+- Explore Museum (PM, Monday, 2026-10-26): the card of a picked place is over the map with a line to
+  the place, drawn as a black dot; the text under a gallery's name is its description; the map draws
+  no amenity icons and larger gallery icons; a gallery is filled on its polygon, not its geofence;
+  the legend's title is SemiBold 14.
 - The position dot disappears when the position is lost, and in a privacy zone, instead of turning
   grey (PM, Monday "Privacy zone to have the same position marker as position disappearing").
 - The top 44 pt of the map card, around its handle, do not pan the map. With `.bottomBar` and
