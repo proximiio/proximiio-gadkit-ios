@@ -792,7 +792,8 @@ struct Widgets: WidgetBundle {
 ## Field log
 
 `FieldLog` writes relay positions, positions during a visit, tracking health, artwork arrivals, journey,
-binding and `ProximiMap` events to `Documents/gad-debug.log`. It does not write the SDK's geofence
+binding and `ProximiMap` events, and the state of each map when it changes (venue features on the map,
+features left out, style source, floor, zoom, last error), to `Documents/gad-debug.log`. It does not write the SDK's geofence
 events. It is off by default. Turn it on at launch, before `start()`, in test builds only:
 
 ```swift
@@ -875,6 +876,17 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.15.2 (2026-10-27)
+
+No change for host apps' code.
+
+Added:
+
+- Field log: the state of each map when it changes, checked every second: "map state journey:
+  features 968 · dropped 0 · style organization · L1 · zoom 19.0 · camera ready true", with the last
+  error when there is one. The journey map, the museum map and the Explore Museum map write it (PM,
+  Monday "Floorplan disappears zometimes", 2026-10-27).
 
 ### 1.15.1 (2026-10-27)
 

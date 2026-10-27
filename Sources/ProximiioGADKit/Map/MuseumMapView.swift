@@ -60,6 +60,7 @@ struct MuseumMapView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
+        .task { await MapDiagnostics.follow(session, name: "museum") }
         .task {
             // No dot in a privacy zone (`MapStyle.hidingPosition(_:)`).
             let position = MapStyle.options(settings: venue.settings).position

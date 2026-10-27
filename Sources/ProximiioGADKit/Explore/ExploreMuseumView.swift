@@ -98,6 +98,7 @@ struct ExploreMuseumView: View {
         .animation(.easeInOut(duration: 0.25), value: panel)
         .animation(.easeInOut(duration: 0.2), value: selected)
         .task { await start() }
+        .task { await MapDiagnostics.follow(session, name: "explore") }
         .onChange(of: venue.data.version) { _, _ in
             Task { await load() }
         }

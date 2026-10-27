@@ -483,6 +483,7 @@ struct VisitView: View {
                 }
             }
             .task(id: controller.isRerouting) { await followRerouting() }
+            .task { await MapDiagnostics.follow(controller.session, name: "journey") }
     }
 
     /// "Rerouting you…" after 0.5 s of routing; hidden when the routing ends.

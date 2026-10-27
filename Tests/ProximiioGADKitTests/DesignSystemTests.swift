@@ -36,3 +36,17 @@ struct DesignSystemTests {
         #expect(GADSettings.standard.mapLoadingTimeout == 20)
     }
 }
+
+/// PM, Monday "Floorplan disappears zometimes", 2026-10-27.
+@MainActor
+struct MapDiagnosticsTests {
+    @Test func theLineNamesTheMapStateAndTheZoomIsRoundedToAHalf() {
+        #expect(MapDiagnostics.Snapshot.rounded(zoom: 20.74) == 20.5)
+        #expect(MapDiagnostics.Snapshot.rounded(zoom: 20.76) == 21)
+        #expect(MapDiagnostics.Snapshot.rounded(zoom: nil) == nil)
+        var snapshot = MapDiagnostics.Snapshot(features: 968, dropped: 16, error: "16 features left out", style: "cache",
+                                               level: 1, zoom: 19, isCameraReady: true)
+        snapshot.name = "journey"
+        #expect(snapshot.line == "map state journey: features 968 · dropped 16 · style cache · L1 · zoom 19.0 · camera ready true · error 16 features left out")
+    }
+}
