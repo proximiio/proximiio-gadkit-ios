@@ -152,6 +152,11 @@ struct VisitView: View {
     }
 
     var body: some View {
+        presenting(observing(screen))
+    }
+
+    /// The map card, the bottom bar, the spinner and the lift or stairs view.
+    private var screen: some View {
         GeometryReader { geometry in
             ZStack {
                 if options.contains(.background) { ScreenBackground.map.view }
@@ -159,40 +164,8 @@ struct VisitView: View {
                     VisitLiveActivityDriver(navigator: controller.navigator, session: controller.session, liveActivity: liveActivity)
                 }
                 VStack(spacing: 10) {
-                    MapGlassFrame(onPullDown: pullDownAction) {
-                        ProximiioMapView(session: controller.session)
-                        if showsList {
-                            VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, onSkip: requestSkip)
-                                .background(Palette.white.opacity(0.92))
-                                .transition(.opacity)
-                        }
-                        if showsRerouting {
-                            // "Rerouting you…" fades the map (PM, Monday "Rerouting calculation view").
-                            Palette.white.opacity(0.5).transition(.opacity)
-                            ReroutingCard().transition(.opacity)
-                        }
-                    } overlay: {
-                        cardOverlay
-                    }
-                    if options.contains(.bottomBar) {
-                        BottomGlassBar {
-                            if onClose != nil {
-                                Button(action: requestClose) {
-                                    Image(systemName: "chevron.backward").font(.system(size: 18, weight: .medium))
-                                }
-                                .buttonStyle(RoundGlassButtonStyle())
-                                .accessibilityLabel(Text("Back", bundle: .module))
-                            }
-                        } trailing: {
-                            if hasStops {
-                                Button { withAnimation { mode = showsList ? .map : .list } } label: {
-                                    Image(systemName: showsList ? "map" : "list.bullet").font(.system(size: 18, weight: .medium))
-                                }
-                                .buttonStyle(RoundGlassButtonStyle())
-                                .accessibilityLabel(showsList ? Text("Map", bundle: .module) : Text("List", bundle: .module))
-                            }
-                        }
-                    }
+                    mapCard
+                    bottomBar
                 }
                 // The map ignores the safe area; the card starts below the status bar as in the design.
                 .padding(.top, geometry.safeAreaInsets.top + 8)
@@ -206,259 +179,310 @@ struct VisitView: View {
             }
             .ignoresSafeArea()
         }
-        .animation(.default, value: mode)
-        .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
-        .onChange(of: floorGuide.phase) { _, _ in floorGuidePhaseChanged() }
-        .onChange(of: mode) { _, mode in emit(.modeChanged(mode)) }
-        .onChange(of: accessibility) { _, accessibility in
-            Task { await controller.setAccessibility(accessibility) }
+    }
+
+    /// The map in its glass card, with the list, "Rerouting you…" and the controls over it.
+    private var mapCard: some View {
+        MapGlassFrame(onPullDown: pullDownAction) {
+            ProximiioMapView(session: controller.session)
+            if showsList {
+                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, onSkip: requestSkip)
+                    .background(Palette.white.opacity(0.92))
+                    .transition(.opacity)
+            }
+            if showsRerouting {
+                // "Rerouting you…" fades the map (PM, Monday "Rerouting calculation view").
+                Palette.white.opacity(0.5).transition(.opacity)
+                ReroutingCard().transition(.opacity)
+            }
+        } overlay: {
+            cardOverlay
         }
-        .task {
-            controller.onArtworkDone = { [emit] stop, isActiveStop in
-                emit(isActiveStop ? .artworkReached(stop) : .artworkVisitedOutOfOrder(stop))
-            }
-            floorGuide.onEnter = { [emit, controller] change in
-                // Under the Map / List toggle, beside the map buttons, above the stop card.
-                FloorWithoutPositioningGuide.show(change, on: controller.session, padding: UIEdgeInsets(top: 100, left: 40, bottom: 220, right: 90))
-                emit(.floorWithoutPositioningEntered(level: change.level))
-            }
-            floorGuide.onLeave = { [emit, controller] change in
-                controller.session.followMyFloor()
-                FieldLog.log("recentre (floor without positioning left) · heading true")
-                controller.session.recentre(withHeading: true)
-                emit(.floorWithoutPositioningLeft(level: change.level))
-            }
-            for await event in controller.navigator.events {
-                // The navigator walks to an artwork visited out of order for a moment.
-                if case .legChanged(let stop, _) = event, stop.id == controller.passingStopID { continue }
-                emit(.journey(event))
-                if case .detourEnded(let stop, _) = event, routedDestination?.placeID == (stop.poiID ?? stop.id) {
-                    clearDestination()
-                }
-            }
-        }
-        .task {
-            // Before `controller.start` below: the host app's streams get the journey's first events.
-            onNavigator?(controller.navigator)
-            #if DEBUG
-            if DebugLaunch.current.visitList { mode = .list }
-            #endif
-            monitor.start()
-            await loadVenueData()
-            await MapStyle.waitForCanvas(of: controller.session)
-            applyStopMarkers()
-            if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }
-            // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).
-            mapLayers.attach(to: controller.session)
-            refreshMapLayers()
-            // A journey without stops shows the map alone; the navigator would report it finished.
-            if hasStops {
-                await controller.start(accessibility: accessibility)
-                // A visitor who opens the journey inside the first artwork's geofence.
-                checkArrival()
-            }
-            // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
-            // map did not turn until "Centre on me").
-            if controller.session.position != nil { recentre(withHeading: true, reason: "journey started") }
-            isReady = true
-            destinationChanged(destination.wrappedValue)
-        }
-        .onChange(of: destination.wrappedValue) { _, destination in destinationChanged(destination) }
-        .task {
-            let events = await venue.sdk.geofenceEvents()
-            // The stream does not repeat the geofences entered before it started.
-            controller.enteredGeofenceIDs = await venue.sdk.enteredGeofenceIds
-            checkArrival()
-            for await event in events {
-                switch event {
-                case .entered(let geofence): controller.enteredGeofenceIDs.insert(geofence.id)
-                case .exited(let geofence, _): controller.enteredGeofenceIDs.remove(geofence.id)
-                default: break
-                }
-                // Artwork geofences lie inside the gallery geofences, so only galleries set the
-                // current gallery.
-                switch event {
-                case .entered(let geofence) where geofence.isGallery:
-                    currentGallery = geofence.name
-                    visitedGalleries.insert(galleries.first { $0.name == geofence.name }?.id ?? geofence.id)
-                    refreshMapLayers()
-                    applyFollowZoom()
-                case .exited(let geofence, _) where geofence.isGallery:
-                    if currentGallery == geofence.name {
-                        currentGallery = nil
-                        applyFollowZoom()
+    }
+
+    @ViewBuilder private var bottomBar: some View {
+        if options.contains(.bottomBar) {
+            BottomGlassBar {
+                if onClose != nil {
+                    Button(action: requestClose) {
+                        Image(systemName: "chevron.backward").font(.system(size: 18, weight: .medium))
                     }
-                case .entered(let geofence) where geofence.isArtwork:
-                    controller.artworkGeofenceEntered(remoteID: geofence.remoteId)
-                default: break
+                    .buttonStyle(RoundGlassButtonStyle())
+                    .accessibilityLabel(Text("Back", bundle: .module))
+                }
+            } trailing: {
+                if hasStops {
+                    Button { withAnimation { mode = showsList ? .map : .list } } label: {
+                        Image(systemName: showsList ? "map" : "list.bullet").font(.system(size: 18, weight: .medium))
+                    }
+                    .buttonStyle(RoundGlassButtonStyle())
+                    .accessibilityLabel(showsList ? Text("Map", bundle: .module) : Text("List", bundle: .module))
                 }
             }
         }
-        .onChange(of: amenityOnMap) { _, place in show(amenity: place) }
-        // Field log only. Camera diagnostics for the map library: why the heading-up follow does not start on a
-        // device (PM review 2026-10-12).
-        .onReceive(controller.session.$cameraMode) { mode in
-            FieldLog.log("camera mode \(mode) · ready \(controller.session.isCameraReady) · heading available \(CLLocationManager.headingAvailable())")
-        }
-        .task {
-            guard FieldLog.isEnabled else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                let navigator = controller.navigator
-                let position = controller.session.position
-                let guidance = navigator.guidance
-                let stop = navigator.activeStop
-                // Typed: as a `CVarArg` argument, `optional ?? -1` is an Int when the optional is nil,
-                // which does not match `%.1f`.
-                let accuracy: Double = position?.horizontalAccuracy ?? -1
-                let remaining: Double = guidance?.remainingMeters ?? -1
-                let dwell: Double = guidance?.arrivalProgress ?? 0
-                let offRoute: Double = guidance?.offRouteMeters ?? -1
-                FieldLog.log(String(
-                    format: "guidance stop %@ L%@ · visitor L%@ acc %.1f · remaining %.1f arrived %@ dwell %.2f offRoute %@ (%.1f m) · gallery %@",
-                    stop?.title ?? "-", stop?.floor.map { String(Int($0.level.rounded())) } ?? "-",
-                    position?.floor.map { String(Int($0.level.rounded())) } ?? "-", accuracy,
-                    remaining, String(navigator.hasArrived), dwell,
-                    String(guidance?.isOffRoute ?? false), offRoute, currentGallery ?? "-"
-                ))
+    }
+
+    /// The tasks and the reactions to the journey, the map and the venue data.
+    private func observing(_ content: some View) -> some View {
+        content
+            .animation(.default, value: mode)
+            .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
+            .onChange(of: floorGuide.phase) { _, _ in floorGuidePhaseChanged() }
+            .onChange(of: mode) { _, mode in emit(.modeChanged(mode)) }
+            .onChange(of: accessibility) { _, accessibility in
+                Task { await controller.setAccessibility(accessibility) }
             }
-        }
-        .task {
-            guard FieldLog.isEnabled else { return }
-            for await event in controller.navigator.events {
-                let overview = controller.navigator.overview
-                FieldLog.log("journey event: \(event) · active \(controller.navigator.activeStop?.title ?? "none") · unreachable \(overview.unreachableStopIDs.count)")
-            }
-        }
-        .task {
-            // Ambiguity is checked every few seconds, not on every position.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(4))
-                evaluateAmbiguity()
-            }
-        }
-        .onChange(of: controller.navigator.isFinished) { _, isFinished in
-            if isFinished && options.contains(.journeyComplete) { isShowingWrapUp = true }
-        }
-        .onChange(of: incoming) { _, incoming in
-            guard let incoming else { return }
-            Task { await controller.apply(incoming.journey) }
-        }
-        .fullScreenCover(isPresented: $isShowingWrapUp, onDismiss: leaveIfAsked) {
-            JourneyCompleteView(venue: venue) {
-                controller.end()
-                leave(dismissing: { isShowingWrapUp = false })
-            }
-        }
-        .sheet(isPresented: $isConfirmingExit, onDismiss: leaveIfAsked) {
-            let stops = controller.navigator.journey.stops.filter { $0.state != .skipped }
-            ExitConfirmationSheet(
-                visited: stops.filter { $0.state == .done }.count,
-                total: stops.count,
-                onLeave: {
-                    emit(.exitConfirmed)
-                    leave(dismissing: { isConfirmingExit = false })
-                },
-                onCarryOn: {
-                    isConfirmingExit = false
-                    emit(.exitCancelled)
+            .task {
+                controller.onArtworkDone = { [emit] stop, isActiveStop in
+                    emit(isActiveStop ? .artworkReached(stop) : .artworkVisitedOutOfOrder(stop))
                 }
-            )
-        }
-        .sheet(item: $lowConfidenceStop) { stop in
-            LowConfidencePrompt(stop: stop.title) {
-                answeredAmbiguity["low"] = .now
-                lowConfidenceStop = nil
-            } onNotHere: {
-                answeredAmbiguity["low"] = .now
-                lowConfidenceStop = nil
+                floorGuide.onEnter = { [emit, controller] change in
+                    // Under the Map / List toggle, beside the map buttons, above the stop card.
+                    FloorWithoutPositioningGuide.show(change, on: controller.session, padding: UIEdgeInsets(top: 100, left: 40, bottom: 220, right: 90))
+                    emit(.floorWithoutPositioningEntered(level: change.level))
+                }
+                floorGuide.onLeave = { [emit, controller] change in
+                    controller.session.followMyFloor()
+                    FieldLog.log("recentre (floor without positioning left) · heading true")
+                    controller.session.recentre(withHeading: true)
+                    emit(.floorWithoutPositioningLeft(level: change.level))
+                }
+                for await event in controller.navigator.events {
+                    // The navigator walks to an artwork visited out of order for a moment.
+                    if case .legChanged(let stop, _) = event, stop.id == controller.passingStopID { continue }
+                    emit(.journey(event))
+                    if case .detourEnded(let stop, _) = event, routedDestination?.placeID == (stop.poiID ?? stop.id) {
+                        clearDestination()
+                    }
+                }
             }
-        }
-        .onDisappear {
-            monitor.stop()
-            liveActivity.end()
-        }
-        // No tracking or wristband alerts: the host app handles the wristband states
-        // (PM 2026-10-15).
-        .onChange(of: monitor.health) { _, health in
-            emit(.trackingChanged(health))
-            applyPositionStyle(for: health)
-        }
-        .onChange(of: controller.session.position == nil) { _, hasNoPosition in
-            if !hasNoPosition { recentre(reason: "first position") }
-        }
-        .followsVisitorFloor(controller.session, venue: venue, isPaused: floorGuide.isActive)
-        .onReceive(controller.session.$guidance) { _ in
-            Task { @MainActor in
-                refreshConnector()
-                refreshLevelChanger()
-                let session = controller.session
-                let navigator = controller.navigator
-                floorGuide.update(
-                    coordinate: session.position?.coordinate, level: session.position?.floor?.level,
-                    markers: session.routeRenderer?.geometry?.markers ?? [],
-                    destinationID: navigator.detourStop?.id ?? navigator.activeStop?.id
+            .task {
+                // Before `controller.start` below: the host app's streams get the journey's first events.
+                onNavigator?(controller.navigator)
+                #if DEBUG
+                if DebugLaunch.current.visitList { mode = .list }
+                #endif
+                monitor.start()
+                await loadVenueData()
+                await MapStyle.waitForCanvas(of: controller.session)
+                applyStopMarkers()
+                if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }
+                // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).
+                mapLayers.attach(to: controller.session)
+                refreshMapLayers()
+                // A journey without stops shows the map alone; the navigator would report it finished.
+                if hasStops {
+                    await controller.start(accessibility: accessibility)
+                    // A visitor who opens the journey inside the first artwork's geofence.
+                    checkArrival()
+                }
+                // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
+                // map did not turn until "Centre on me").
+                if controller.session.position != nil { recentre(withHeading: true, reason: "journey started") }
+                isReady = true
+                destinationChanged(destination.wrappedValue)
+            }
+            .onChange(of: destination.wrappedValue) { _, destination in destinationChanged(destination) }
+            .task {
+                let events = await venue.sdk.geofenceEvents()
+                // The stream does not repeat the geofences entered before it started.
+                controller.enteredGeofenceIDs = await venue.sdk.enteredGeofenceIds
+                checkArrival()
+                for await event in events {
+                    switch event {
+                    case .entered(let geofence): controller.enteredGeofenceIDs.insert(geofence.id)
+                    case .exited(let geofence, _): controller.enteredGeofenceIDs.remove(geofence.id)
+                    default: break
+                    }
+                    // Artwork geofences lie inside the gallery geofences, so only galleries set the
+                    // current gallery.
+                    switch event {
+                    case .entered(let geofence) where geofence.isGallery:
+                        currentGallery = geofence.name
+                        visitedGalleries.insert(galleries.first { $0.name == geofence.name }?.id ?? geofence.id)
+                        refreshMapLayers()
+                        applyFollowZoom()
+                    case .exited(let geofence, _) where geofence.isGallery:
+                        if currentGallery == geofence.name {
+                            currentGallery = nil
+                            applyFollowZoom()
+                        }
+                    case .entered(let geofence) where geofence.isArtwork:
+                        controller.artworkGeofenceEntered(remoteID: geofence.remoteId)
+                    default: break
+                    }
+                }
+            }
+            .onChange(of: amenityOnMap) { _, place in show(amenity: place) }
+            // Field log only. Camera diagnostics for the map library: why the heading-up follow does not start on a
+            // device (PM review 2026-10-12).
+            .onReceive(controller.session.$cameraMode) { mode in
+                FieldLog.log("camera mode \(mode) · ready \(controller.session.isCameraReady) · heading available \(CLLocationManager.headingAvailable())")
+            }
+            .task {
+                guard FieldLog.isEnabled else { return }
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(1))
+                    let navigator = controller.navigator
+                    let position = controller.session.position
+                    let guidance = navigator.guidance
+                    let stop = navigator.activeStop
+                    // Typed: as a `CVarArg` argument, `optional ?? -1` is an Int when the optional is nil,
+                    // which does not match `%.1f`.
+                    let accuracy: Double = position?.horizontalAccuracy ?? -1
+                    let remaining: Double = guidance?.remainingMeters ?? -1
+                    let dwell: Double = guidance?.arrivalProgress ?? 0
+                    let offRoute: Double = guidance?.offRouteMeters ?? -1
+                    FieldLog.log(String(
+                        format: "guidance stop %@ L%@ · visitor L%@ acc %.1f · remaining %.1f arrived %@ dwell %.2f offRoute %@ (%.1f m) · gallery %@",
+                        stop?.title ?? "-", stop?.floor.map { String(Int($0.level.rounded())) } ?? "-",
+                        position?.floor.map { String(Int($0.level.rounded())) } ?? "-", accuracy,
+                        remaining, String(navigator.hasArrived), dwell,
+                        String(guidance?.isOffRoute ?? false), offRoute, currentGallery ?? "-"
+                    ))
+                }
+            }
+            .task {
+                guard FieldLog.isEnabled else { return }
+                for await event in controller.navigator.events {
+                    let overview = controller.navigator.overview
+                    FieldLog.log("journey event: \(event) · active \(controller.navigator.activeStop?.title ?? "none") · unreachable \(overview.unreachableStopIDs.count)")
+                }
+            }
+            .task {
+                // Ambiguity is checked every few seconds, not on every position.
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(4))
+                    evaluateAmbiguity()
+                }
+            }
+            .onChange(of: controller.navigator.isFinished) { _, isFinished in
+                if isFinished && options.contains(.journeyComplete) { isShowingWrapUp = true }
+            }
+            .onChange(of: incoming) { _, incoming in
+                guard let incoming else { return }
+                Task { await controller.apply(incoming.journey) }
+            }
+            .fullScreenCover(isPresented: $isShowingWrapUp, onDismiss: leaveIfAsked) {
+                JourneyCompleteView(venue: venue) {
+                    controller.end()
+                    leave(dismissing: { isShowingWrapUp = false })
+                }
+            }
+    }
+
+    /// The rest of the reactions, the sheets and the prompts.
+    private func presenting(_ content: some View) -> some View {
+        content
+            .sheet(isPresented: $isConfirmingExit, onDismiss: leaveIfAsked) {
+                let stops = controller.navigator.journey.stops.filter { $0.state != .skipped }
+                ExitConfirmationSheet(
+                    visited: stops.filter { $0.state == .done }.count,
+                    total: stops.count,
+                    onLeave: {
+                        emit(.exitConfirmed)
+                        leave(dismissing: { isConfirmingExit = false })
+                    },
+                    onCarryOn: {
+                        isConfirmingExit = false
+                        emit(.exitCancelled)
+                    }
                 )
             }
-        }
-        // The session updates the guidance after the position on every fix; a fix without guidance
-        // is checked on the position. The map publishes guidance only on a leg with a route, so the
-        // arrival is checked on the position (field test 2026-10-19).
-        .onReceive(controller.session.$position) { position in
-            checkStopNearby(position: position, guidance: controller.navigator.guidance)
-            // `$position` publishes before the session stores the fix.
-            Task { @MainActor in
-                checkArrival()
-                controller.checkCloserArtwork()
-                updateVisitorGallery(controller.session.position)
-                if let fix = controller.session.position { floorGuide.positionReceived(at: fix.timestamp) }
-            }
-        }
-        .onReceive(controller.navigator.$guidance) { guidance in
-            checkStopNearby(position: controller.session.position, guidance: guidance)
-        }
-        .onChange(of: controller.navigator.activeStop?.id) { _, _ in
-            checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
-            checkArrival()
-        }
-        .onChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
-        .onChange(of: venue.data.version) { _, _ in
-            let routeNetworkChanged = venue.data.changedKinds.contains(.features)
-            Task {
-                await loadVenueData()
-                refreshMapLayers()
-                let withoutPlace = await controller.venueChanged(places: places, galleries: galleries, routeNetworkChanged: routeNetworkChanged)
-                for stop in withoutPlace {
-                    emit(.stopPlaceDeleted(stop))
+            .sheet(item: $lowConfidenceStop) { stop in
+                LowConfidencePrompt(stop: stop.title) {
+                    answeredAmbiguity["low"] = .now
+                    lowConfidenceStop = nil
+                } onNotHere: {
+                    answeredAmbiguity["low"] = .now
+                    lowConfidenceStop = nil
                 }
             }
-        }
-        .onReceive(controller.navigator.$journey) { _ in
-            Task { @MainActor in
-                refreshMapLayers()
-                refreshLevelChanger()
+            .onDisappear {
+                monitor.stop()
+                liveActivity.end()
             }
-        }
-        .onChange(of: controller.galleryAhead) { _, gallery in galleryAheadChanged(gallery) }
-        .onReceive(controller.session.$selectedFloor) { _ in
-            Task { @MainActor in
-                refreshMapLayers()
-                refreshConnector()
-                refreshLevelChanger()
+            // No tracking or wristband alerts: the host app handles the wristband states
+            // (PM 2026-10-15).
+            .onChange(of: monitor.health) { _, health in
+                emit(.trackingChanged(health))
+                applyPositionStyle(for: health)
             }
-        }
-        .sheet(item: $stopToSkip) { stop in
-            SkipConfirmation(stop: stop) {
-                stopToSkip = nil
-                // Without `.progress` the host app skips the stop.
-                if options.contains(.progress) { Task { await controller.skip(stopID: stop.id) } }
-                emit(.stopSkipped(stop))
-            } onKeep: {
-                stopToSkip = nil
-                emit(.skipCancelled(stop))
+            .onChange(of: controller.session.position == nil) { _, hasNoPosition in
+                if !hasNoPosition { recentre(reason: "first position") }
             }
-        }
-        .task(id: controller.isRerouting) { await followRerouting() }
+            .followsVisitorFloor(controller.session, venue: venue, isPaused: floorGuide.isActive)
+            .onReceive(controller.session.$guidance) { _ in
+                Task { @MainActor in
+                    refreshConnector()
+                    refreshLevelChanger()
+                    let session = controller.session
+                    let navigator = controller.navigator
+                    floorGuide.update(
+                        coordinate: session.position?.coordinate, level: session.position?.floor?.level,
+                        markers: session.routeRenderer?.geometry?.markers ?? [],
+                        destinationID: navigator.detourStop?.id ?? navigator.activeStop?.id
+                    )
+                }
+            }
+            // The session updates the guidance after the position on every fix; a fix without guidance
+            // is checked on the position. The map publishes guidance only on a leg with a route, so the
+            // arrival is checked on the position (field test 2026-10-19).
+            .onReceive(controller.session.$position) { position in
+                checkStopNearby(position: position, guidance: controller.navigator.guidance)
+                // `$position` publishes before the session stores the fix.
+                Task { @MainActor in
+                    checkArrival()
+                    controller.checkCloserArtwork()
+                    updateVisitorGallery(controller.session.position)
+                    if let fix = controller.session.position { floorGuide.positionReceived(at: fix.timestamp) }
+                }
+            }
+            .onReceive(controller.navigator.$guidance) { guidance in
+                checkStopNearby(position: controller.session.position, guidance: guidance)
+            }
+            .onChange(of: controller.navigator.activeStop?.id) { _, _ in
+                checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
+                checkArrival()
+            }
+            .onChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
+            .onChange(of: venue.data.version) { _, _ in
+                let routeNetworkChanged = venue.data.changedKinds.contains(.features)
+                Task {
+                    await loadVenueData()
+                    refreshMapLayers()
+                    let withoutPlace = await controller.venueChanged(places: places, galleries: galleries, routeNetworkChanged: routeNetworkChanged)
+                    for stop in withoutPlace {
+                        emit(.stopPlaceDeleted(stop))
+                    }
+                }
+            }
+            .onReceive(controller.navigator.$journey) { _ in
+                Task { @MainActor in
+                    refreshMapLayers()
+                    refreshLevelChanger()
+                }
+            }
+            .onChange(of: controller.galleryAhead) { _, gallery in galleryAheadChanged(gallery) }
+            .onReceive(controller.session.$selectedFloor) { _ in
+                Task { @MainActor in
+                    refreshMapLayers()
+                    refreshConnector()
+                    refreshLevelChanger()
+                }
+            }
+            .sheet(item: $stopToSkip) { stop in
+                SkipConfirmation(stop: stop) {
+                    stopToSkip = nil
+                    // Without `.progress` the host app skips the stop.
+                    if options.contains(.progress) { Task { await controller.skip(stopID: stop.id) } }
+                    emit(.stopSkipped(stop))
+                } onKeep: {
+                    stopToSkip = nil
+                    emit(.skipCancelled(stop))
+                }
+            }
+            .task(id: controller.isRerouting) { await followRerouting() }
     }
 
     /// "Rerouting you…" after 0.5 s of routing; hidden when the routing ends.
