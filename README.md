@@ -894,6 +894,13 @@ Changed:
 - `GADSettings.minimumZoom` and `maximumZoom` are `MapOptions.minimumZoom` and `maximumZoom`. The
   opening frame, "Centre on me", the follow and the journey's leg frames keep to them too.
 
+Fixed:
+
+- iOS 26: since 1.14.0 the glass took touches only where its content was. The accessible routes button
+  took a tap only on its symbol (Monday "Accessible routing", 2026-10-27), a drag on the empty part of a
+  journey list row did not reveal Skip, and the Skip panel took no tap. The glass surfaces take touches
+  on their whole shape again; iOS 27 is unchanged.
+
 From SDK 6.0.0-beta.65 and 6.0.0-beta.66, without a change in this package:
 
 - `authenticate()` gives up after 30 s.

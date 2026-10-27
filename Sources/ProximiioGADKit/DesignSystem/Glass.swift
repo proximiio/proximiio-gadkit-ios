@@ -47,8 +47,15 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
+        if #available(iOS 27, *) {
             content.glassEffect(.regular, in: shape)
+        } else if #available(iOS 26, *) {
+            // On iOS 26.3 the glass outside the content takes no touch: a drag on the empty part of a
+            // list row did not reach its pan, and the skip panel took no tap. The shape makes the whole
+            // surface take touches, as the material of iOS 17 and 18 does. iOS 27 takes the touches
+            // without it, and with it the journey list of `ProximiMapView` stopped responding at its
+            // start (simulators, 2026-10-27).
+            content.glassEffect(.regular, in: shape).contentShape(shape)
         } else {
             content
                 .background {
