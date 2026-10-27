@@ -29,11 +29,11 @@ enum VisitEvent: Sendable, Equatable {
     case skipCancelled(JourneyStop)
     /// The visitor picked an amenity on the map. A card shows it with "Go here".
     case amenitySelected(VenuePlace)
-    /// The amenity is now a detour of the journey: the visitor confirmed "Change your route?".
+    /// The amenity is now a detour of the journey: "Add a stop", or the host app's destination.
     case detourStarted(VenuePlace)
     /// The host app's destination (`ProximiMapView`'s `destination`) gets no route.
     case destinationUnavailable(poiID: String, reason: ProximiDestination.Failure)
-    /// The visitor tapped "Resume your Journey" or "Show the route from here".
+    /// The visitor tapped "Resume your Journey".
     case journeyResumed
     /// The visitor tapped "Centre on me".
     case recentred

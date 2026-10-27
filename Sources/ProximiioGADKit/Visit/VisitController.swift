@@ -36,10 +36,17 @@
 //  again while no stop is reached. A restored journey keeps its order. After a detour the stops
 //  still ahead are ordered again from the visitor. A curated tour (`keepsOrder`) is never ordered.
 //
-//  With `ProximiMapView.Options.offRoutePrompt`, leaving the route does not re-route the leg
-//  (`JourneyDeviationPolicy.askApp`): the visitor gets a warning (`isOffRoute`) once they are far
-//  from the route or off it for too long, and "Show the route from here" re-routes from where they
-//  are. Without it the navigator re-routes from the visitor (`.automatic`).
+//  Off the route (PM, Monday "Personalized tour: off-route and re-route behaviour" and "Curated tour:
+//  off-route and recalculation", 2026-10-26): the visitor gets a warning (`isOffRoute`) once they are
+//  far from the route or off it for too long. In a personalised journey (`JourneyDeviationPolicy.askApp`)
+//  the leg stays where the visitor left it. When another open artwork is now the nearest stop, the
+//  stops ahead are ordered again from the visitor and the leg leads to it (`checkCloserArtwork`). A
+//  curated tour, and a journey without `ProximiMapView.Options.offRoutePrompt`, is routed again from
+//  the visitor (`.automatic`).
+//
+//  An artwork visited out of order moves before the stops still to visit, so the numbers in the list
+//  and on the map follow the visit order (PM, Monday "Personalized tour: renumbering artworks",
+//  2026-10-26).
 //
 //  Without `managesProgress` (`ProximiMapView.Options.progress`) the host app moves the journey on:
 //  no arrival by geofence, no ordering, and `apply(_:)` takes the host app's changes.
@@ -62,6 +69,19 @@ final class VisitController {
     /// `true` after `farFromRoute` or `offRouteTooLong`, until the visitor returns to the route
     /// or answers the warning.
     private(set) var isOffRoute = false
+    /// `true` while the controller routes the journey again: the order after an artwork visited out
+    /// of order or a closer artwork, the leg from the visitor, the end of a detour.
+    private(set) var isRerouting = false
+    @ObservationIgnored private var reroutes = 0 {
+        didSet { isRerouting = reroutes > 0 }
+    }
+    /// From `farFromRoute` or `offRouteTooLong` until the visitor is back on the route or a new leg
+    /// starts. The warning can be closed meanwhile.
+    @ObservationIgnored private var isOffRouteEpisode = false
+    @ObservationIgnored private var lastCloserArtworkCheck = Date.distantPast
+    /// The stop the navigator walks to for a moment while an artwork visited out of order moves
+    /// ahead. `VisitView` reports no `nextStop` for it.
+    private(set) var passingStopID: String?
     /// Called after an artwork stop is marked done: `true` for the active stop, `false` for an
     /// artwork visited out of order. `VisitView` reports `VisitEvent.artworkReached` and
     /// `artworkVisitedOutOfOrder`.
@@ -129,8 +149,9 @@ final class VisitController {
     /// `ProximiMapView.Options.progress`: artwork geofences mark stops visited, the journey is
     /// ordered, and a stop whose POI is deleted is skipped. Off, only `apply(_:)` changes the stops.
     private let managesProgress: Bool
-    /// `ProximiMapView.Options.offRoutePrompt`: the leg stays where the visitor left it until "Show the
-    /// route from here" (`.askApp`). Off, the navigator routes again from the visitor.
+    /// `.askApp`: the leg stays where the visitor left it (personalised journeys with
+    /// `ProximiMapView.Options.offRoutePrompt`). `.automatic`: the navigator routes again from the
+    /// visitor.
     private let deviationPolicy: JourneyDeviationPolicy
 
     /// Stores the journey after each change; `nil` after Journey Complete. `ProximiMap` writes
@@ -233,12 +254,19 @@ final class VisitController {
             scheduleDone(stop.id)
         case .detourEnded(_, completed: true):
             tasks.append(Task { [weak self] in
-                await self?.serially { [weak self] in await self?.orderRemaining() }
+                await self?.serially { [weak self] in
+                    guard let self else { return }
+                    await self.rerouting { await self.orderRemaining() }
+                }
             })
         case .farFromRoute, .offRouteTooLong:
             isOffRoute = true
+            isOffRouteEpisode = true
         case .returnedToRoute:
             isOffRoute = false
+            isOffRouteEpisode = false
+        case .legChanged, .rerouted:
+            isOffRouteEpisode = false
         default:
             break
         }
@@ -324,9 +352,38 @@ final class VisitController {
             await self?.serially { [weak self] in
                 guard let self else { return }
                 self.isOffRoute = false
-                await self.navigator.resumeJourney()
+                await self.rerouting { await self.navigator.resumeJourney() }
             }
         })
+    }
+
+    /// Called on every fix. Personalised journeys off the route: when the nearest open artwork is no
+    /// longer the active stop, the stops ahead are ordered again from the visitor and the leg leads
+    /// to that artwork. At most every 5 s.
+    func checkCloserArtwork() {
+        guard managesProgress, !keepsOrder, isNavigating, isOffRouteEpisode, navigator.detourStop == nil,
+              let active = navigator.activeStop, Date.now.timeIntervalSince(lastCloserArtworkCheck) >= 5
+        else { return }
+        lastCloserArtworkCheck = .now
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self, self.isOffRouteEpisode, self.navigator.activeStop?.id == active.id,
+                      let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
+                      proposal.isImprovement, let first = proposal.order.first, first != active.id
+                else { return }
+                FieldLog.log("off route: \(first) is nearer than \(active.title) · journey ordered again")
+                self.isOffRouteEpisode = false
+                self.isOffRoute = false
+                await self.rerouting { await self.apply(proposal) }
+            }
+        })
+    }
+
+    /// Runs `body` with `isRerouting` on.
+    private func rerouting(_ body: () async -> Void) async {
+        reroutes += 1
+        await body()
+        reroutes -= 1
     }
 
     /// Runs `edit` after the journey changes started before it. Out of order once proposed an order
@@ -362,7 +419,15 @@ final class VisitController {
                 else { return }
                 FieldLog.log("artwork visited out of order: \(stopID)")
                 let activeStopID = self.navigator.activeStop?.id
-                if await self.navigator.markDone(stopID: stopID), let stop = self.stop(stopID) {
+                self.reroutes += 1
+                defer { self.reroutes -= 1 }
+                // The artwork moves before the stops still to visit: the numbers follow the visit
+                // order. The navigator walks to it for a moment.
+                self.passingStopID = stopID
+                await self.navigator.move(stopID: stopID, toIndex: 0)
+                let isDone = await self.navigator.markDone(stopID: stopID)
+                self.passingStopID = nil
+                if isDone, let stop = self.stop(stopID) {
                     self.onArtworkDone?(stop, false)
                 }
                 await self.orderRemaining()
@@ -545,7 +610,7 @@ final class VisitController {
         }
     }
 
-    /// "Resume your Journey" after a detour and "Back to my route" after leaving the route.
+    /// "Resume your Journey" after a detour.
     ///
     /// A detour reached is recorded as visited; one not reached is dropped. After a detour the
     /// stops still ahead are ordered again from the visitor. The leg is drawn from here.
@@ -554,13 +619,16 @@ final class VisitController {
         await serially { [weak self] in
             guard let self else { return }
             let hadDetour = self.navigator.detourStop != nil
-            await self.navigator.resumeJourney()
-            if hadDetour { await self.orderRemaining() }
+            await self.rerouting {
+                await self.navigator.resumeJourney()
+                if hadDetour { await self.orderRemaining() }
+            }
             self.persist(self.navigator.journey)
         }
     }
 
-    /// Closes the off-route warning without re-routing. It opens again on the next episode.
+    /// "Dismiss" on the off-route warning. The leg is not drawn again. The warning opens again on the
+    /// next episode.
     func dismissOffRoute() {
         isOffRoute = false
     }

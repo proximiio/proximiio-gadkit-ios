@@ -26,14 +26,25 @@ import SwiftUI
 
 /// The map in its glass card, with overlays placed inside the card.
 struct MapGlassFrame<Map: View, Overlay: View>: View {
+    /// A drag down from the handle at the top. `nil`: the handle area takes the touches and does
+    /// nothing, so a sheet that holds the view can be pulled down there.
+    var onPullDown: (() -> Void)?
     @ViewBuilder let map: Map
     @ViewBuilder let overlay: Overlay
 
     private let shape = RoundedRectangle(cornerRadius: 50, style: .continuous)
 
+    /// The handle area at the top: the map does not pan there (PM, Monday "More space for the pull
+    /// down functionality", 2026-10-26).
+    private static var handleAreaHeight: CGFloat { 44 }
+
     var body: some View {
         ZStack {
             map.softEdges(cornerRadius: 50)
+            VStack(spacing: 0) {
+                handleArea
+                Spacer(minLength: 0).allowsHitTesting(false)
+            }
             overlay
         }
         .clipShape(shape)
@@ -47,6 +58,22 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
         }
         .overlay(shape.strokeBorder(Palette.white, lineWidth: 1))
         .padding(.horizontal, 10)
+    }
+
+    @ViewBuilder private var handleArea: some View {
+        let area = Color.clear
+            .frame(height: Self.handleAreaHeight)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        if let onPullDown {
+            area
+                .gesture(DragGesture(minimumDistance: 10).onEnded { value in
+                    if value.translation.height > 60 { onPullDown() }
+                })
+                .accessibilityHidden(true)
+        } else {
+            area.accessibilityHidden(true)
+        }
     }
 }
 

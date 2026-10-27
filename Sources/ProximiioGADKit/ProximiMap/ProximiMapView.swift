@@ -39,20 +39,18 @@ public struct ProximiMapView: View {
         /// "Skip this artwork?" after a swipe on a stop in the list. Without it the view reports
         /// `skipRequested` only, and the host app decides.
         public static let skipPrompt = Options(rawValue: 1 << 6)
-        /// "You've left your route": the leg stays where the visitor left it until "Show the route
-        /// from here". Without it the route follows the visitor who left it.
+        /// "Looks like you've left your route" with "Dismiss". With `progress`, a personalised journey
+        /// keeps the leg where the visitor left it until another artwork is nearer. Without it the
+        /// view reports `offRoute` only, and the route follows the visitor who left it.
         public static let offRoutePrompt = Options(rawValue: 1 << 7)
         /// "Probably at …" when the position is uncertain near the active stop. Without it the view
         /// reports `positionUncertain`.
         public static let uncertainPositionPrompt = Options(rawValue: 1 << 8)
-        /// "Change your route?" after "Go here" on an amenity during a journey. Without it "Go here"
-        /// starts the detour at once.
-        public static let changeRoutePrompt = Options(rawValue: 1 << 9)
         /// "Leave the tour here" after Back on the bottom bar during a journey in progress. Without it
         /// Back calls `onClose` at once.
         public static let leaveTourPrompt = Options(rawValue: 1 << 10)
-        /// All five prompts.
-        public static let prompts: Options = [.skipPrompt, .offRoutePrompt, .uncertainPositionPrompt, .changeRoutePrompt, .leaveTourPrompt]
+        /// All four prompts.
+        public static let prompts: Options = [.skipPrompt, .offRoutePrompt, .uncertainPositionPrompt, .leaveTourPrompt]
         /// The view moves the journey on and writes it to the binding: an artwork is visited when the
         /// visitor enters its geofence or stays at it out of order, a personalised journey is ordered
         /// floor by floor and gallery by gallery, and a stop whose POI is deleted is skipped. Without

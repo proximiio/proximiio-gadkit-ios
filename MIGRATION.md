@@ -232,7 +232,7 @@ It does not see calls on the navigator that change the journey, and its next cha
 | `add(_:)`, `insert(_:at:)` | Append or insert `ProximiJourney.Stop(id:)` |
 | `move(stopID:toIndex:)`, `apply(_:)` | Reorder `journey.stops` |
 | Remove a stop | Remove it from `journey.stops` |
-| `detour(to:)`, `cancelDetour()` | No call. The visitor picks an amenity in the view's search and taps "Go here", or the app sets `destination` (README "Routing to a place") and sets it to `nil` to end the detour. `onEvent` reports `amenitySelected`, `detourStarted` and `detourEnded`. |
+| `detour(to:)`, `cancelDetour()` | No call. The visitor picks an amenity in the view's search and taps "Add a stop", or the app sets `destination` (README "Routing to a place") and sets it to `nil` to end the detour. `onEvent` reports `amenitySelected`, `detourStarted` and `detourEnded`. |
 | `resumeJourney()` | No call. The route follows a visitor who left it. |
 | `setRouteOptions(_:)` | The `routeAccessibility:` parameter (`RouteAccessibility`) |
 
@@ -270,7 +270,7 @@ Every time and distance of the view is in `GADSettings` (README "Settings"), pas
 |---|---|
 | `.bottomBar` | A bar with Back (with `onClose`) and a Map / List button. |
 | `.background` | The package's background image around the map card. |
-| `.skipPrompt`, `.offRoutePrompt`, `.uncertainPositionPrompt`, `.changeRoutePrompt`, `.leaveTourPrompt` | One of the view's prompts each: skip, off the route, uncertain position, change of route, leave the tour. `.prompts` is all five. |
+| `.skipPrompt`, `.offRoutePrompt`, `.uncertainPositionPrompt`, `.leaveTourPrompt` | One of the view's prompts each: skip, off the route, uncertain position, leave the tour. `.prompts` is all four. |
 | `.journeyComplete` | Journey Complete when the last stop is done. |
 | `.progress` | The view marks artworks visited, orders a personalised journey and writes the journey to the binding. |
 | `.liveActivity` | The journey's Live Activity, with `ProximiioGADLiveActivity` in the widget extension. |

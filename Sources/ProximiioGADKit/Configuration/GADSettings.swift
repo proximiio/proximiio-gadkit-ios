@@ -49,9 +49,9 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Route
 
-    /// Metres from the route before "You've left your route".
+    /// Metres from the route before "Looks like you've left your route".
     public var offRouteMeters: Double = 30
-    /// Seconds off the route before "You've left your route", at any distance.
+    /// Seconds off the route before "Looks like you've left your route", at any distance.
     public var offRouteSeconds: TimeInterval = 300
     /// The position dot is drawn on the route while it is within this many metres of it. Display
     /// only; guidance and arrival use the real position.
@@ -59,8 +59,12 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Map
 
-    /// Zoom of "Centre on me" and of the first position.
-    public var followZoom: Double = 21
+    /// Zoom of "Centre on me", of the first position and of the follow (PM, Monday "Curated tours:
+    /// zoom level", 2026-10-27).
+    public var followZoom: Double = 19
+    /// Zoom of the follow while the visitor is in a gallery during a personalised journey, or `nil`
+    /// for `followZoom` (PM, Monday "Navigation to a gallery", 2026-10-27).
+    public var galleryFollowZoom: Double? = 20
     /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
     /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
     public var minimumZoom: Double?

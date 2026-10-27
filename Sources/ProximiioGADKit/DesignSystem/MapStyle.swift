@@ -53,6 +53,10 @@ enum MapStyle {
         position.trail = walkedTrail
             ? PositionTrailStyle(isVisible: true, color: location, widthPoints: 6, opacity: 0.3)
             : PositionTrailStyle()
+        // The dot disappears when the position does (PM, Monday "Privacy zone to have the same position
+        // marker as position disappearing", 2026-10-26). `hidingPosition(_:)` hides it in a privacy zone.
+        position.freshness.staleOpacity = 0
+        position.freshness.lostOpacity = 0
         var options = MapOptions(
             camera: .followWithHeading,
             floorSelector: .none,
@@ -89,6 +93,17 @@ enum MapStyle {
         // The dot a privacy zone holds is clear too (as on Android).
         options.position.privacy = PositionPrivacyStyle(color: clear, showsAccuracy: false)
         return options
+    }
+
+    /// `position` with nothing drawn while a privacy zone holds the dot. The map library draws a held
+    /// dot at full opacity; its fill, stroke, shadow and ring are made clear.
+    static func hidingPosition(_ position: PositionStyle) -> PositionStyle {
+        var position = position
+        let clear = MapColor(hex: 0xFFFFFF, alpha: 0)
+        position.dot.strokeColor = clear
+        position.dot.shadowOpacity = 0
+        position.privacy = PositionPrivacyStyle(color: clear, showsAccuracy: false)
+        return position
     }
 
     /// Journey stop markers, drawn by the map library. Skipped stops have no marker and no number.

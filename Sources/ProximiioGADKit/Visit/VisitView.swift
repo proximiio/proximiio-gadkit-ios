@@ -36,8 +36,8 @@ struct VisitView: View {
     @State private var isShowingAmenities = false
     /// The amenity picked from search, shown on a card before it becomes a detour.
     @State private var selectedAmenity: VenuePlace?
-    /// The amenity whose detour waits for "Change your route?".
-    @State private var amenityToConfirm: VenuePlace?
+    /// "Rerouting you…" shows when the journey is routed again for longer than 0.5 s.
+    @State private var showsRerouting = false
     /// EC04d: the soft prompt for an uncertain position near the active stop.
     @State private var lowConfidenceStop: JourneyStop?
     /// Prompt kinds the visitor answered, and when; they stay quiet for a while.
@@ -133,7 +133,9 @@ struct VisitView: View {
             session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder,
             countsOutOfOrder: kind.countsOutOfOrder,
             managesProgress: options.contains(.progress),
-            deviationPolicy: options.contains(.offRoutePrompt) ? .askApp : .automatic,
+            // Off the route a personalised journey keeps the leg; a curated tour is routed again
+            // (PM, Monday, 2026-10-26).
+            deviationPolicy: options.contains(.offRoutePrompt) && options.contains(.progress) && !kind.keepsOrder ? .askApp : .automatic,
             settings: settings, persist: persist
         ))
         self.onClose = onClose
@@ -148,16 +150,17 @@ struct VisitView: View {
                     VisitLiveActivityDriver(navigator: controller.navigator, session: controller.session, liveActivity: liveActivity)
                 }
                 VStack(spacing: 10) {
-                    MapGlassFrame {
+                    MapGlassFrame(onPullDown: pullDownAction) {
                         ProximiioMapView(session: controller.session)
                         if showsList {
                             VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, onSkip: requestSkip)
                                 .background(Palette.white.opacity(0.92))
                                 .transition(.opacity)
                         }
-                        if amenityToConfirm != nil {
-                            // "Change your route?" fades the map (Figma node 10889:112476).
+                        if showsRerouting {
+                            // "Rerouting you…" fades the map (PM, Monday "Rerouting calculation view").
                             Palette.white.opacity(0.5).transition(.opacity)
+                            ReroutingCard().transition(.opacity)
                         }
                     } overlay: {
                         cardOverlay
@@ -216,6 +219,8 @@ struct VisitView: View {
                 emit(.floorWithoutPositioningLeft(level: change.level))
             }
             for await event in controller.navigator.events {
+                // The navigator walks to an artwork visited out of order for a moment.
+                if case .legChanged(let stop, _) = event, stop.id == controller.passingStopID { continue }
                 emit(.journey(event))
                 if case .detourEnded(let stop, _) = event, routedDestination?.placeID == (stop.poiID ?? stop.id) {
                     clearDestination()
@@ -267,8 +272,12 @@ struct VisitView: View {
                     currentGallery = geofence.name
                     visitedGalleries.insert(galleries.first { $0.name == geofence.name }?.id ?? geofence.id)
                     refreshMapLayers()
+                    applyFollowZoom()
                 case .exited(let geofence, _) where geofence.isGallery:
-                    if currentGallery == geofence.name { currentGallery = nil }
+                    if currentGallery == geofence.name {
+                        currentGallery = nil
+                        applyFollowZoom()
+                    }
                 case .entered(let geofence) where geofence.isArtwork:
                     controller.artworkGeofenceEntered(remoteID: geofence.remoteId)
                 default: break
@@ -361,7 +370,10 @@ struct VisitView: View {
         }
         // No tracking or wristband alerts: the host app handles the wristband states
         // (PM 2026-10-15).
-        .onChange(of: monitor.health) { _, health in emit(.trackingChanged(health)) }
+        .onChange(of: monitor.health) { _, health in
+            emit(.trackingChanged(health))
+            applyPositionStyle(for: health)
+        }
         .onChange(of: controller.session.position == nil) { _, hasNoPosition in
             if !hasNoPosition { recentre(reason: "first position") }
         }
@@ -385,7 +397,10 @@ struct VisitView: View {
         .onReceive(controller.session.$position) { position in
             checkStopNearby(position: position, guidance: controller.navigator.guidance)
             // `$position` publishes before the session stores the fix.
-            Task { @MainActor in checkArrival() }
+            Task { @MainActor in
+                checkArrival()
+                controller.checkCloserArtwork()
+            }
         }
         .onReceive(controller.navigator.$guidance) { guidance in
             checkStopNearby(position: controller.session.position, guidance: guidance)
@@ -431,22 +446,55 @@ struct VisitView: View {
                 emit(.skipCancelled(stop))
             }
         }
-        .sheet(isPresented: isShowingOffRouteWarning) {
-            OffRouteWarning {
-                Task { await controller.resumeJourney() }
-                emit(.journeyResumed)
-            } onClose: {
-                controller.dismissOffRoute()
-            }
+        .task(id: controller.isRerouting) { await followRerouting() }
+    }
+
+    /// "Rerouting you…" after 0.5 s of routing; hidden when the routing ends.
+    private func followRerouting() async {
+        guard controller.isRerouting else {
+            withAnimation(.easeInOut(duration: 0.2)) { showsRerouting = false }
+            return
+        }
+        try? await Task.sleep(for: .milliseconds(500))
+        guard !Task.isCancelled, controller.isRerouting else { return }
+        withAnimation(.easeInOut(duration: 0.2)) { showsRerouting = true }
+    }
+
+    /// No dot while a privacy zone holds it (`MapStyle.hidingPosition(_:)`).
+    private func applyPositionStyle(for health: TrackingHealth) {
+        let position = MapStyle.options(routeMarkers: false, settings: settings).position
+        controller.session.options.position = health == TrackingHealth.privacyZone ? MapStyle.hidingPosition(position) : position
+    }
+
+    /// A drag down on the handle of the map card: Back, with the bottom bar and `onClose`.
+    private var pullDownAction: (() -> Void)? {
+        guard options.contains(.bottomBar), onClose != nil else { return nil }
+        return { requestClose() }
+    }
+
+    /// "Looks like you've left your route" on the stop card's place, unless another card is up.
+    private var showsOffRouteCard: Bool {
+        options.contains(.offRoutePrompt) && controller.isOffRoute && hasStops && !floorGuide.isActive
+    }
+
+    /// The zoom of "Centre on me" and of the follow: `GADSettings.galleryFollowZoom` inside a gallery
+    /// in a personalised journey, else `followZoom` (PM, Monday "Navigation to a gallery" and
+    /// "Curated tours: zoom level", 2026-10-27). A camera that follows the visitor zooms to it; one
+    /// the visitor moved stays.
+    private func applyFollowZoom() {
+        let zoom = Self.followZoom(inGallery: currentGallery != nil, kind: kind, settings: settings)
+        guard controller.session.options.recentreZoom != zoom else { return }
+        controller.session.options.recentreZoom = zoom
+        if controller.session.cameraMode == .follow, !floorGuide.isActive {
+            FieldLog.log("follow zoom \(zoom) · in a gallery \(currentGallery ?? "-")")
+            controller.session.recentre(zoom: zoom)
         }
     }
 
-    /// The off-route warning, unless another prompt is up.
-    private var isShowingOffRouteWarning: Binding<Bool> {
-        Binding(
-            get: { options.contains(.offRoutePrompt) && controller.isOffRoute && stopToSkip == nil && amenityToConfirm == nil && !floorGuide.isActive },
-            set: { if !$0 { controller.dismissOffRoute() } }
-        )
+    /// Pure; covered by tests.
+    static func followZoom(inGallery: Bool, kind: JourneyKind, settings: GADSettings) -> Double {
+        guard inGallery, kind.guidesToGalleryFirst, let zoom = settings.galleryFollowZoom else { return settings.followZoom }
+        return zoom
     }
 
     /// Arrival at an artwork, out of order and gallery first. On a floor without positioning the
@@ -486,7 +534,7 @@ struct VisitView: View {
 
     /// The amenity picked in the menu while its card or route is on screen.
     private var amenityOnMap: VenuePlace? {
-        selectedAmenity ?? amenityToConfirm ?? routedAmenity
+        selectedAmenity ?? routedAmenity
     }
 
     /// Highlights `place` and shows it with the visitor (`PlaceFraming`); `nil` removes the highlight.
@@ -624,7 +672,7 @@ struct VisitView: View {
         // Without `offRoutePrompt` the off-route state shows nothing and does not hold the report back.
         lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit
             || (options.contains(.offRoutePrompt) && controller.isOffRoute)
-            || amenityToConfirm != nil || isShowingWrapUp || floorGuide.isActive
+            || isShowingWrapUp || floorGuide.isActive
     }
 
     private func evaluateAmbiguity() {
@@ -703,31 +751,17 @@ struct VisitView: View {
                         .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .module))
                     }
                 }
-                if let place = amenityToConfirm {
-                    // "Change your route?" (Figma node 10889:112477): a card over the faded map
-                    // with "Go here" and "Close" side by side (PM 2026-10-15).
-                    PlaceInfoCard(
-                        title: String(localized: "Change your route?", bundle: .module),
-                        subtitle: changeRouteText(to: place),
-                        primary: "Go here",
-                        onPrimary: {
-                            amenityToConfirm = nil
-                            Task { await controller.detour(to: place) }
-                            emit(.detourStarted(place))
-                        },
-                        onClose: { amenityToConfirm = nil }
-                    )
-                } else if let place = selectedAmenity {
+                if let place = selectedAmenity {
+                    // During a journey "Add a stop" starts the detour at once (PM, Monday "Add stop
+                    // confirmation", 2026-10-26: no second confirmation).
                     PlaceInfoCard(
                         title: place.title,
                         subtitle: place.cardSubtitle,
-                        primary: "Go here",
+                        primary: hasStops ? "Add a stop" : "Go here",
                         onPrimary: {
                             selectedAmenity = nil
                             if !hasStops {
                                 Task { await route(to: place) }
-                            } else if options.contains(.changeRoutePrompt) {
-                                amenityToConfirm = place
                             } else {
                                 Task { await controller.detour(to: place) }
                                 emit(.detourStarted(place))
@@ -741,6 +775,14 @@ struct VisitView: View {
                         subtitle: amenityRouteError ?? place.cardSubtitle,
                         primary: "Close",
                         onPrimary: endAmenityRoute
+                    )
+                } else if showsOffRouteCard {
+                    // PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-26.
+                    PlaceInfoCard(
+                        title: String(localized: "Looks like you’ve left your route", bundle: .module),
+                        subtitle: offRouteText,
+                        primary: "Dismiss",
+                        onPrimary: { controller.dismissOffRoute() }
                     )
                 } else if hasStops {
                     VisitCard(
@@ -761,7 +803,7 @@ struct VisitView: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 20)
         .animation(.easeInOut(duration: 0.2), value: isShowingAmenities)
-        .animation(.easeInOut(duration: 0.2), value: amenityToConfirm)
+        .animation(.easeInOut(duration: 0.2), value: showsOffRouteCard)
     }
 
     /// "Go here" on a map without a journey: the route from the visitor to `place`, as on the museum
@@ -830,7 +872,6 @@ struct VisitView: View {
         let routed = RoutedDestination(requested: destination.poiID, placeID: id)
         FieldLog.log("destination: \(place.title)")
         selectedAmenity = nil
-        amenityToConfirm = nil
         isShowingAmenities = false
         routedDestination = routed
         guard hasStops else {
@@ -887,15 +928,16 @@ struct VisitView: View {
         if destination.wrappedValue != nil { destination.wrappedValue = nil }
     }
 
-    private func changeRouteText(to place: VenuePlace) -> String {
-        if let nextStop = nextStopName {
-            return String(localized: "Navigating to \(place.title) adds a stop to your route to \(nextStop). Your journey progress is kept.", bundle: .module)
+    /// "Your next stop is Gallery 103." The gallery the leg ends at, else the next stop.
+    private var offRouteText: String {
+        guard let next = controller.galleryAhead?.gallery.name ?? controller.navigator.activeStop?.title else {
+            return String(localized: "Head back to your route.", bundle: .module)
         }
-        return String(localized: "Navigating to \(place.title) adds a stop to your route. Your journey progress is kept.", bundle: .module)
+        return String(localized: "Your next stop is \(next).", bundle: .module)
     }
 
-    /// Shows the nearest place of `kind` on a card. "Go here" and "Change your route?" add it as
-    /// a journey detour (PM review 2026-10-12).
+    /// Shows the nearest place of `kind` on a card. "Add a stop" adds it as a journey detour (PM
+    /// review 2026-10-12).
     private func detour(to kind: AmenityKind) {
         let here = controller.session.position
         let from = here.map { ProximiioCoordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude) }
@@ -903,12 +945,6 @@ struct VisitView: View {
         if let selectedAmenity { emit(.amenitySelected(selectedAmenity)) }
     }
 
-    /// The gallery of the next artwork, or the artwork, for "Change your route?".
-    private var nextStopName: String? {
-        guard let stop = controller.navigator.journey.stops.first(where: { $0.kind != .detour && ($0.state == .active || $0.state == .pending) })
-        else { return nil }
-        return Gallery.containing(stop.coordinate.proximiio, level: stop.floor?.level, in: galleries)?.name ?? stop.title
-    }
 }
 
 /// The card at the bottom of the map (Figma "Stop Info"): an icon in a white circle, the
@@ -1111,22 +1147,18 @@ private struct SkipConfirmation: View {
     }
 }
 
-/// "You've left your route" bottom sheet. The route is not redrawn while the visitor walks
-/// elsewhere (PM review 2026-10-12); "Show the route from here" redraws it.
-private struct OffRouteWarning: View {
-    let onReroute: () -> Void
-    let onClose: () -> Void
-
+/// "Rerouting you…" in the middle of the map (PM, Monday "Rerouting calculation view", 2026-10-26).
+private struct ReroutingCard: View {
     var body: some View {
-        VStack(spacing: 10) {
-            Text("You've left your route", bundle: .module).textStyle(.h1Bold)
-            Text("The route stays as it is until you return to it.", bundle: .module)
-                .textStyle(.bodySmallRegular)
-                .padding(.bottom, 20)
-            Button(String(localized: "Show the route from here", bundle: .module), action: onReroute).buttonStyle(.primary)
-            Button(String(localized: "Close", bundle: .module), action: onClose).buttonStyle(.textAction)
+        VStack(spacing: 14) {
+            ProgressView().controlSize(.large)
+            Text("Rerouting you…", bundle: .module).textStyle(.bodyMedium)
         }
-        .overlaySheetStyle()
+        .foregroundStyle(Palette.ink)
+        .padding(.horizontal, 36)
+        .padding(.vertical, 28)
+        .background(Palette.white, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -236,11 +236,10 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `.bottomBar` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
 | `.background` | The package's background image around the map card. | Transparent. |
 | `.skipPrompt` | "Skip this artwork?" after a swipe on a stop. "Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it. | A swipe reports `skipRequested` only. |
-| `.offRoutePrompt` | "You've left your route": the route stays until "Show the route from here". | The route follows a visitor who left it. `offRoute` reports it. |
+| `.offRoutePrompt` | "Looks like you've left your route" with "Dismiss", in place of the stop card. With `.progress` a personalised journey keeps the leg where the visitor left it until another open artwork is the nearest stop; then the stops ahead are ordered again from the visitor. A curated tour is routed again from the visitor. | The route follows a visitor who left it. `offRoute` reports it. |
 | `.uncertainPositionPrompt` | "Probably at …" when the position is uncertain near the active stop. | `positionUncertain` reports it. |
-| `.changeRoutePrompt` | "Change your route?" after "Go here" on an amenity during a journey. | "Go here" starts the detour at once. |
 | `.leaveTourPrompt` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `.bottomBar` and `onClose`). | Back calls `onClose` at once. |
-| `.prompts` | All five prompts above. | |
+| `.prompts` | All four prompts above. | |
 | `.progress` | The view moves the journey on and writes it to the binding: an artwork is visited when the visitor enters its geofence (`artworkReached`) or, in a personalised journey, stays at it out of order (`artworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and writes nothing. |
 | `.liveActivity` | The journey's Live Activity. The widget extension needs `ProximiioGADLiveActivity`. | No Live Activity. |
 | `.journeyComplete` | Journey Complete when the last stop is done. | `journeyFinished` reports the end; nothing shows. |
@@ -374,7 +373,7 @@ The view's navigator differs from a navigator with the map library's default rul
 |---|---|
 | `.stopSkipped`, `.legChanged`, `.journeyFinished` | Sent when the view applies a change of the binding (`update(to:)`). |
 | `.farFromRoute`, `.offRouteTooLong` | After `GADSettings.offRouteMeters` (30 m) and `GADSettings.offRouteSeconds` (300 s). |
-| Off the route | Without `.prompts` the route follows the visitor (`deviationPolicy` `.automatic`); with `.prompts` the view asks (`.askApp`). |
+| Off the route | With `.offRoutePrompt` and `.progress` a personalised journey keeps the leg (`deviationPolicy` `.askApp`). Otherwise the route follows the visitor (`.automatic`). |
 | `.stopReached` and the cue `.arrived` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
 | The cue `.approachingDestination` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
 
@@ -631,9 +630,9 @@ position, search and routes.
 | `skipRequested`, `stopSkipped`, `skipCancelled` (`ProximiStop`) | A swipe on a stop in the list, "Skip artwork", "Keep it". `ProximiMapView` without `.skipPrompt` sends only `skipRequested`. `skipUndone` is not sent since 1.13.0. |
 | `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
-| `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Go here" on an amenity (after "Change your route?" with `.changeRoutePrompt`) or the host app's `destination`; the detour reached (`completed`) or left. |
+| `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Add a stop" on an amenity's card during a journey, or the host app's `destination`; the detour reached (`completed`) or left. |
 | `destinationUnavailable(poiID:reason:)` | `ProximiMapView` does not route to the host app's `destination`: `.unknownPlace`, `.noRoute` or `.noPosition`. `poiID` is the id the host app gave. The view sets the binding back to `nil`. |
-| `journeyResumed` | "Resume your Journey" or "Show the route from here". |
+| `journeyResumed` | "Resume your Journey". |
 | `offRoute(duration:)`, `backOnRoute` | The visitor has been off the route for `offRouteSeconds`; the visitor is on the route again. |
 | `journeyFinished` | Every stop is visited or skipped. Journey Complete shows with `ProximiMap` and with `ProximiMapView.Options.journeyComplete`. |
 | `floorWithoutPositioningEntered(level:)`, `floorWithoutPositioningLeft(level:)` | See "Floors without positioning". |
@@ -669,9 +668,10 @@ let configuration = GADConfiguration(
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `geofenceExitDelay` | 5 s | Time outside an entered geofence or privacy zone before the SDK reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK default 3 s). Enters are reported at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. 0 reports the exit at the first position outside. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
-| `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "You've left your route": this far from the route, or off it this long. |
+| `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "Looks like you've left your route": this far from the route, or off it this long. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
-| `followZoom` | 21 | Zoom of "Centre on me" and of the first position. |
+| `followZoom` | 19 | Zoom of "Centre on me", of the first position and of the follow. |
+| `galleryFollowZoom` | 20 | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
 | `minimumZoom`, `maximumZoom` | `nil` | The zoom levels the visitor cannot go beyond on every map of the package, or the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
 | `mapLoadingTimeout` | 20 s | The longest time a map shows its spinner while the venue's features are not on the map. |
@@ -877,8 +877,12 @@ Added:
 - `ProximiMap.start()` without a connection, on a phone where the API accepted the token before. The
   route network comes from the stored features. See [ProximiMap](#proximimap).
 - One `ProximiMapView.Options` per prompt (Nagarro, 2026-10-27): `.skipPrompt`, `.offRoutePrompt`,
-  `.uncertainPositionPrompt`, `.changeRoutePrompt` and `.leaveTourPrompt`. `.prompts` is all five; code
-  that passes it keeps compiling and works as before.
+  `.uncertainPositionPrompt` and `.leaveTourPrompt`. `.prompts` is all four; code that passes it keeps
+  compiling.
+- `GADSettings.galleryFollowZoom` (20): the follow zooms in while the visitor is in a gallery during a
+  personalised journey (PM, Monday "Navigation to a gallery", 2026-10-27).
+- "Rerouting you…" in the middle of the map while the journey is routed again for longer than 0.5 s
+  (PM, Monday "Rerouting calculation view").
 - `ProximiMapView(destination:)`: the host app routes the visitor to a place at once, for example from
   the audio guide's proximiio-mcp answer, and `ProximiMapEvent.destinationUnavailable(poiID:reason:)`.
   The place's id can be the feature id or its `properties.id`, which proximiio-mcp returns. See
@@ -888,6 +892,23 @@ Added:
 
 Changed:
 
+- During a journey the amenity card has "Add a stop" and "Close". "Add a stop" starts the detour at
+  once; "Change your route?" is gone (PM, Monday "Add stop confirmation", 2026-10-26).
+- Off the route (`.offRoutePrompt`): "Looks like you've left your route" with "Dismiss" takes the
+  stop card's place, instead of the "You've left your route" sheet with "Show the route from here".
+  A personalised journey keeps the leg until another open artwork is the nearest stop, then orders
+  the stops ahead again from the visitor; a curated tour is routed again from the visitor (PM, Monday
+  "Personalized tour: off-route and re-route behaviour" and "Curated tour: off-route and
+  recalculation", 2026-10-26).
+- An artwork visited out of order moves before the stops still to visit: the numbers in the list and
+  on the map follow the visit order (1 A, 2 C, 3 B; PM, Monday "Personalized tour: renumbering
+  artworks", 2026-10-26). `nextStop` is not sent for the moment the navigator walks to that artwork.
+- `GADSettings.followZoom` is 19, was 21 (PM, Monday "Curated tours: zoom level", 2026-10-27).
+- The position dot disappears when the position is lost, and in a privacy zone, instead of turning
+  grey (PM, Monday "Privacy zone to have the same position marker as position disappearing").
+- The top 44 pt of the map card, around its handle, do not pan the map. With `.bottomBar` and
+  `onClose`, a drag down there is Back; otherwise a sheet that holds the view can be pulled down
+  there (PM, Monday "More space for the pull down functionality", 2026-10-26).
 - A token the API has refused for at least two hours: the SDK deletes the venue data, `ProximiMap`
   closes its screens and `status` becomes `.failed(.startFailed)`. `start()` starts again.
   `ProximiMapView`: the host app closes the view (see [ProximiMapView](#proximimapview)).

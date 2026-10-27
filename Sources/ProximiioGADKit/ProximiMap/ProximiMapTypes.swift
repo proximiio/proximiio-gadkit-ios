@@ -194,7 +194,7 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// `ProximiMapView` does not route to the `destination` the host app set, and sets it back to
     /// `nil`.
     case destinationUnavailable(poiID: String, reason: ProximiDestination.Failure)
-    /// "Resume your Journey" or "Show the route from here".
+    /// "Resume your Journey".
     case journeyResumed
     /// The visitor has been off the route for `GADSettings.offRouteSeconds`.
     case offRoute(duration: TimeInterval)

@@ -22,6 +22,17 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.levelChangeViewSeconds == 5)
     }
 
+    /// PM, Monday "Navigation to a gallery" and "Curated tours: zoom level", 2026-10-27.
+    @Test @MainActor func theFollowZoomIs19And20InAGalleryOfAPersonalisedJourney() {
+        let settings = GADSettings.standard
+        #expect(VisitView.followZoom(inGallery: false, kind: .personalised, settings: settings) == 19)
+        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 20)
+        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 19)
+        var withoutGalleryZoom = settings
+        withoutGalleryZoom.galleryFollowZoom = nil
+        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: withoutGalleryZoom) == 19)
+    }
+
     @Test func theRelayAPICanBeAURL() throws {
         let api = try #require(URL(string: "https://api.example.com"))
         let relay = try #require(URL(string: "https://relay.example.com"))

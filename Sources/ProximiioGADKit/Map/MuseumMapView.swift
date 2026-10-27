@@ -61,6 +61,13 @@ struct MuseumMapView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
         .task {
+            // No dot in a privacy zone (`MapStyle.hidingPosition(_:)`).
+            let position = MapStyle.options(settings: venue.settings).position
+            for await state in await venue.sdk.privacyZoneStateChanges() {
+                session.options.position = state.isPrivate ? MapStyle.hidingPosition(position) : position
+            }
+        }
+        .task {
             floorGuide.onEnter = { [session] change in
                 // Under the search button, beside the map buttons, above the route card.
                 FloorWithoutPositioningGuide.show(change, on: session, padding: UIEdgeInsets(top: 90, left: 40, bottom: 230, right: 90))

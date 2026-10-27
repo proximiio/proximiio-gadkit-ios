@@ -67,7 +67,7 @@ struct ProximiMapTests {
     }
 
     @Test func promptsIsEveryPromptAndEachPromptIsItsOwnOption() {
-        let each: [ProximiMapView.Options] = [.skipPrompt, .offRoutePrompt, .uncertainPositionPrompt, .changeRoutePrompt, .leaveTourPrompt]
+        let each: [ProximiMapView.Options] = [.skipPrompt, .offRoutePrompt, .uncertainPositionPrompt, .leaveTourPrompt]
         #expect(ProximiMapView.Options(each) == .prompts)
         #expect(ProximiMapView.Options.all.isSuperset(of: .prompts))
         for option in each {
