@@ -9,10 +9,11 @@
 //  - `in_facilities` and `facilities_order`: the Explore Museum map's Amenities list and the
 //    facilities of its legend.
 //
-//  `metadata` and both keys are optional. A flag that is `false` or "false" leaves the amenity out; a
-//  flag `true` or "true" puts in an amenity the list does not show by itself. The order is a number or
-//  a numeric string, lowest first. An amenity without an order comes after the ordered ones, in the
-//  list's own order.
+//  `metadata` and both keys are optional. When an amenity has the flag `true` or "true", the list
+//  shows only the amenities with the flag true (PM, Monday "Amenity search & Map legend views",
+//  2026-10-28). Without such an amenity the list shows its own choice, without the amenities whose
+//  flag is `false` or "false". The order is a number or a numeric string, lowest first. An amenity
+//  without an order comes after the ordered ones, in the list's own order.
 //
 import Foundation
 import Proximiio
@@ -27,6 +28,10 @@ struct AmenityListing: Equatable, Sendable {
     /// The same by lower-case amenity title, for the legend's lifts and stairs.
     private(set) var orderByTitle: [String: Double] = [:]
     private(set) var excludedTitles: Set<String> = []
+    private(set) var includedTitles: Set<String> = []
+
+    /// An amenity has the flag true: the list shows only those.
+    var isLimitedToIncluded: Bool { !included.isEmpty }
 
     /// No amenity has the keys: each list keeps its own choice and order.
     static let all = AmenityListing()
@@ -45,6 +50,7 @@ struct AmenityListing: Equatable, Sendable {
                 continue
             case true?:
                 included.insert(amenity.id)
+                if let title { includedTitles.insert(title) }
             case nil:
                 break
             }
@@ -63,24 +69,24 @@ struct AmenityListing: Equatable, Sendable {
         AmenityListing(amenities: amenities, flag: "in_facilities", orderKey: "facilities_order")
     }
 
-    /// The sort key of `amenityID`: its order, after every order without one, `nil` when its flag is
-    /// false.
+    /// The sort key of `amenityID`: its order, after every order without one. `nil` when the list
+    /// does not show it: its flag is false, or other amenities have the flag true and it has not.
     func rank(of amenityID: String?) -> Double? {
-        guard let amenityID else { return .greatestFiniteMagnitude }
-        if excluded.contains(amenityID) { return nil }
+        guard let amenityID else { return isLimitedToIncluded ? nil : .greatestFiniteMagnitude }
+        if excluded.contains(amenityID) || (isLimitedToIncluded && !included.contains(amenityID)) { return nil }
         return order[amenityID] ?? .greatestFiniteMagnitude
     }
 
     /// The rank of the amenity titled `title`, as `rank(of:)`.
     func rank(ofTitle title: String) -> Double? {
         let title = title.lowercased()
-        if excludedTitles.contains(title) { return nil }
+        if excludedTitles.contains(title) || (isLimitedToIncluded && !includedTitles.contains(title)) { return nil }
         return orderByTitle[title] ?? .greatestFiniteMagnitude
     }
 
-    /// The shortcut kinds of `places`: the kinds of `AmenityKind.shortcuts` and those of the amenities
-    /// with the flag true, without those whose flag is false, by the data's order, then in the order
-    /// of `AmenityKind.allCases`. Pure; covered by tests.
+    /// The shortcut kinds of `places`: those of the amenities with the flag true when there are any,
+    /// else the kinds of `AmenityKind.shortcuts` without those whose flag is false; by the data's
+    /// order, then in the order of `AmenityKind.allCases`. Pure; covered by tests.
     func shortcuts(places: [VenuePlace]) -> [AmenityKind] {
         let ranked = AmenityKind.allCases.compactMap { kind -> (AmenityKind, Double)? in
             let matching = places.filter(kind.matches)

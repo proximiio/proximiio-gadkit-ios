@@ -515,8 +515,7 @@ also stay hidden while the visitor is outside every gallery, unless the active a
 every gallery too. The destination gallery is filled over the venue's artworks, furniture and inner
 walls (2026-10-27).
 
-A gallery the visitor has been in during the journey, or that holds a visited stop, is visited: the
-map fills it with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4
+A gallery that holds a visited artwork of the journey is visited (PM, 2026-10-28): the map fills it with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4
 #FDC1A8), over the venue's artworks, furniture and inner walls. At its POI it draws the icon of the
 POI's amenity in the white 30 pt circle with the red border of a visited artwork, with the title
 under it (PM, Monday "Visited gallery visualization", 2026-10-28).
@@ -944,6 +943,19 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.18.1 (2026-10-28)
+
+No change for host apps' code.
+
+Changed (PM's answers, 2026-10-28):
+
+- When an amenity has `metadata.in_search` true, the search shortcuts are only the amenities with it.
+  Without one, they are the built-in ones (women's and men's restroom, café, help desk, prayer room,
+  museum shop), without those whose flag is false. `in_facilities` does the same for the Explore Museum
+  Amenities list and the legend's facilities. On 2026-10-28 only Museum Shop has `in_search` true.
+- A gallery is visited when it holds a visited artwork of the journey. Being in the gallery no longer
+  counts.
 
 ### 1.18.0 (2026-10-28)
 

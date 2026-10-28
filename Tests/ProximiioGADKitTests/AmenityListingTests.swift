@@ -37,8 +37,9 @@ struct AmenityListingTests {
         #expect(AmenityListing.all.shortcuts(places: Self.places) == AmenityKind.shortcuts)
     }
 
-    /// The GAD data on 2026-10-27: five amenities ordered, Help Desk without metadata after them.
-    @Test func theOrderComesFromTheMetadataAndTheRestFollows() {
+    /// Five amenities with the flag true, in the data's order; Help Desk without metadata is left out
+    /// (PM, Monday "Amenity search & Map legend views", 2026-10-28).
+    @Test func theFlaggedAmenitiesInTheDataOrderAreTheOnlyShortcuts() {
         let listing = AmenityListing.search([
             Self.amenity("a-prayer", "Prayer Room", ["in_search": .string("true"), "search_order": .number(4)]),
             Self.amenity("a-women", "Women's Restroom", ["in_search": .string("true"), "search_order": .number(1)]),
@@ -47,25 +48,35 @@ struct AmenityListingTests {
             Self.amenity("a-men", "Men's Restroom", ["in_search": .string("true"), "search_order": .string("2")]),
             Self.amenity("a-help", "Helpdesk"),
         ])
-        #expect(listing.shortcuts(places: Self.places) == [.womensRestroom, .mensRestroom, .cafe, .prayerRoom, .museumShop, .helpDesk])
+        #expect(listing.shortcuts(places: Self.places) == [.womensRestroom, .mensRestroom, .cafe, .prayerRoom, .museumShop])
     }
 
-    /// A flag that is false leaves the amenity out; a flag that is true puts in one the list does not
-    /// show by itself.
-    @Test func theFlagLeavesOutOrPutsIn() {
+    /// The GAD data on 2026-10-28: only Museum Shop has `in_search` true, so it is the only shortcut.
+    @Test func oneFlaggedAmenityIsTheOnlyShortcut() {
         let listing = AmenityListing.search([
-            Self.amenity("a-help", "Helpdesk", ["in_search": .bool(false)]),
-            Self.amenity("a-stairs", "Staircase", ["in_search": .bool(true), "search_order": .number(0)]),
+            Self.amenity("a-shop", "Museum Shop", ["in_search": .string("true"), "search_order": .number(5)]),
+            Self.amenity("a-prayer", "Prayer Room"),
         ])
-        let shortcuts = listing.shortcuts(places: Self.places)
-        #expect(!shortcuts.contains(.helpDesk))
-        #expect(shortcuts.first == .stairs)
-        #expect(listing.rank(of: "a-help") == nil)
-        #expect(listing.rank(of: "a-unknown") == .greatestFiniteMagnitude)
-        #expect(listing.rank(of: nil) == .greatestFiniteMagnitude)
+        #expect(listing.shortcuts(places: Self.places) == [.museumShop])
+        #expect(listing.rank(of: "a-prayer") == nil)
+        #expect(listing.rank(of: nil) == nil)
     }
 
-    /// The facilities keys order the Explore Museum's Amenities list within a level and the legend.
+    /// Without a flag true, a flag false leaves the amenity out of the built-in shortcuts. A flag true
+    /// puts in one the built-in list does not have.
+    @Test func theFlagLeavesOutOrPutsIn() {
+        let without = AmenityListing.search([Self.amenity("a-help", "Helpdesk", ["in_search": .bool(false)])])
+        #expect(without.shortcuts(places: Self.places) == AmenityKind.shortcuts.filter { $0 != .helpDesk })
+        #expect(without.rank(of: "a-help") == nil)
+        #expect(without.rank(of: "a-unknown") == .greatestFiniteMagnitude)
+        #expect(without.rank(of: nil) == .greatestFiniteMagnitude)
+
+        let stairs = AmenityListing.search([Self.amenity("a-stairs", "Staircase", ["in_search": .bool(true), "search_order": .number(0)])])
+        #expect(stairs.shortcuts(places: Self.places) == [.stairs])
+    }
+
+    /// The facilities keys choose and order the Explore Museum's Amenities list within a level and the
+    /// legend. With a flag true only the flagged amenities show.
     @Test func theFacilitiesOrderTheExploreLists() {
         let facilities = AmenityListing.facilities([
             Self.amenity("a-shop", "Museum Shop", ["in_facilities": .string("true"), "facilities_order": .number(1)]),
@@ -77,9 +88,20 @@ struct AmenityListingTests {
             categories: ["a-shop": "Museum Shop", "a-women": "Women's Restroom", "a-cafe": "Cafe", "a-men": "Men's Restroom"],
             levelChangerTypes: ["elevator"], facilities: facilities
         )
-        #expect(catalog.amenities.first?.title == "Museum Shop")
-        #expect(!catalog.amenities.contains { $0.title == "Women's restroom" })
-        #expect(catalog.legendFacilities.map(\.title).prefix(2) == ["Museum Shop", "Elevator"])
-        #expect(!catalog.legendFacilities.contains { $0.title == "Women's Restroom" })
+        #expect(catalog.amenities.map(\.title) == ["Museum Shop"])
+        #expect(catalog.legendFacilities.map(\.title) == ["Museum Shop"])
+
+        let ordered = AmenityListing.facilities([
+            Self.amenity("a-women", "Women's Restroom", ["in_facilities": .string("false")]),
+            Self.amenity("a-elevator", "Elevator", ["facilities_order": .number(0)]),
+        ])
+        let unflagged = ExploreCatalog(
+            places: Self.places, destinations: [:],
+            categories: ["a-shop": "Museum Shop", "a-women": "Women's Restroom", "a-cafe": "Cafe", "a-men": "Men's Restroom"],
+            levelChangerTypes: ["elevator"], facilities: ordered
+        )
+        #expect(!unflagged.amenities.contains { $0.title == "Women's restroom" })
+        #expect(unflagged.legendFacilities.first?.title == "Elevator")
+        #expect(!unflagged.legendFacilities.contains { $0.title == "Women's Restroom" })
     }
 }

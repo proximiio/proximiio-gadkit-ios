@@ -63,8 +63,6 @@ struct VisitView: View {
     /// The POI of the gallery the visitor is in, which the map does not draw (PM, Monday "Navigation
     /// to a gallery", 2026-10-26).
     @State private var visitorGalleryPlaceID: String?
-    /// Galleries the visitor has been in during this visit.
-    @State private var visitedGalleries: Set<String> = []
     @State private var mapLayers = JourneyMapLayers()
     @State private var isShowingWrapUp = false
     /// Set by a button in a sheet or cover that leaves the visit: `onClose` runs after that
@@ -319,7 +317,6 @@ struct VisitView: View {
                     switch event {
                     case .entered(let geofence) where geofence.isGallery:
                         currentGallery = geofence.name
-                        visitedGalleries.insert(galleries.first { $0.name == geofence.name }?.id ?? geofence.id)
                         refreshMapLayers()
                         applyFollowZoom()
                     case .exited(let geofence, _) where geofence.isGallery:
@@ -632,12 +629,10 @@ struct VisitView: View {
         if controller.session.hiddenFeatureIDs != hidden { controller.session.hiddenFeatureIDs = hidden }
     }
 
-    /// The galleries the visitor has been in during this visit, and those of the done stops.
+    /// The galleries that hold a visited artwork of the journey (PM, 2026-10-28).
     private var visitedGalleryIDs: Set<String> {
-        let journey = controller.navigator.journey
-        let visitedByStops = journey.stops.filter { $0.state == .done }
-            .compactMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries)?.id }
-        return visitedGalleries.union(visitedByStops)
+        Set(controller.navigator.journey.stops.filter { $0.state == .done && $0.kind != .detour }
+            .compactMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries)?.id })
     }
 
     /// The POIs of the visited galleries, other than the gallery the leg ends at and the gallery the
