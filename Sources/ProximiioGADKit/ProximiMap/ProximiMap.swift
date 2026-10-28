@@ -158,6 +158,7 @@ public final class ProximiMap {
     }
 
     private func performStart() async throws {
+        let started = ContinuousClock.now
         status = .starting
         runSession()
         do {
@@ -201,12 +202,12 @@ public final class ProximiMap {
                 tasks.append(Task { [notifier] in await notifier.run(sdk: venue.sdk, posts: posts) })
             }
             status = .ready
-            FieldLog.log("map: ready · \(places.count) places")
+            FieldLog.log("map: ready · \(places.count) places · start \(MapDiagnostics.Timing.text(MapDiagnostics.seconds(since: started)))")
             #if DEBUG
             await runDebugLaunch(venue: venue)
             #endif
         } catch {
-            FieldLog.log("map: start failed: \(error)")
+            FieldLog.log("map: start failed after \(MapDiagnostics.Timing.text(MapDiagnostics.seconds(since: started))): \(error)")
             let failure = ProximiMapError.startFailed(String(describing: error))
             status = .failed(failure)
             throw failure
@@ -371,6 +372,7 @@ public final class ProximiMap {
             break
         }
         FieldLog.log("map: open \(screen.rawValue) · on screen \(self.screen?.rawValue ?? "-")")
+        MapDiagnostics.openedAt = .now
         replace { [weak self] in self?.show(screen) }
     }
 

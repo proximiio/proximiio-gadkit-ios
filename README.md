@@ -817,6 +817,16 @@ FieldLog.logLaunch()
 `FieldLogShareButton()` opens the share sheet with the file. A line is `[GAD] <time stamp> <message>`;
 the time stamp is ISO 8601 in UTC with the date and milliseconds (`FieldLog.timeStamp`).
 
+Two lines time the start and each map:
+
+- `map: ready · 237 places · start 4.92 s`: the time `start()` took.
+- `map timing explore: style cache 0.01 s · features 968 1.32 s · camera ready 1.32 s · shown 1.32 s, 2.34 s after open()`:
+  the time from the map view's appearance to each style the map took, the first venue features on the
+  map and the camera framing the venue. `shown` is the last of the first venue style, the features and
+  the camera; after a screen opened with `open(_:)`, the time from that call follows. A view closed earlier writes `closed … before shown`. A style the map takes later gets a
+  line with `after shown`. The map library does not report when MapLibre has drawn the tiles, icons and
+  labels, so `shown` comes before that.
+
 ## Debug builds
 
 In the Debug configuration `start()` reads these launch arguments:
@@ -891,6 +901,15 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.16.1 (2026-10-28)
+
+No change for host apps' code.
+
+Added:
+
+- The field log times `start()` (`map: ready · … · start 4.92 s`) and each map, from the map view's
+  appearance until it shows the venue (`map timing`). See "Field log".
 
 ### 1.16.0 (2026-10-28)
 
