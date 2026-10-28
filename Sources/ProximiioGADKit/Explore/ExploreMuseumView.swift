@@ -46,6 +46,8 @@ struct ExploreMuseumView: View {
     @State private var mapLayers = JourneyMapLayers()
     @State private var catalog = ExploreCatalog()
     @State private var level: Double = 0
+    /// The floor changer shows a button for each level.
+    @State private var isShowingLevels = false
     /// The open list or the legend, or `nil` for the map alone.
     @State private var panel: ExplorePanel?
     /// The amenities' icons from the venue data, by amenity id.
@@ -134,28 +136,56 @@ struct ExploreMuseumView: View {
     }
 
     /// The floor changer of the PM screens: the level in a tile of the level colour, a chevron under
-    /// it, in a frosted frame. Lists the museum's levels, highest first.
+    /// it, in a frosted frame. Open, it shows a glass button for each of the museum's levels, highest
+    /// first, the shown level in bold, and a chevron that closes it (PM, Monday "Explore museum: Level
+    /// selector dropdown", 2026-10-28).
     private var floorChanger: some View {
-        Menu {
-            ForEach(catalog.levels.reversed(), id: \.self) { candidate in
-                Button(String(localized: "Level \(Int(candidate))", bundle: .module)) { show(level: candidate) }
+        VStack(spacing: 8) {
+            if isShowingLevels {
+                ForEach(catalog.levels.reversed(), id: \.self) { candidate in
+                    let isShown = VenueLevel.same(candidate, level)
+                    GlassSquareButton(action: {
+                        show(level: candidate)
+                        withAnimation(.easeInOut(duration: 0.2)) { isShowingLevels = false }
+                    }) {
+                        Text(GuidanceText.floorLabel(candidate))
+                            .textStyle(isShown ? .bodyBold : .bodyRegular)
+                    }
+                    .accessibilityLabel(Text("Level \(Int(candidate))", bundle: .module))
+                    .accessibilityAddTraits(isShown ? .isSelected : [])
+                }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isShowingLevels = false }
+                } label: {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 50, height: 18)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(Text("Close", bundle: .module))
+            } else {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isShowingLevels = true }
+                } label: {
+                    VStack(spacing: 4) {
+                        Text(GuidanceText.floorLabel(level))
+                            .textStyle(.bodyBold)
+                            .frame(width: 46, height: 46)
+                            .background(levelTile, in: RoundedRectangle(cornerRadius: 10))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(level))", bundle: .module))
             }
-        } label: {
-            VStack(spacing: 4) {
-                Text(GuidanceText.floorLabel(level))
-                    .textStyle(.bodyBold)
-                    .frame(width: 46, height: 46)
-                    .background(levelTile, in: RoundedRectangle(cornerRadius: 10))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .foregroundStyle(Palette.ink)
-            .padding(.horizontal, 6)
-            .padding(.top, 6)
-            .padding(.bottom, 4)
-            .glassSurface(RoundedRectangle(cornerRadius: 14), strength: .frosted)
         }
-        .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(level))", bundle: .module))
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.ink)
+        .padding(.horizontal, 6)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
+        .glassSurface(RoundedRectangle(cornerRadius: 14), strength: .frosted)
     }
 
     private var levelTile: LinearGradient {

@@ -40,6 +40,11 @@ lists every change; changes that need a change in the host app are marked **Brea
 6.0.0-beta.55 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
+The package depends on `https://github.com/airbnb/lottie-ios` from 4.5.0, up to the next major
+version, for the lift and stairs animations. A host app that uses Lottie adds the same package
+(`lottie-ios`), so both share one `Lottie` module; `lottie-spm` next to it gives two modules with that
+name.
+
 A host app that draws its journey with the map library's `ProximiioMapView` and its own
 `JourneyNavigator` moves to `ProximiMapView` with [MIGRATION.md](MIGRATION.md). It lists the SDK and
 Map changes since SDK 6.0.0-beta.58 and Map 6.0.0-beta.43.
@@ -632,8 +637,9 @@ not start, stop or configure the SDK and reports no event.
 The visitor is not at the museum there: the map has no position dot, no route, and its camera does not
 follow.
 
-- At the top: "Level N" and the floor changer (the level in a tile of the level colour). The changer
-  lists the museum's levels. The map opens on the lowest level with a gallery, framed on the museum.
+- At the top: "Level N" and the floor changer (the level in a tile of the level colour). A tap opens a
+  glass button for each of the museum's levels, highest first, the shown level in bold. The map opens on
+  the lowest level with a gallery, framed on the museum.
 - The galleries of the shown level are filled with the level colour (`Palette.level(_:)`). Artworks
   have no marker.
 - At the bottom: the legend button and the tabs Spaces, Highlights and Amenities. A tab opens its list
@@ -943,6 +949,23 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.19.0 (2026-10-28)
+
+**Breaking** for a host app that depends on `lottie-spm`: the package now depends on `lottie-ios`
+(from 4.5.0). Such an app moves to `lottie-ios`. Other host apps change nothing.
+
+Added:
+
+- The lift and stairs view on the way to a floor without positioning plays RPR's animation of a lift or
+  stairs going up or down (Lottie; PM, Monday "Elevator/Staircase animation"). Escalators use the
+  stairs.
+
+Changed:
+
+- Explore Museum: the floor changer opens a glass button for each level, highest first, the shown
+  level in bold, with a chevron that closes it, not a menu of "Level N" rows (PM, Monday "Explore
+  museum: Level selector dropdown", 2026-10-28).
 
 ### 1.18.1 (2026-10-28)
 

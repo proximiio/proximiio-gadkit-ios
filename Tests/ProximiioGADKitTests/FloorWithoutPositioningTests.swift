@@ -28,10 +28,22 @@ struct FloorWithoutPositioningTests {
     @Test func theRideToAFloorWithoutPositioningIsReachedNearTheStairs() throws {
         let change = try #require(FloorWithoutPositioningGuide.reachedChange(coordinate: Self.north(3), level: 1, markers: toCafe, settings: .standard))
         #expect(change.level == 0)
+        #expect(change.from == 1)
         #expect(change.featureType == "staircase")
         #expect(FloorWithoutPositioningGuide.reachedChange(coordinate: Self.north(8), level: 1, markers: toCafe, settings: .standard) == nil)
         #expect(FloorWithoutPositioningGuide.reachedChange(coordinate: Self.north(3), level: 2, markers: toCafe, settings: .standard) == nil)
         #expect(FloorWithoutPositioningGuide.reachedChange(coordinate: Self.north(3), level: nil, markers: toCafe, settings: .standard) == nil)
+    }
+
+    /// RPR's Lottie animations, bundled with the package (PM, Monday "Elevator/Staircase animation").
+    @MainActor @Test func theRidePlaysTheLiftOrStairsAnimationUpOrDown() {
+        #expect(FloorChangeView.animationName(featureType: "elevator", from: 1, to: 0) == "GAD_Lift_GoingDown")
+        #expect(FloorChangeView.animationName(featureType: "elevator", from: 0, to: 2) == "GAD_Lift_GoingUp")
+        #expect(FloorChangeView.animationName(featureType: "staircase", from: 1, to: 0) == "GAD_Stairs_GoingDown")
+        #expect(FloorChangeView.animationName(featureType: "escalator", from: 0, to: 1) == "GAD_Stairs_GoingUp")
+        for (type, from, to) in [("elevator", 1, 0), ("elevator", 0, 1), ("staircase", 1, 0), ("staircase", 0, 1)] {
+            #expect(FloorChangeView.animation(featureType: type, from: from, to: to) != nil, "\(type) \(from)→\(to) is not in the package")
+        }
     }
 
     @Test func aFloorWithPositioningIsNoChange() {

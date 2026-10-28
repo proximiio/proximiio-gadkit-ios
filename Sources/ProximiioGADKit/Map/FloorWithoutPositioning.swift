@@ -20,9 +20,10 @@
 //  the floor button, or after `GADSettings.floorWithoutPositioningMaximumSeconds`. The same
 //  destination then gets no second view.
 //
-//  `FloorChangeView` shows the lift or stairs icon until RPR's animation exists (Monday
-//  "Elevator/Staircase view").
+//  `FloorChangeView` plays RPR's lift or stairs animation, up or down (Lottie; PM, Monday
+//  "Elevator/Staircase animation", 2026-10-27).
 //
+import Lottie
 import Observation
 import Proximiio
 import ProximiioMap
@@ -36,6 +37,8 @@ final class FloorWithoutPositioningGuide {
     struct Change: Equatable {
         /// The floor the ride ends on.
         var level: Int
+        /// The floor the ride starts on.
+        var from: Int
         /// `elevator`, `staircase` or `escalator`.
         var featureType: String
         /// The lift or stairs.
@@ -159,7 +162,7 @@ final class FloorWithoutPositioningGuide {
         guard settings.levelsWithoutPositioning.contains(end),
               GeoMath.haversineDistance(from: coordinate.proximiio, to: marker.coordinate.proximiio) <= settings.levelChangerReachedMeters
         else { return nil }
-        return Change(level: end, featureType: marker.featureType, coordinate: marker.coordinate)
+        return Change(level: end, from: Int(level.rounded()), featureType: marker.featureType, coordinate: marker.coordinate)
     }
 
     /// The lift or stairs on `level` nearest `origin` that also serves `target`, for the way back.
@@ -184,25 +187,43 @@ final class FloorWithoutPositioningGuide {
     }
 }
 
-/// The lift or stairs view on the way to a floor without positioning: the icon, "Take the lift to
-/// level 0" and that the position is not shown there. A tap ends it.
+/// The lift or stairs view on the way to a floor without positioning: the animation, "Take the lift
+/// to level 0" and that the position is not shown there. A tap ends it.
 struct FloorChangeView: View {
     let change: FloorWithoutPositioningGuide.Change
 
     private var icon: GADIcon { change.featureType == "elevator" ? .elevator : .stairs }
 
+    /// RPR's animation of the ride: a lift for a lift, stairs for stairs and escalators. Pure;
+    /// covered by tests.
+    static func animationName(featureType: String, from: Int, to: Int) -> String {
+        "GAD_\(featureType == "elevator" ? "Lift" : "Stairs")_Going\(to > from ? "Up" : "Down")"
+    }
+
+    /// The animation of the ride from the package's resources.
+    static func animation(featureType: String, from: Int, to: Int) -> LottieAnimation? {
+        LottieAnimation.named(animationName(featureType: featureType, from: from, to: to), bundle: .module)
+    }
+
     var body: some View {
         ZStack {
             Palette.white.opacity(0.92).ignoresSafeArea()
             VStack(spacing: 16) {
-                icon.image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 64, height: 64)
-                    .foregroundStyle(Palette.position)
-                    .frame(width: 140, height: 140)
-                    .background(Palette.white, in: Circle())
-                    .overlay(Circle().strokeBorder(Palette.badgeStroke, lineWidth: 1.5))
+                if let animation = Self.animation(featureType: change.featureType, from: change.from, to: change.level) {
+                    LottieView(animation: animation)
+                        .playing(loopMode: .loop)
+                        .frame(width: 140, height: 140)
+                        .accessibilityHidden(true)
+                } else {
+                    icon.image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 64, height: 64)
+                        .foregroundStyle(Palette.position)
+                        .frame(width: 140, height: 140)
+                        .background(Palette.white, in: Circle())
+                        .overlay(Circle().strokeBorder(Palette.badgeStroke, lineWidth: 1.5))
+                }
                 Text(GuidanceText.rideText(featureType: change.featureType, level: change.level))
                     .textStyle(.h1Bold)
                     .multilineTextAlignment(.center)
