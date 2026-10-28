@@ -216,7 +216,7 @@ public final class ProximiMap {
 
     private func loadPlaces(from venue: VenueService) async {
         let features = await venue.sdk.features()
-        places = VenuePlace.all(in: features)
+        places = VenuePlace.all(in: features, amenities: (try? await venue.sdk.amenities()) ?? [])
         galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
     }
 

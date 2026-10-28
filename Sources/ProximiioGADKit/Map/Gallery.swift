@@ -42,11 +42,6 @@ struct GalleryDestination: Identifiable, Equatable, Sendable {
     var id: String { gallery.id }
     /// The outline the map fills: the polygon, else the geofence.
     var shown: Gallery { polygon ?? gallery }
-
-    /// The text of the map marker: the first word of the name, such as "G303".
-    var label: String {
-        gallery.name.split(separator: " ").first.map(String.init) ?? gallery.name
-    }
 }
 
 struct Gallery: Identifiable, Equatable, Sendable {

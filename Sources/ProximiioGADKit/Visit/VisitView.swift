@@ -53,6 +53,9 @@ struct VisitView: View {
     @State private var hiddenFeatureIDs: Set<String> = []
     /// The galleries of gallery first (`Gallery.destinations`).
     @State private var galleryDestinations: [GalleryDestination] = []
+    /// The amenity icons of the venue data, by amenity id: the gallery's icon on the stop card and
+    /// the gallery markers.
+    @State private var amenityIcons: [String: UIImage] = [:]
     /// The lifts and stairs, for the way back from a floor without positioning.
     @State private var levelChangerPlaces: [LevelChangerPlace] = []
     /// The destination on the floor without positioning, where the way back starts.
@@ -565,8 +568,13 @@ struct VisitView: View {
     /// venue data.
     private func loadVenueData() async {
         let features = await venue.sdk.features()
-        places = VenuePlace.all(in: features)
-        searchListing = .search((try? await venue.sdk.amenities()) ?? [])
+        let amenities = (try? await venue.sdk.amenities()) ?? []
+        places = VenuePlace.all(in: features, amenities: amenities)
+        searchListing = .search(amenities)
+        let scale = UIScreen.main.scale
+        amenityIcons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
+                                  uniquingKeysWith: { first, _ in first })
+        mapLayers.updateGalleryIcons(amenityIcons)
         controller.artworkRemoteIDs = Dictionary(
             places.compactMap { place in place.remoteID.map { (place.id, $0) } },
             uniquingKeysWith: { first, _ in first }
@@ -614,13 +622,41 @@ struct VisitView: View {
     }
 
     /// The features the map does not draw: the artworks and level changers (`hiddenFeatureIDs`), the
-    /// POI of the gallery the leg ends at (the red gallery marker takes its place) and the POI of the
-    /// gallery the visitor is in.
+    /// POIs of the gallery the leg ends at and of the visited galleries (their markers take their
+    /// place) and the POI of the gallery the visitor is in.
     private func applyHiddenFeatures() {
         var hidden = hiddenFeatureIDs
         if let gallery = controller.galleryAhead { hidden.insert(gallery.placeID) }
         if let visitorGalleryPlaceID { hidden.insert(visitorGalleryPlaceID) }
+        hidden.formUnion(visitedGalleryPOIs.map(\.placeID))
         if controller.session.hiddenFeatureIDs != hidden { controller.session.hiddenFeatureIDs = hidden }
+    }
+
+    /// The galleries the visitor has been in during this visit, and those of the done stops.
+    private var visitedGalleryIDs: Set<String> {
+        let journey = controller.navigator.journey
+        let visitedByStops = journey.stops.filter { $0.state == .done }
+            .compactMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries)?.id }
+        return visitedGalleries.union(visitedByStops)
+    }
+
+    /// The POIs of the visited galleries, other than the gallery the leg ends at and the gallery the
+    /// visitor is in.
+    private var visitedGalleryPOIs: [GalleryDestination] {
+        let visited = galleries.filter { visitedGalleryIDs.contains($0.id) }
+        guard !visited.isEmpty else { return [] }
+        return galleryDestinations.filter { destination in
+            destination.placeID != controller.galleryAhead?.placeID && destination.placeID != visitorGalleryPlaceID
+                && visited.contains { $0.contains(destination.entry, level: destination.gallery.level) }
+        }
+    }
+
+    /// The marker of a gallery at its POI, with the icon of the POI's amenity.
+    private func galleryMarker(_ destination: GalleryDestination, isDestination: Bool) -> JourneyMapLayers.GalleryMarker {
+        JourneyMapLayers.GalleryMarker(
+            coordinate: destination.entry, level: destination.gallery.level, name: destination.gallery.name,
+            amenityID: places.first { $0.id == destination.placeID }?.amenityID, isDestination: isDestination
+        )
     }
 
     /// The numbered stop markers. With gallery first they are hidden while the leg ends at a
@@ -658,7 +694,7 @@ struct VisitView: View {
         }
         guard placeID != visitorGalleryPlaceID else { return }
         visitorGalleryPlaceID = placeID
-        applyHiddenFeatures()
+        refreshMapLayers()
         applyStopMarkers()
     }
 
@@ -671,12 +707,9 @@ struct VisitView: View {
 
     /// Stop markers and gallery fills for the current journey and floor.
     private func refreshMapLayers() {
-        let journey = controller.navigator.journey
         let active = controller.navigator.activeStop
         let destination = active.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries) }
-        let visitedByStops = journey.stops.filter { $0.state == .done }
-            .compactMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries)?.id }
-        let visited = visitedGalleries.union(visitedByStops)
+        let visited = visitedGalleryIDs
         // Gallery first: the outline of the gallery geofence the leg ends at, in place of the
         // outline that holds the artwork.
         let galleryAhead = controller.galleryAhead
@@ -686,9 +719,9 @@ struct VisitView: View {
         }
         if let galleryAhead { fills.append(.init(gallery: galleryAhead.shown, isDestination: true)) }
         mapLayers.update(fills: fills, level: controller.session.selectedFloor.level)
-        mapLayers.updateGalleryMarker(galleryAhead.map {
-            .init(coordinate: $0.entry, level: $0.gallery.level, label: $0.label)
-        })
+        mapLayers.updateGalleryMarkers(visitedGalleryPOIs.map { galleryMarker($0, isDestination: false) }
+            + (galleryAhead.map { [galleryMarker($0, isDestination: true)] } ?? []))
+        applyHiddenFeatures()
     }
 
     /// The line from the visitor to the start of the route ahead, on the visitor's floor only.
@@ -949,6 +982,9 @@ struct VisitView: View {
                         session: controller.session,
                         galleries: galleries,
                         galleryAhead: controller.galleryAhead?.gallery,
+                        galleryIcon: controller.galleryAhead
+                            .flatMap { ahead in places.first { $0.id == ahead.placeID }?.amenityID }
+                            .flatMap { amenityIcons[$0] },
                         places: places,
                         isOnFloorWithoutPositioning: floorGuide.isActive,
                         returningToLevel: returningToLevel,
@@ -1132,6 +1168,9 @@ private struct VisitCard: View {
     let galleries: [Gallery]
     /// The gallery the card names instead of the artwork.
     let galleryAhead: Gallery?
+    /// The icon of the gallery's amenity in the venue data (PM, Monday "Gallery icons missing from
+    /// instructions", 2026-10-28).
+    var galleryIcon: UIImage?
     let places: [VenuePlace]
     /// The map shows a floor without positioning: the card names the stop, with no instruction
     /// from fixes of another floor.
@@ -1310,7 +1349,11 @@ private struct VisitCard: View {
             if let stopNumber, showsStopNumber {
                 Text("\(stopNumber)", bundle: .module).textStyle(.bodyMedium)
             } else if galleryAhead != nil {
-                Image(systemName: "photo.artframe")
+                if let galleryIcon {
+                    Image(uiImage: galleryIcon).resizable().scaledToFit().frame(width: 20, height: 20)
+                } else {
+                    Image(systemName: "photo.artframe")
+                }
             } else {
                 Image(systemName: "arrow.up")
             }

@@ -7,6 +7,7 @@ import os
 import Proximiio
 import ProximiioMap
 import Testing
+import UIKit
 @testable import ProximiioGADKit
 
 struct GalleryFirstTests {
@@ -59,14 +60,17 @@ struct GalleryFirstRoutingTests {
         #expect(GalleryFirstRouting.gallery(origin: outside, originLevel: 3, destination: other, state: state()) == nil)
     }
 
-    @Test func theLabelIsTheFirstWordOfTheName() {
-        #expect(destination.label == "G303")
-    }
-
-    @MainActor @Test func theMarkerIsALabel28PointsHigh() throws {
-        let image = try #require(JourneyMapLayers.galleryLabel("G303"))
-        #expect(image.size.height == 28)
-        #expect(image.size.width > 40)
+    /// The marker is the gallery's icon in a 30 pt circle with its full name under it, the circle in
+    /// the middle of the image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+    @MainActor @Test func theMarkerIsTheIconWithTheNameUnderIt() {
+        let named = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", icon: nil, isDestination: true)
+        #expect(named.size.width > 60)
+        #expect(named.size.height > 50)
+        let visited = JourneyMapLayers.galleryMarkerImage(name: "G1", icon: UIImage(systemName: "square"), isDestination: false)
+        #expect(visited.size.width == 30)
+        let marker = JourneyMapLayers.GalleryMarker(coordinate: .init(latitude: 0, longitude: 0), level: 3, name: "G303 Language",
+                                                    amenityID: "a", isDestination: true)
+        #expect(marker.imageName(iconGeneration: 1) != marker.imageName(iconGeneration: 2))
     }
 
     /// Field test 2026-10-19: test copies of artworks named galleries in another building.

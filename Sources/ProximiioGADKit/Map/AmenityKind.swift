@@ -6,8 +6,10 @@
 //  node 10889:116263): Women's restroom, Men's restroom, Café, Help Desk, Prayer Room,
 //  Stairs, Elevator, Museum Shop.
 //
-//  A place matches a kind by its amenity id or its title. The venue data is still being
-//  built, so both are checked.
+//  An amenity has a kind when its title names it ("Prayer Room", "Women's Restroom"). A place
+//  matches a kind by its amenity (`VenuePlace.amenityKind`), not by its own title: the prayer room
+//  shortcut led to the artwork "Endless Prayers XIII" (PM, Monday "Amenity search & Map legend
+//  views", 2026-10-28).
 //
 import Foundation
 import Proximiio
@@ -60,7 +62,7 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Lower-case fragments matched against the amenity id and the title.
+    /// Lower-case fragments matched against an amenity's id and title.
     private var keywords: [String] {
         switch self {
         case .womensRestroom: ["women", "female", "ladies"]
@@ -74,8 +76,15 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Whether the place's amenity is of this kind.
     func matches(_ place: VenuePlace) -> Bool {
-        matches(text: "\(place.amenityID ?? "") \(place.title)".lowercased())
+        place.amenityKind == self
+    }
+
+    /// The kind of each amenity that has one, by amenity id. Pure; covered by tests.
+    static func kinds(of amenities: [ProximiioAmenity]) -> [String: AmenityKind] {
+        Dictionary(amenities.compactMap { amenity in kind(forAmenityID: amenity.id, title: amenity.title).map { (amenity.id, $0) } },
+                   uniquingKeysWith: { first, _ in first })
     }
 
     /// `text` is lower case: an amenity id and a title.

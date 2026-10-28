@@ -273,8 +273,9 @@ struct MuseumMapView: View {
     /// Places and level changers, at the start and after a change of the venue data.
     private func loadPlaces() async {
         let features = await venue.sdk.features()
-        places = VenuePlace.all(in: features)
-        searchListing = .search((try? await venue.sdk.amenities()) ?? [])
+        let amenities = (try? await venue.sdk.amenities()) ?? []
+        places = VenuePlace.all(in: features, amenities: amenities)
+        searchListing = .search(amenities)
         let levelChangers = LevelChangerPlace.all(in: features)
         mapLayers.updateLevelChangers(levelChangers)
         session.hiddenFeatureIDs = Set(levelChangers.map(\.id))

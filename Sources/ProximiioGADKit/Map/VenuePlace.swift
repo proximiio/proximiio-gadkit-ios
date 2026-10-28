@@ -46,6 +46,11 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
     /// `included_amenities`: the amenity ids the POI is also listed under, such as the highlight
     /// amenity (`highlightAmenityID`).
     var includedAmenityIDs: [String] = []
+    /// The design's kind of the POI's amenity (`AmenityKind.kinds(of:)`), from the amenity catalogue.
+    /// The search shortcuts, the Explore Museum amenities and the legend match POIs by it, never by
+    /// the POI's title (PM, Monday "Amenity search & Map legend views", 2026-10-28: the prayer room
+    /// shortcut led to the artwork "Endless Prayers XIII").
+    var amenityKind: AmenityKind?
 
     /// The "Highlight" amenity of the GAD data: a highlight artwork lists it in
     /// `included_amenities` (PM, Monday "Explore museum view", 2026-10-15).
@@ -54,11 +59,22 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
     /// True for a highlight artwork of the Explore Museum map.
     var isHighlight: Bool { includedAmenityIDs.contains(Self.highlightAmenityID) }
 
-    /// Every point POI in `features`, sorted by title.
-    static func all(in features: [ProximiioFeature]) -> [VenuePlace] {
-        features
+    /// Every point POI in `features`, sorted by title, with the kind of its amenity among `amenities`.
+    static func all(in features: [ProximiioFeature], amenities: [ProximiioAmenity]) -> [VenuePlace] {
+        let places = features
             .compactMap(VenuePlace.init(feature:))
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        return withAmenityKinds(places, amenities: amenities)
+    }
+
+    /// `places` with `amenityKind` set from `amenities`. Pure; covered by tests.
+    static func withAmenityKinds(_ places: [VenuePlace], amenities: [ProximiioAmenity]) -> [VenuePlace] {
+        let kinds = AmenityKind.kinds(of: amenities)
+        return places.map { place in
+            var place = place
+            place.amenityKind = place.amenityID.flatMap { kinds[$0] }
+            return place
+        }
     }
 
     /// The place under a map tap. `identifiers` are the feature ids from

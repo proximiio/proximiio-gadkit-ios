@@ -19,12 +19,16 @@ struct AmenityListingTests {
         VenuePlace(id: id, title: title, details: nil, coordinate: .init(latitude: 24.54, longitude: 54.40), level: 1, amenityID: amenity)
     }
 
-    private static let places = [
+    private static let places = VenuePlace.withAmenityKinds([
         place("p-women", "Women's restroom", amenity: "a-women"), place("p-men", "Men's restroom", amenity: "a-men"),
         place("p-cafe", "Cafe", amenity: "a-cafe"), place("p-help", "Help Desk", amenity: "a-help"),
         place("p-prayer", "Prayer Room", amenity: "a-prayer"), place("p-shop", "Museum Shop", amenity: "a-shop"),
         place("p-stairs", "Staircase", amenity: "a-stairs"),
-    ]
+    ], amenities: [
+        amenity("a-women", "Women's Restroom"), amenity("a-men", "Men's Restroom"), amenity("a-cafe", "Cafe"),
+        amenity("a-help", "Helpdesk"), amenity("a-prayer", "Prayer Room"), amenity("a-shop", "Museum Shop"),
+        amenity("a-stairs", "Staircase"),
+    ])
 
     /// Without metadata the shortcuts are the built-in ones, in the built-in order.
     @Test func withoutMetadataTheShortcutsStay() {

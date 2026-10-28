@@ -94,7 +94,7 @@ import Foundation
     @MainActor
     func run(with venue: VenueService, wristband: WristbandSession) async {
         if listJourneys {
-            let titles = VenuePlace.all(in: await venue.sdk.features()).map { "\($0.title) [L\(Int($0.level))]" }
+            let titles = VenuePlace.all(in: await venue.sdk.features(), amenities: []).map { "\($0.title) [L\(Int($0.level))]" }
             Self.log("places: \(titles.joined(separator: ", "))")
             do {
                 for journey in try await venue.sdk.journeys() {

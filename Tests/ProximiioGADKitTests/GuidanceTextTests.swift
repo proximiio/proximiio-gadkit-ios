@@ -34,21 +34,35 @@ struct AmenityKindTests {
         VenuePlace(id: title, title: title, coordinate: .init(latitude: lat, longitude: 0), level: level, amenityID: amenity)
     }
 
-    @Test func restroomsAreNotConfused() {
-        #expect(AmenityKind.womensRestroom.matches(place("Women's Restroom")))
-        #expect(!AmenityKind.mensRestroom.matches(place("Women's Restroom")))
-        #expect(AmenityKind.mensRestroom.matches(place("Men's Restroom")))
-        #expect(!AmenityKind.womensRestroom.matches(place("Men's Restroom")))
+    private func cafe(_ title: String, level: Double, lat: Double) -> VenuePlace {
+        var place = place(title, amenity: "a-cafe", level: level, lat: lat)
+        place.amenityKind = .cafe
+        return place
     }
 
-    @Test func matchesByAmenityID() {
-        #expect(AmenityKind.cafe.matches(place("The Terrace", amenity: "food:cafe")))
-        #expect(AmenityKind.prayerRoom.matches(place("Room 4", amenity: "services:prayer_room")))
-        #expect(!AmenityKind.cafe.matches(place("Gallery 101")))
+    @Test func restroomsAreNotConfused() {
+        #expect(AmenityKind.kind(forAmenityID: "a1", title: "Women's Restroom") == .womensRestroom)
+        #expect(AmenityKind.kind(forAmenityID: "a2", title: "Men's Restroom") == .mensRestroom)
+        #expect(AmenityKind.kind(forAmenityID: "a3", title: "Womens restroom visited") == nil)
+    }
+
+    /// A place matches by its amenity, never by its title (PM, Monday "Amenity search & Map legend
+    /// views", 2026-10-28: the prayer room shortcut led to the artwork "Endless Prayers XIII").
+    @Test func aPlaceMatchesByItsAmenityNotItsTitle() {
+        let amenities = [ProximiioAmenity(id: "a-prayer", title: "Prayer Room"), ProximiioAmenity(id: "a-art", title: "Artwork"),
+                         ProximiioAmenity(id: "a-cafe", title: "Cafe")]
+        let places = VenuePlace.withAmenityKinds(
+            [place("Endless Prayers XIII", amenity: "a-art"), place("Room 4", amenity: "a-prayer"),
+             place("The Terrace", amenity: "a-cafe"), place("Prayer room", amenity: nil)],
+            amenities: amenities
+        )
+        #expect(places.filter(AmenityKind.prayerRoom.matches).map(\.title) == ["Room 4"])
+        #expect(places.filter(AmenityKind.cafe.matches).map(\.title) == ["The Terrace"])
+        #expect(AmenityKind.kinds(of: amenities) == ["a-prayer": .prayerRoom, "a-cafe": .cafe])
     }
 
     @Test func nearestPrefersTheVisitorsLevel() {
-        let places = [place("Café A", level: 3, lat: 0.0001), place("Café B", level: 1, lat: 0.01)]
+        let places = [cafe("Café A", level: 3, lat: 0.0001), cafe("Café B", level: 1, lat: 0.01)]
         #expect(AmenityKind.cafe.nearest(in: places, from: .init(latitude: 0, longitude: 0), level: 1)?.title == "Café B")
         #expect(AmenityKind.cafe.nearest(in: places, from: .init(latitude: 0, longitude: 0), level: 2)?.title == "Café A")
     }
@@ -56,9 +70,9 @@ struct AmenityKindTests {
     /// GAD data 2026-10-15: from level 1 of the Guggenheim the café chip chose the DCT office café,
     /// on level 1 but 11 km away, over the Guggenheim café on level 0.
     @Test func nearestStaysInTheVenueOfTheNearestPlace() {
-        var guggenheim = place("Café", level: 0, lat: 0.0001)
+        var guggenheim = cafe("Café", level: 0, lat: 0.0001)
         guggenheim.placeID = "guggenheim"
-        var dct = place("DCT Cafe", level: 1, lat: 0.1)
+        var dct = cafe("DCT Cafe", level: 1, lat: 0.1)
         dct.placeID = "dct"
         #expect(AmenityKind.cafe.nearest(in: [dct, guggenheim], from: .init(latitude: 0, longitude: 0), level: 1)?.title == "Café")
         #expect(AmenityKind.cafe.nearest(in: [dct, guggenheim], from: .init(latitude: 0.1, longitude: 0), level: 0)?.title == "DCT Cafe")

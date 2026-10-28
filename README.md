@@ -506,12 +506,20 @@ In a personalised journey, a leg to an artwork in a gallery the visitor is not i
 gallery. The artwork's `metadata.gallery_id` names the gallery: the gallery geofence
 (`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. The route ends
 at the POI. The map fills the gallery's polygon feature (else the geofence's outline) with the floor's
-colour and marks the POI with a red label, the first word of its title ("G303"); the POI's own icon is
-hidden, and so are the numbered artwork markers. The stop card names the POI ("G303 Language") with a
-gallery icon and no stop number. The POI of the gallery the visitor is in is not drawn (PM, Monday
-"Navigation to a gallery", 2026-10-26). The numbered artwork markers also stay hidden while the
-visitor is outside every gallery, unless the active artwork is outside every gallery too. The
-destination gallery is filled over the venue's artworks, furniture and inner walls (2026-10-27).
+colour. At the POI it draws the icon of the POI's amenity in white in the red 30 pt circle with a white
+border, with the POI's title under it ("G303 Language"); the POI's own icon is hidden, and so are the
+numbered artwork markers (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). The stop
+card names the POI with the icon of its amenity and no stop number. The POI of the gallery the visitor
+is in is not drawn (PM, Monday "Navigation to a gallery", 2026-10-26). The numbered artwork markers
+also stay hidden while the visitor is outside every gallery, unless the active artwork is outside
+every gallery too. The destination gallery is filled over the venue's artworks, furniture and inner
+walls (2026-10-27).
+
+A gallery the visitor has been in during the journey, or that holds a visited stop, is visited: the
+map fills it with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4
+#FDC1A8), over the venue's artworks, furniture and inner walls. At its POI it draws the icon of the
+POI's amenity in the white 30 pt circle with the red border of a visited artwork, with the title
+under it (PM, Monday "Visited gallery visualization", 2026-10-28).
 
 The first fix inside the gallery geofence routes the leg again from the visitor, to the artwork. A
 leg that starts in the artwork's gallery ends at the artwork. An artwork without `gallery_id`, or
@@ -936,6 +944,23 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.18.0 (2026-10-28)
+
+No change for host apps' code.
+
+Changed:
+
+- The search shortcuts, the Explore Museum amenities and the legend find a place by its amenity, not
+  by its title. The prayer room shortcut led to the artwork "Endless Prayers XIII" (PM, Monday "Amenity
+  search & Map legend views", 2026-10-28).
+- Gallery first: the gallery the leg ends at is the icon of the gallery POI's amenity in the red circle
+  with its title under it, not the red label "G303" (PM, Monday "Gallery numbers in gallery
+  navigation", 2026-10-28). The stop card shows the same icon (Monday "Gallery icons missing from
+  instructions").
+- A visited gallery is filled over the venue's artworks, furniture and inner walls, and its POI is the
+  amenity's icon in the white circle with the red border, with its title (Monday "Visited gallery
+  visualization").
 
 ### 1.17.0 (2026-10-28)
 

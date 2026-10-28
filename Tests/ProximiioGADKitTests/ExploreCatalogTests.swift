@@ -19,6 +19,8 @@ struct ExploreCatalogTests {
         var place = VenuePlace(id: id, title: title, details: details,
                                coordinate: .init(latitude: 24.54, longitude: 54.40), level: level, amenityID: amenity)
         place.placeID = placeID
+        // The test ids name their amenity ("org:cafe").
+        place.amenityKind = amenity.flatMap { AmenityKind.kind(forAmenityID: $0, title: nil) }
         return place
     }
 

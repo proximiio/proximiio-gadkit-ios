@@ -233,7 +233,7 @@ final class HostedMapModel {
     private func loadPlaces() async {
         guard let venue else { return }
         let features = await venue.sdk.features()
-        places = VenuePlace.all(in: features)
+        places = VenuePlace.all(in: features, amenities: (try? await venue.sdk.amenities()) ?? [])
         galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
     }
 
