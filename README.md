@@ -37,7 +37,7 @@ cases come in minor versions; a `switch` with `default` keeps compiling. The [Ch
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.66 and `proximiio-map-ios-binary`
-6.0.0-beta.54 exactly. The host app needs no dependency on them. A host app that also depends on
+6.0.0-beta.55 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 A host app that draws its journey with the map library's `ProximiioMapView` and its own
@@ -145,7 +145,15 @@ them.
 `start()` creates the SDK (`ProximiioConfiguration.relayOnly`, no fallback host), authenticates,
 starts positioning, loads the route network and attaches the wristband's position provider. Visitor
 reporting is on. Call it at launch: the map style and the venue data are then loaded before the first
-map screen. The package contacts only `apiBaseURL` and the relay-api host.
+map screen. The package contacts `apiBaseURL`, the relay-api host and the host of the style's raster
+tiles.
+
+The maps draw the raster tiles of the organisation's style (map 6.0.0-beta.55): the style's
+`metadata["proximiio:raster:tileurl"]` with the other `proximiio:raster:*` keys, as MapTap and the
+portal read them. They are drawn below `proximiio:raster:beforelayer`, and below the floor plan
+(`proximiio-floors`) when that key is empty. A style without `tileurl` draws no tiles. The tiles come
+from the host in `tileurl` and get no token; in the GAD Sandbox style on 2026-10-28 it is
+`fra1.digitaloceanspaces.com`.
 
 Without a connection, `start()` succeeds on a phone where the API accepted the token before
 (`ProximiioConfiguration.allowsOfflineStart`, SDK 6.0.0-beta.65). The route network then comes from
@@ -797,7 +805,8 @@ struct Widgets: WidgetBundle {
 
 `FieldLog` writes relay positions, positions during a visit, tracking health, artwork arrivals, journey,
 binding and `ProximiMap` events, and the state of each map when it changes (venue features on the map,
-features left out, style source, floor, zoom, last error), to `Documents/gad-debug.log`. It does not write the SDK's geofence
+features left out, style source, floor, zoom, the style's fonts the glyph server does not have, last
+error), to `Documents/gad-debug.log`. It does not write the SDK's geofence
 events. It is off by default. Turn it on at launch, before `start()`, in test builds only:
 
 ```swift
@@ -868,6 +877,8 @@ passes the SDK's `ProximiioJourney.validate()`. `-listJourneys` prints the curre
   anonymous visitor id (analytics and the rate limit) and the wristband binding id, which only the
   relay-api receives. The host app's App Store privacy details declare the same.
 - `ProximiMap.start()` asks for "While Using the App" location only.
+- The maps load the style's raster tiles from the host in `proximiio:raster:tileurl`, without the
+  token and the visitor headers.
 
 ## Tests
 
@@ -880,6 +891,22 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.16.0 (2026-10-28)
+
+**Breaking:** `proximiio-map-ios-binary` 6.0.0-beta.55. A host app that depends on it sets the same
+version.
+
+Added:
+
+- The maps draw the raster tiles of the organisation's style, the illustrated map of the GAD venue
+  (map 6.0.0-beta.55; PM, Monday "Illustrated map not visible"). See "ProximiMap".
+- The field log's map state names the style's fonts the glyph server does not have ("missing fonts").
+
+Changed:
+
+- Gallery first keeps hiding the artworks' numbers with the invisible style of 1.15.3, so the detour
+  keeps its marker. Map 6.0.0-beta.55 takes the markers off the map with a stop marker style of `nil`.
 
 ### 1.15.4 (2026-10-27)
 

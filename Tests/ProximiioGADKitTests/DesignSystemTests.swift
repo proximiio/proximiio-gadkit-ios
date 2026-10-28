@@ -49,4 +49,13 @@ struct MapDiagnosticsTests {
         snapshot.name = "journey"
         #expect(snapshot.line == "map state journey: features 968 · dropped 16 · style cache · L1 · zoom 19.0 · camera ready true · error 16 features left out")
     }
+
+    /// Map 6.0.0-beta.55 names the style's fonts the glyph server does not have.
+    @Test func theLineNamesTheMissingFonts() {
+        var snapshot = MapDiagnostics.Snapshot(features: 968, dropped: 0, error: nil, style: "organization",
+                                               level: 1, zoom: 20, isCameraReady: true,
+                                               missingFonts: ["Guggenheim Sans Bold", "Open Sans Bold"])
+        snapshot.name = "museum"
+        #expect(snapshot.line == "map state museum: features 968 · dropped 0 · style organization · L1 · zoom 20.0 · camera ready true · missing fonts Guggenheim Sans Bold, Open Sans Bold")
+    }
 }

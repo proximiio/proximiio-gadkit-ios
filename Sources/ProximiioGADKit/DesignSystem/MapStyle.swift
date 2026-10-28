@@ -126,9 +126,8 @@ enum MapStyle {
         )
     }()
 
-    /// `journeyStops` with the artworks' markers invisible; the detour keeps its marker. The map
-    /// library keeps a marker layer whose style is set to `nil` on the map, with the floor it showed
-    /// (map 6.0.0-beta.54), so the markers are hidden with this style instead.
+    /// `journeyStops` with the artworks' markers invisible; the detour keeps its marker. A stop marker
+    /// style of `nil` would take the detour's marker off too.
     static let journeyStopsHidden: JourneyStopMarkerStyle = {
         var style = journeyStops
         style.done.opacity = 0

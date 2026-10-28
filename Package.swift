@@ -18,7 +18,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/proximiio/proximiio-sdk-ios-binary", exact: "6.0.0-beta.66"),
-        .package(url: "https://github.com/proximiio/proximiio-map-ios-binary", exact: "6.0.0-beta.54"),
+        .package(url: "https://github.com/proximiio/proximiio-map-ios-binary", exact: "6.0.0-beta.55"),
     ],
     targets: [
         .target(name: "ProximiioGADLiveActivity"),

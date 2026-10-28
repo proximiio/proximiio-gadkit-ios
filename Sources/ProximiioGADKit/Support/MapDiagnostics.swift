@@ -4,9 +4,9 @@
 //
 //  Field log only. The state of a map session, written when it changes: the venue features on the
 //  map, the features the last push left out, the last error, where the style came from, the shown
-//  floor and the zoom. For the floor plan that is missing on the journey map at a high zoom (PM,
-//  Monday "Floorplan disappears zometimes", 2026-10-27): a MapLibre shape source takes the
-//  venue's collection whole or not at all.
+//  floor, the zoom and the style's fonts the glyph server does not have. For the floor plan that is
+//  missing on the journey map at a high zoom (PM, Monday "Floorplan disappears zometimes",
+//  2026-10-27): a MapLibre shape source takes the venue's collection whole or not at all.
 //
 import Foundation
 import ProximiioMap
@@ -23,10 +23,13 @@ enum MapDiagnostics {
         /// The zoom to 0.5.
         var zoom: Double?
         var isCameraReady: Bool
+        /// The style's font stacks the glyph server answered "not found" for, sorted.
+        var missingFonts: [String] = []
 
         var line: String {
             let zoomText = zoom.map { String(format: "%.1f", $0) } ?? "-"
             return "map state \(name): features \(features) · dropped \(dropped) · style \(style) · L\(Int(level.rounded())) · zoom \(zoomText) · camera ready \(isCameraReady)"
+                + (missingFonts.isEmpty ? "" : " · missing fonts \(missingFonts.joined(separator: ", "))")
                 + (error.map { " · error \($0)" } ?? "")
         }
 
@@ -51,7 +54,8 @@ enum MapDiagnostics {
                 style: String(describing: session.styleSource),
                 level: session.selectedFloor.level,
                 zoom: Snapshot.rounded(zoom: session.camera.zoomLevel),
-                isCameraReady: session.isCameraReady
+                isCameraReady: session.isCameraReady,
+                missingFonts: session.unavailableFontStacks.sorted()
             )
             snapshot.name = name
             if snapshot != last {
