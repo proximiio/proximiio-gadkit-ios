@@ -159,8 +159,8 @@ struct GlassSquareButton<Label: View>: View {
     }
 }
 
-/// The glass of `GlassSquareButton`.
-private struct SquareGlassButtonStyle: PrimitiveButtonStyle {
+/// The glass of `GlassSquareButton` and `AccessibleRoutesButton`: 50 × 50 pt, frosted.
+struct SquareGlassButtonStyle: PrimitiveButtonStyle {
     let isSelected: Bool
 
     func makeBody(configuration: Configuration) -> some View {
@@ -190,6 +190,14 @@ struct AmenityChipList: View {
                 // (PM 2026-10-15, "Search menu transparency").
                 .buttonStyle(.small(selected: kind == selected, strength: .frosted))
             }
+        }
+        // A white haze behind the list, so the map behind it shows less (RPR, Monday "White blur
+        // behind amenity list", 2026-10-28).
+        .background {
+            Palette.white.opacity(0.8)
+                .padding(-12)
+                .blur(radius: 18)
+                .allowsHitTesting(false)
         }
     }
 }

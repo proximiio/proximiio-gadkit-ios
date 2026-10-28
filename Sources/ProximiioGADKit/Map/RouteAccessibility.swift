@@ -96,17 +96,12 @@ struct AccessibleRoutesButton: View {
             isOn.toggle()
             onToggle(isOn)
         } label: {
-            // On: a black outline, no colour (RPR, Monday "Accessible routing", 2026-10-28).
             Image(systemName: "figure.roll")
                 .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(Palette.ink)
-                .frame(width: 50, height: 50)
-                .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
-                .overlay {
-                    if isOn { RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1) }
-                }
         }
-        .buttonStyle(.plain)
+        // On, and while pressed: a black outline, no colour (RPR, Monday "Accessible routing" and
+        // "Buttons to have black border when pressed", 2026-10-28).
+        .buttonStyle(SquareGlassButtonStyle(isSelected: isOn))
         .accessibilityLabel(Text("Accessible routes", bundle: .module))
         .accessibilityValue(isOn ? Text("On", bundle: .module) : Text("Off", bundle: .module))
         .accessibilityAddTraits(isOn ? .isSelected : [])

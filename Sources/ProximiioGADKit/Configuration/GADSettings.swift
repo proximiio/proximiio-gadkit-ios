@@ -64,8 +64,8 @@ public struct GADSettings: Equatable, Sendable {
     // MARK: Map
 
     /// Zoom of "Centre on me", of the first position and of the follow (PM, Monday "Curated tours:
-    /// zoom level", 2026-10-27).
-    public var followZoom: Double = 19
+    /// zoom level", 2026-10-27; RPR, "Need to determine correct zoom levels on-site", 2026-10-28).
+    public var followZoom: Double = 18.8
     /// Zoom of the follow while the visitor is in a gallery during a personalised journey, or `nil`
     /// for `followZoom` (PM, Monday "Navigation to a gallery", 2026-10-27).
     public var galleryFollowZoom: Double? = 20

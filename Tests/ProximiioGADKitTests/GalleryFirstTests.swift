@@ -17,6 +17,21 @@ struct GalleryFirstTests {
     ]
     private let g106 = Gallery(id: "106", name: "Gallery 106", level: 1, ring: Self.square)
 
+    /// The galleries with a `gallery_id` come first, named by their POI; an outline that holds one of
+    /// their POIs is left out, another outline stays (PM, Monday "Visited gallery visualization",
+    /// 2026-10-28: after the POIs were renamed, only three galleries were known).
+    @Test func theGalleriesWithAnIDComeFirstAndTheirOutlinesAreNotRepeated() {
+        let far = Self.square.map { ProximiioCoordinate(latitude: $0.latitude + 5, longitude: $0.longitude) }
+        let g101 = GalleryDestination(gallery: Gallery(id: "e984", name: "G101 Pop Culture", level: 1, ring: Self.square),
+                                      entry: ProximiioCoordinate(latitude: 0.5, longitude: 0.5), placeID: "poi-g101")
+        let merged = Gallery.merged(destinations: [g101], outlines: [
+            Gallery(id: "feature-101", name: "Gallery 101", level: 1, ring: Self.square),
+            Gallery(id: "feature-306", name: "Gallery 306", level: 3, ring: far),
+        ])
+        #expect(merged.map(\.name) == ["G101 Pop Culture", "Gallery 306"])
+        #expect(merged.first?.id == "e984")
+    }
+
     @Test func stopNumber() {
         #expect(!GalleryFirst.showsStopNumber(state: .walking(stop: "Tongari-kun"), galleryAhead: g106))
         #expect(!GalleryFirst.showsStopNumber(state: .nextStopOnOtherLevel(stop: "Tongari-kun", level: 3), galleryAhead: g106))
@@ -76,8 +91,8 @@ struct GalleryFirstRoutingTests {
     /// the middle of the image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
     @MainActor @Test func theMarkerIsTheIconWithTheNameUnderIt() {
         let named = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", icon: nil, isDestination: true)
-        #expect(named.size.width > 60)
-        #expect(named.size.height > 50)
+        #expect(named.size.width > 100)
+        #expect(named.size.height == 30)
         let visited = JourneyMapLayers.galleryMarkerImage(name: "G1", icon: UIImage(systemName: "square"), isDestination: false)
         #expect(visited.size.width == 30)
         let marker = JourneyMapLayers.GalleryMarker(coordinate: .init(latitude: 0, longitude: 0), level: 3, name: "G303 Language",

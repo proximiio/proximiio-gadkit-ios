@@ -511,9 +511,9 @@ In a personalised journey, a leg to an artwork in a gallery the visitor is not i
 gallery. The artwork's `metadata.gallery_id` names the gallery: the gallery geofence
 (`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. The route ends
 at the POI. The map fills the gallery's polygon feature (else the geofence's outline) with the floor's
-colour. At the POI it draws the icon of the POI's amenity in white in the red 30 pt circle with a white
-border, with the POI's title under it ("G303 Language"); the POI's own icon is hidden, and so are the
-numbered artwork markers (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). The stop
+colour. At the POI it draws a red pill with a white border, the icon of the POI's amenity and the POI's
+title in white ("G303 Language"); the POI's own icon is hidden, and so are the numbered artwork markers
+(PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). The stop
 card names the POI with the icon of its amenity and no stop number. The POI of the gallery the visitor
 is in is not drawn (PM, Monday "Navigation to a gallery", 2026-10-26). The numbered artwork markers
 also stay hidden while the visitor is outside every gallery, unless the active artwork is outside
@@ -742,7 +742,7 @@ let configuration = GADConfiguration(
 | `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
-| `followZoom` | 19 | Zoom of "Centre on me", of the first position and of the follow. |
+| `followZoom` | 18.8 | Zoom of "Centre on me", of the first position and of the follow. |
 | `galleryFollowZoom` | 20 | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
 | `minimumZoom`, `maximumZoom` | `nil` | The zoom levels the visitor cannot go beyond on every map of the package, or the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
@@ -965,6 +965,19 @@ Changed:
   routing", 2026-10-28).
 - The stop card keeps its instruction line while the route is routed again, so the card and the buttons
   above it no longer jump when the accessible routes button is pressed (same item).
+- The glass buttons are `glassSurface` with a 1 pt ink outline while pressed or selected, not Apple's
+  glass button style, which grew on a press (PM, Monday "Buttons to have black border when pressed",
+  2026-10-28). The search shortcuts, "Centre on me" and the accessible routes button show the outline
+  while pressed.
+- The search shortcuts have a white haze behind them (RPR, Monday "White blur behind amenity list").
+- `GADSettings.followZoom` is 18.8, was 19 (RPR, Monday "Need to determine correct zoom levels
+  on-site").
+- The destination gallery is a red pill with a white border, the icon of its amenity and its title in
+  white (RPR, Monday "Gallery numbers in gallery navigation", 2026-10-28, second answer).
+- The journey map knows every gallery with a `gallery_id`, named by its POI. The gallery outlines were
+  named by a POI whose title says "gallery"; after the GAD POIs were renamed ("G101 Pop Culture") only
+  three galleries were known, so no other gallery showed as visited (PM, Monday "Visited gallery
+  visualization").
 
 ### 1.19.0 (2026-10-28)
 

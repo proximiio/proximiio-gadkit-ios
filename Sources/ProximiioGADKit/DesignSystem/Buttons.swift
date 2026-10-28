@@ -12,10 +12,10 @@
 //  | `.iconGlass` | Button_medium | glass, 40 × 40 pt, 16 pt icon |
 //  | `.textAction` | "Skip for now", "Carry on" | Body Small, underlined |
 //
-//  On iOS 26 and later the glass styles are Apple's glass button style (`.buttonStyle(.glass)`):
-//  the system draws the glass and the pressed state (Figma "Glass review: iOS 26, iOS 27 and
-//  Android", node 16349:60996, 2026-10-24). Earlier versions draw `glassSurface` and scale a
-//  pressed button to 0.95. Selected is a 1 pt ink outline; disabled is 40 % opacity.
+//  The glass styles draw `glassSurface` in the button's shape: Apple's Regular glass on iOS 26 and
+//  later. Pressed and selected are a 1 pt ink outline; the button does not grow or shrink (PM, Monday
+//  "Buttons to have black border when pressed", 2026-10-28: Apple's glass button style grew on a
+//  press). Disabled is 40 % opacity.
 //
 import SwiftUI
 
@@ -83,9 +83,7 @@ enum GlassButtonShape: Equatable {
 }
 
 /// The button of `configuration` with `label` on glass in `shape`. `label` has the size of the
-/// design's button. On iOS 26 and later Apple's glass button style draws the button; its insets
-/// around the label (12 pt horizontal, 7 pt vertical at the regular control size) are taken from
-/// the label, so the button keeps the design's size.
+/// design's button.
 struct GlassButton<Label: View>: View {
     let configuration: PrimitiveButtonStyleConfiguration
     var shape: GlassButtonShape
@@ -95,64 +93,28 @@ struct GlassButton<Label: View>: View {
     @ViewBuilder let label: Label
     @Environment(\.isEnabled) private var isEnabled
 
-    /// The insets of `.buttonStyle(.glass)` at the regular control size.
-    static var systemInsets: EdgeInsets { EdgeInsets(top: 7, leading: 12, bottom: 7, trailing: 12) }
-
     var body: some View {
-        if #available(iOS 26, *) {
-            Button(role: configuration.role, action: configuration.trigger) {
-                label
-                    .foregroundStyle(Palette.ink)
-                    .padding(-Self.systemInsets)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(borderShape)
-            .controlSize(.regular)
-            .overlay { outline }
-            .opacity(isEnabled ? 1 : Palette.disabledOpacity)
-        } else {
-            Button(role: configuration.role, action: configuration.trigger) {
-                label.foregroundStyle(Palette.ink)
-            }
-            .buttonStyle(LegacyGlassButtonStyle(shape: shape, strength: strength, isEnabled: isEnabled))
-            .overlay { outline }
+        Button(role: configuration.role, action: configuration.trigger) {
+            label.foregroundStyle(Palette.ink)
         }
-    }
-
-    @available(iOS 26, *)
-    private var borderShape: ButtonBorderShape {
-        switch shape {
-        case .roundedRectangle(let radius): .roundedRectangle(radius: radius)
-        case .capsule: .capsule
-        case .circle: .circle
-        }
-    }
-
-    @ViewBuilder private var outline: some View {
-        if isSelected {
-            switch shape {
-            case .roundedRectangle(let radius): RoundedRectangle(cornerRadius: radius).strokeBorder(Palette.ink, lineWidth: 1).allowsHitTesting(false)
-            case .capsule: Capsule().strokeBorder(Palette.ink, lineWidth: 1).allowsHitTesting(false)
-            case .circle: Circle().strokeBorder(Palette.ink, lineWidth: 1).allowsHitTesting(false)
-            }
-        }
+        .buttonStyle(GlassSurfaceButtonStyle(shape: shape, strength: strength, isSelected: isSelected, isEnabled: isEnabled))
     }
 }
 
-/// The glass buttons below iOS 26: `glassSurface` in the button's shape, scaled to 0.95 while
-/// pressed.
-private struct LegacyGlassButtonStyle: ButtonStyle {
+/// `glassSurface` in the button's shape, with the 1 pt ink outline while pressed or selected.
+private struct GlassSurfaceButtonStyle: ButtonStyle {
     let shape: GlassButtonShape
     let strength: GlassStrength
+    let isSelected: Bool
     let isEnabled: Bool
 
     func makeBody(configuration: Configuration) -> some View {
         surface(configuration.label)
             .contentShape(Rectangle())
+            .overlay {
+                if isSelected || configuration.isPressed { outline }
+            }
             .opacity(isEnabled ? 1 : Palette.disabledOpacity)
-            .scaleEffect(configuration.isPressed ? 0.95 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 
     @ViewBuilder private func surface(_ label: some View) -> some View {
@@ -162,11 +124,13 @@ private struct LegacyGlassButtonStyle: ButtonStyle {
         case .circle: label.glassSurface(Circle(), strength: strength, shadow: isEnabled)
         }
     }
-}
 
-private extension EdgeInsets {
-    static prefix func - (insets: EdgeInsets) -> EdgeInsets {
-        EdgeInsets(top: -insets.top, leading: -insets.leading, bottom: -insets.bottom, trailing: -insets.trailing)
+    @ViewBuilder private var outline: some View {
+        switch shape {
+        case .roundedRectangle(let radius): RoundedRectangle(cornerRadius: radius).strokeBorder(Palette.ink, lineWidth: 1).allowsHitTesting(false)
+        case .capsule: Capsule().strokeBorder(Palette.ink, lineWidth: 1).allowsHitTesting(false)
+        case .circle: Circle().strokeBorder(Palette.ink, lineWidth: 1).allowsHitTesting(false)
+        }
     }
 }
 

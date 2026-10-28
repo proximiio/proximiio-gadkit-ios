@@ -253,17 +253,18 @@ final class JourneyMapLayers {
         source.shape = MLNShapeCollectionFeature(shapes: features)
     }
 
-    /// A gallery's marker: its icon in the 30 pt circle of the stop markers, with its name under it
-    /// (PM, Monday "Gallery numbers in gallery navigation" and "Visited gallery visualization",
-    /// 2026-10-28). The destination is the red circle with a white border and the icon in white, as an
-    /// amenity detour; a visited gallery is the white circle with the red border, as a visited
-    /// artwork. The circle is in the middle of the image, so it sits on the POI. Without `icon`, a
+    /// A gallery's marker (PM, Monday "Gallery numbers in gallery navigation" and "Visited gallery
+    /// visualization", 2026-10-28). The destination is a red pill with a white border, the icon and the
+    /// whole title in white, its middle on the POI (RPR's second answer, 2026-10-28). A visited gallery
+    /// is its icon in the white 30 pt circle with the red border of a visited artwork, with its title
+    /// under it; the circle is in the middle of the image, so it sits on the POI. Without `icon`, a
     /// picture frame.
     static func galleryMarkerImage(name: String, icon: UIImage?, isDestination: Bool) -> UIImage {
         let red = UIColor(hex: 0xED3731)
         let ink = UIColor(hex: 0x2B2B2B)
         let glyph = (icon ?? UIImage(systemName: "photo.artframe"))
             .map { isDestination ? $0.withTintColor(.white, renderingMode: .alwaysOriginal) : $0 }
+        if isDestination { return galleryPill(name: name, glyph: glyph, red: red) }
         let font = UIFont(name: "GuggenheimSansDisplay-SemiBold", size: 12) ?? .systemFont(ofSize: 12, weight: .semibold)
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
@@ -288,6 +289,28 @@ final class JourneyMapLayers {
                       attributes: [.font: font, .paragraphStyle: paragraph, .strokeColor: UIColor.white, .strokeWidth: 6], context: nil)
             text.draw(with: labelRect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
                       attributes: [.font: font, .paragraphStyle: paragraph, .foregroundColor: ink], context: nil)
+        }
+    }
+
+    /// The destination gallery's red pill: 30 pt high, the icon and the title in white.
+    private static func galleryPill(name: String, glyph: UIImage?, red: UIColor) -> UIImage {
+        let font = UIFont(name: "GuggenheimSansDisplay-SemiBold", size: 14) ?? .systemFont(ofSize: 14, weight: .semibold)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
+        let text = name as NSString
+        let textSize = text.size(withAttributes: attributes)
+        let icon: CGFloat = 16, gap: CGFloat = 6, inset: CGFloat = 12, height: CGFloat = 30
+        let textWidth = min(ceil(textSize.width), 220)
+        let size = CGSize(width: inset + icon + gap + textWidth + inset + 2, height: height)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            let pill = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), cornerRadius: height / 2 - 1)
+            red.setFill()
+            pill.fill()
+            UIColor.white.setStroke()
+            pill.lineWidth = 2
+            pill.stroke()
+            glyph?.draw(in: CGRect(x: inset, y: (height - icon) / 2, width: icon, height: icon))
+            text.draw(with: CGRect(x: inset + icon + gap, y: (height - ceil(textSize.height)) / 2, width: textWidth, height: ceil(textSize.height)),
+                      options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], attributes: attributes, context: nil)
         }
     }
 

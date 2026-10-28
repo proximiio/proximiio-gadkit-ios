@@ -119,12 +119,30 @@ struct Gallery: Identifiable, Equatable, Sendable {
         return destinations
     }
 
-    /// The gallery outlines among `features`, or the named polygon geofences when there are none.
+    /// The galleries with a `gallery_id` (`destinations`), then the gallery outlines among `features`
+    /// (or the named polygon geofences when there are none) that hold none of their POIs. The outlines
+    /// alone are named by a POI whose title says "gallery"; the GAD POIs renamed to "G101 Pop Culture"
+    /// on 2026-10-28 left only three galleries (PM, Monday "Visited gallery visualization").
     static func load(from sdk: Proximiio, features: [ProximiioFeature], places: [VenuePlace]) async -> [Gallery] {
-        let outlines = all(features: features, places: places)
-        guard outlines.isEmpty else { return outlines }
-        let levels = Dictionary(await sdk.floors().map { ($0.id, $0.level) }, uniquingKeysWith: { first, _ in first })
-        return all(geofences: await sdk.geofences(), levels: levels)
+        let geofences = await sdk.geofences()
+        let galleries = Array(destinations(geofences: geofences, places: places, features: features).values)
+        var outlines = all(features: features, places: places)
+        if outlines.isEmpty {
+            let levels = Dictionary(await sdk.floors().map { ($0.id, $0.level) }, uniquingKeysWith: { first, _ in first })
+            outlines = all(geofences: geofences, levels: levels)
+        }
+        return merged(destinations: galleries, outlines: outlines)
+    }
+
+    /// The outline of each gallery of `destinations` (`GalleryDestination.shown`, named by its POI),
+    /// by name, then the `outlines` that are none of them and hold none of their POIs. Pure; covered by
+    /// tests.
+    static func merged(destinations: [GalleryDestination], outlines: [Gallery]) -> [Gallery] {
+        let shown = destinations.map(\.shown).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let others = outlines.filter { outline in
+            !destinations.contains { $0.shown.id == outline.id || outline.contains($0.entry, level: $0.gallery.level) }
+        }
+        return shown + others
     }
 
     /// The polygon features whose type starts with `gallery`, with their `metadata.gallery_id`.

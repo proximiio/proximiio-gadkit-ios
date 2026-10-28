@@ -654,7 +654,7 @@ struct VisitView: View {
         guard !visited.isEmpty else { return [] }
         return galleryDestinations.filter { destination in
             destination.placeID != controller.galleryAhead?.placeID && destination.placeID != visitorGalleryPlaceID
-                && visited.contains { $0.contains(destination.entry, level: destination.gallery.level) }
+                && visited.contains { $0.id == destination.shown.id || $0.contains(destination.entry, level: destination.gallery.level) }
         }
     }
 
