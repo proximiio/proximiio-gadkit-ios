@@ -629,10 +629,22 @@ struct VisitView: View {
         if controller.session.hiddenFeatureIDs != hidden { controller.session.hiddenFeatureIDs = hidden }
     }
 
-    /// The galleries that hold a visited artwork of the journey (PM, 2026-10-28).
+    /// The galleries whose artworks of the journey are all visited or skipped, at least one visited
+    /// (the customer, Monday "Visited gallery visualization", 2026-10-28).
     private var visitedGalleryIDs: Set<String> {
-        Set(controller.navigator.journey.stops.filter { $0.state == .done && $0.kind != .detour }
-            .compactMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries)?.id })
+        let stops = controller.navigator.journey.stops.filter { $0.kind != .detour }.map { stop in
+            (gallery: Gallery.containing(stop.coordinate.proximiio, level: stop.floor?.level, in: galleries)?.id, state: stop.state)
+        }
+        return Self.visitedGalleries(stops.compactMap { stop in stop.gallery.map { ($0, stop.state) } })
+    }
+
+    /// The galleries of `stops` whose stops are all done or skipped, at least one done. Pure; covered
+    /// by tests.
+    static func visitedGalleries(_ stops: [(gallery: String, state: JourneyStop.State)]) -> Set<String> {
+        Set(Dictionary(grouping: stops, by: \.gallery).compactMap { gallery, stops in
+            let states = stops.map(\.state)
+            return states.allSatisfy { $0 == .done || $0 == .skipped } && states.contains(.done) ? gallery : nil
+        })
     }
 
     /// The POIs of the visited galleries, other than the gallery the leg ends at and the gallery the
@@ -1220,7 +1232,7 @@ private struct VisitCard: View {
 
     private var stopCard: some View {
         VStack(spacing: 10) {
-            StopInfoCard(caption: caption, title: title, instruction: instruction, remaining: remaining) {
+            StopInfoCard(caption: caption, title: title, instruction: instruction, remaining: remaining, keepsInstructionLine: keepsInstructionLine) {
                 icon
             } trailing: {
                 if case .nextStopOnOtherLevel(_, let level) = state {
@@ -1308,6 +1320,14 @@ private struct VisitCard: View {
             let text = GuidanceText.instruction(for: guidance, markers: markers)
             return text == levelChangeTitle(stopLevel: level) ? nil : text
         default: return nil
+        }
+    }
+
+    /// On the way to a stop the card keeps the instruction line, also while the route is routed again.
+    private var keepsInstructionLine: Bool {
+        switch state {
+        case .walking, .nextStopOnOtherLevel: true
+        default: false
         }
     }
 

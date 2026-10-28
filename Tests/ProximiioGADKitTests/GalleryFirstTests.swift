@@ -60,6 +60,18 @@ struct GalleryFirstRoutingTests {
         #expect(GalleryFirstRouting.gallery(origin: outside, originLevel: 3, destination: other, state: state()) == nil)
     }
 
+    /// A gallery is visited when its artworks of the journey are all visited or skipped, at least one
+    /// visited (the customer, Monday "Visited gallery visualization", 2026-10-28).
+    @MainActor @Test func aGalleryIsVisitedWhenAllItsArtworksAreDoneOrSkipped() {
+        let visited = VisitView.visitedGalleries([
+            ("g101", .done), ("g101", .skipped),
+            ("g104", .done), ("g104", .pending),
+            ("g106", .skipped),
+            ("g303", .done),
+        ])
+        #expect(visited == ["g101", "g303"])
+    }
+
     /// The marker is the gallery's icon in a 30 pt circle with its full name under it, the circle in
     /// the middle of the image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
     @MainActor @Test func theMarkerIsTheIconWithTheNameUnderIt() {

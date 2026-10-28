@@ -520,7 +520,8 @@ also stay hidden while the visitor is outside every gallery, unless the active a
 every gallery too. The destination gallery is filled over the venue's artworks, furniture and inner
 walls (2026-10-27).
 
-A gallery that holds a visited artwork of the journey is visited (PM, 2026-10-28): the map fills it with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4
+A gallery is visited when its artworks of the journey are all visited or skipped and at least one is
+visited (the customer, 2026-10-28): the map fills it with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4
 #FDC1A8), over the venue's artworks, furniture and inner walls. At its POI it draws the icon of the
 POI's amenity in the white 30 pt circle with the red border of a visited artwork, with the title
 under it (PM, Monday "Visited gallery visualization", 2026-10-28).
@@ -824,8 +825,7 @@ map.routeAccessibility = RouteAccessibility(avoidsStairs: true, avoidsRevolvingD
 - The GAD venue data on 2026-10-14 has staircases and elevators. It has no escalators, no `door`
   features and no `narrowPath` paths, so only `avoidsStairs` changes routes until the data has them.
 - The journey map and the museum map of Journey Complete have an accessible routes button (a wheelchair,
-  blue while on).
-  While it is on, routes avoid all four (`RouteAccessibility.accessible`), whatever the host app set.
+  with a black outline while on). While it is on, routes avoid all four (`RouteAccessibility.accessible`), whatever the host app set.
   Its state is kept on the device for both maps and later launches.
 - When no route meets the needs, the museum map shows "No route from here with your accessibility
   settings." In a journey, the stop card shows "No route to this stop with your accessibility
@@ -949,6 +949,20 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.19.1 (2026-10-28)
+
+No change for host apps' code.
+
+Changed:
+
+- A gallery is visited when its artworks of the journey are all visited or skipped and at least one is
+  visited (the customer, Monday "Visited gallery visualization", 2026-10-28). Before, one visited
+  artwork was enough.
+- The accessible routes button, when on, has a black outline and no blue fill (RPR, Monday "Accessible
+  routing", 2026-10-28).
+- The stop card keeps its instruction line while the route is routed again, so the card and the buttons
+  above it no longer jump when the accessible routes button is pressed (same item).
 
 ### 1.19.0 (2026-10-28)
 

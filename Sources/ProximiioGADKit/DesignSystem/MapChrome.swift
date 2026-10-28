@@ -202,6 +202,10 @@ struct StopInfoCard<Icon: View, Trailing: View, Badges: View>: View {
     let title: String
     var instruction: String?
     var remaining: String?
+    /// The instruction line keeps its height without an instruction, for example while the route is
+    /// routed again: the card and the buttons above it do not move (RPR, Monday "Accessible routing",
+    /// 2026-10-28).
+    var keepsInstructionLine = false
     @ViewBuilder let icon: Icon
     @ViewBuilder let trailing: Trailing
     /// At the end of the caption line: the artwork's AR and audio badges (PM, Monday "Augmented
@@ -223,11 +227,12 @@ struct StopInfoCard<Icon: View, Trailing: View, Badges: View>: View {
                     badges
                 }
                 Text(title).textStyle(.largeBodyBold).lineLimit(2)
-                if instruction != nil || remaining != nil {
+                if instruction != nil || remaining != nil || keepsInstructionLine {
                     HStack(alignment: .firstTextBaseline) {
                         if let instruction { Text(instruction).textStyle(.bodyExtraSmall).fontWeight(.bold) }
                         Spacer(minLength: 4)
                         if let remaining { Text(remaining).textStyle(.bodyExtraSmall) }
+                        if instruction == nil && remaining == nil { Text(verbatim: " ").textStyle(.bodyExtraSmall).hidden() }
                     }
                 }
             }
