@@ -593,6 +593,7 @@ extension ProximiMap {
         case .amenitySelected(let p): return .amenitySelected(place(p))
         case .detourStarted(let p): return .detourStarted(place(p))
         case .destinationUnavailable(let id, let reason): return .destinationUnavailable(poiID: id, reason: reason)
+        case .journeyPaused: return .journeyPaused
         case .journeyResumed: return .journeyResumed
         case .recentred: return .recentred
         case .accessibleRoutesChanged(let on): return .accessibleRoutesChanged(on)

@@ -67,6 +67,7 @@ public struct ProximiMapView: View {
 
     @Binding private var journey: ProximiJourney
     private let destination: Binding<ProximiDestination?>
+    private let isPaused: Binding<Bool>
     private let sdk: Proximiio
     private let options: Options
     private let settings: GADSettings
@@ -90,6 +91,13 @@ public struct ProximiMapView: View {
     ///     shows the route from the visitor. The view sets it back to `nil` when the route ends:
     ///     "Resume your Journey", "Close", another place picked on the map, or
     ///     `ProximiMapEvent.destinationUnavailable`. Setting it to `nil` ends the route.
+    ///   - isPaused: `true` pauses the journey, for example from the audio guide's pause button. The
+    ///     dot moves and the route stays, but no artwork is visited, no off-route warning shows and
+    ///     the leg is not routed again. The stop card shows "Journey paused" with "Resume your
+    ///     Journey". `false` resumes it: the leg is drawn again from the visitor, and a personalised
+    ///     journey with `Options.progress` is ordered again from the visitor first. "Resume your
+    ///     Journey" on the card sets it back to `false` and reports `ProximiMapEvent.journeyResumed`.
+    ///     A change of the host app reports no event.
     ///   - options: What the view does beyond drawing the journey. None by default. The view reads
     ///     them when it opens.
     ///   - settings: Times and distances of the screen. The view reads them when it opens.
@@ -113,6 +121,7 @@ public struct ProximiMapView: View {
         sdk: Proximiio,
         journey: Binding<ProximiJourney>,
         destination: Binding<ProximiDestination?> = .constant(nil),
+        isPaused: Binding<Bool> = .constant(false),
         options: Options = [],
         settings: GADSettings = .standard,
         routeAccessibility: RouteAccessibility = .none,
@@ -123,6 +132,7 @@ public struct ProximiMapView: View {
     ) {
         _journey = journey
         self.destination = destination
+        self.isPaused = isPaused
         self.sdk = sdk
         self.options = options
         self.settings = settings
@@ -144,6 +154,7 @@ public struct ProximiMapView: View {
                     mode: mode,
                     incoming: model.incoming,
                     destination: destination,
+                    isPaused: isPaused,
                     persist: { [model, binding = $journey, generation = loaded.generation] journey in
                         model.write(journey, generation: generation, to: binding)
                     },

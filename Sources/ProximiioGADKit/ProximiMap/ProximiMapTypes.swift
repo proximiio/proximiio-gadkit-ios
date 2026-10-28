@@ -194,7 +194,12 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// `ProximiMapView` does not route to the `destination` the host app set, and sets it back to
     /// `nil`.
     case destinationUnavailable(poiID: String, reason: ProximiDestination.Failure)
-    /// "Resume your Journey".
+    /// "Add a stop" on an amenity: the journey waits while the visitor goes there, until "Resume
+    /// your Journey" (`journeyResumed`). Sent after `detourStarted`. A detour to the host app's
+    /// `destination` sends none.
+    case journeyPaused
+    /// "Resume your Journey": after a detour, or on the card of a journey the host app paused
+    /// (`ProximiMapView`'s `isPaused`, which the view then sets back to `false`).
     case journeyResumed
     /// The visitor has been off the route for `GADSettings.offRouteSeconds`.
     case offRoute(duration: TimeInterval)

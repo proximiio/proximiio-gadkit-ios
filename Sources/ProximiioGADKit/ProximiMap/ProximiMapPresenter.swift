@@ -130,9 +130,10 @@ private struct JourneyReadyFlow: View {
 #if DEBUG
 /// `-hostedMap`: `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses
 /// it. This view is the host app: it skips a stop the visitor swiped, "Visited" marks the first
-/// pending stop visited, and "Remove" removes the last stop. The lines at the top count the stop
-/// states of its journey and list the navigators it got from `onNavigator` and the events of the
-/// last one, for UI tests.
+/// pending stop visited, "Remove" removes the last stop, and "Host pause" / "Host resume" set
+/// `isPaused`. The lines at the top count the stop states of its journey, list the navigators it got
+/// from `onNavigator` and the events of the last one, and show `isPaused` and the view's last events,
+/// for UI tests.
 private struct HostedMapCheck: View {
     @Bindable var map: ProximiMap
     let sdk: Proximiio
@@ -143,15 +144,20 @@ private struct HostedMapCheck: View {
     @State private var navigators = 0
     /// `-hostedDestination`.
     @State private var destination: ProximiDestination?
+    @State private var isPaused = false
+    /// The names of the view's events, oldest first.
+    @State private var viewEvents: [String] = []
 
     var body: some View {
         ProximiMapView(
             sdk: sdk,
             journey: $map.hostedJourney,
             destination: $destination,
+            isPaused: $isPaused,
             routeAccessibility: map.routeAccessibility,
             onEvent: { event in
                 FieldLog.log("hosted map → host app: \(event)")
+                viewEvents.append(String(String(describing: event).prefix { $0 != "(" }))
                 if case .skipRequested(let stop) = event { set(stop.id, to: .skipped) }
             },
             onNavigator: { navigator in
@@ -177,6 +183,7 @@ private struct HostedMapCheck: View {
                     if map.hostedJourney.stops.count > 1 {
                         Button("Remove") { map.hostedJourney.stops.removeLast() }.font(.caption2)
                     }
+                    Button(isPaused ? "Host resume" : "Host pause") { isPaused.toggle() }.font(.caption2)
                     Button("Close map") { map.cover = nil }.font(.caption2)
                 }
                 Text("navigator \(navigators): \(navigatorEvents.suffix(6).joined(separator: " "))")
@@ -185,6 +192,9 @@ private struct HostedMapCheck: View {
                 Text("destination \(destination?.poiID ?? "none")")
                     .font(.caption2)
                     .accessibilityIdentifier("hostedDestination")
+                Text("paused \(isPaused) · events \(viewEvents.suffix(4).joined(separator: " "))")
+                    .font(.caption2)
+                    .accessibilityIdentifier("hostedPaused")
             }
         }
         .task {

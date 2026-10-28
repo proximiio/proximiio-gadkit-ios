@@ -33,7 +33,9 @@ enum VisitEvent: Sendable, Equatable {
     case detourStarted(VenuePlace)
     /// The host app's destination (`ProximiMapView`'s `destination`) gets no route.
     case destinationUnavailable(poiID: String, reason: ProximiDestination.Failure)
-    /// The visitor tapped "Resume your Journey".
+    /// The visitor tapped "Add a stop" on an amenity: the journey waits for "Resume your Journey".
+    case journeyPaused
+    /// The visitor tapped "Resume your Journey": after a detour, or on the card of a paused journey.
     case journeyResumed
     /// The visitor tapped "Centre on me".
     case recentred

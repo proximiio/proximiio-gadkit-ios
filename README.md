@@ -208,6 +208,7 @@ journey.stops[0].state = .visited
 | `sdk` | The host app's `Proximiio`, started, with the position provider of its wristband session attached. |
 | `journey` | `Binding<ProximiJourney>`. The view applies every change to the open screen. It writes to the binding only with `.progress`. |
 | `destination` | `Binding<ProximiDestination?>`, default `.constant(nil)`. A place to route the visitor to at once. See [Routing to a place](#routing-to-a-place). |
+| `isPaused` | `Binding<Bool>`, default `.constant(false)`. Pauses and resumes the journey. See [Pausing the journey](#pausing-the-journey). |
 | `options` | `ProximiMapView.Options`, default none. See below. The view reads them when it opens; a change applies to the next view. |
 | `settings` | `GADSettings`, default `.standard`. The view reads them when it opens. `postsGeofenceNotifications` does not apply. |
 | `routeAccessibility` | The visitor's accessibility needs for routes, default `.none`. See "Accessibility". |
@@ -297,7 +298,7 @@ With `.progress` the view also writes:
 
 `onEvent` receives the journey screen's events of the [Events](#events) table: `trackingChanged`,
 `nextStop`, `stopNearby`, `positionUncertain`, `stopPlaceDeleted`, `skipRequested`, the amenity and
-detour events, `destinationUnavailable`, `journeyResumed`, `offRoute`, `backOnRoute`,
+detour events, `destinationUnavailable`, `journeyPaused`, `journeyResumed`, `offRoute`, `backOnRoute`,
 `journeyFinished`, the floor without positioning events, `modeChanged`, `recentred` and
 `accessibleRoutesChanged`; with `.skipPrompt` also `stopSkipped` and `skipCancelled`; with `.progress`
 also `artworkReached`, `artworkVisitedOutOfOrder` and `stopOrderChanged`; with `.bottomBar`,
@@ -336,6 +337,39 @@ destination = ProximiDestination(poiID: target.id)
 - The view sets `destination` back to `nil` when the route ends: "Resume your Journey", "Close",
   another place picked on the map, or `destinationUnavailable`. The host app sets it to `nil` to end
   the route; another destination replaces it.
+
+### Pausing the journey
+
+The host app sets `isPaused` to pause the journey, for example from the audio guide's pause button, and
+back to `false` to resume it.
+
+```swift
+@State private var isPaused = false
+
+ProximiMapView(sdk: sdk, journey: $journey, isPaused: $isPaused) { event in
+    switch event {
+    case .journeyPaused: guide.pause()       // "Add a stop" on an amenity
+    case .journeyResumed: guide.resume()     // "Resume your Journey"
+    default: break
+    }
+}
+
+// The audio guide's pause button:
+isPaused = true
+```
+
+- While paused, the dot moves and the route stays. No artwork is visited, no off-route warning or
+  wrong floor shows, "Probably at …" does not ask, and the leg is not routed again. The view reports
+  no `offRoute`, `backOnRoute` or `positionUncertain`. The stop card
+  shows "Journey paused", the next stop and "Resume your Journey".
+- On resume the leg is drawn again from the visitor. With `.progress` a personalised journey is
+  ordered again from the visitor first, as after a detour. A detour keeps its leg through a pause.
+- "Resume your Journey" on the card sets `isPaused` back to `false` and reports `journeyResumed`.
+- "Add a stop" on an amenity reports `journeyPaused` after `detourStarted`: the journey waits while
+  the visitor goes there. "Resume your Journey" on the detour's card reports `journeyResumed`.
+  `isPaused` does not change.
+- A change of `isPaused` by the host app, and a detour to the host app's `destination`, report no
+  event.
 
 ### The navigator
 
@@ -653,7 +687,8 @@ position, search and routes.
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
 | `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Add a stop" on an amenity's card during a journey, or the host app's `destination`; the detour reached (`completed`) or left. |
 | `destinationUnavailable(poiID:reason:)` | `ProximiMapView` does not route to the host app's `destination`: `.unknownPlace`, `.noRoute` or `.noPosition`. `poiID` is the id the host app gave. The view sets the binding back to `nil`. |
-| `journeyResumed` | "Resume your Journey". |
+| `journeyPaused` | "Add a stop" on an amenity's card during a journey, after `detourStarted`: the journey waits for "Resume your Journey". |
+| `journeyResumed` | "Resume your Journey": after a detour, or on the card of a journey the host app paused (`ProximiMapView`'s `isPaused`). |
 | `offRoute(duration:)`, `backOnRoute` | The visitor has been off the route for `offRouteSeconds`; the visitor is on the route again. |
 | `journeyFinished` | Every stop is visited or skipped. Journey Complete shows with `ProximiMap` and with `ProximiMapView.Options.journeyComplete`. |
 | `floorWithoutPositioningEntered(level:)`, `floorWithoutPositioningLeft(level:)` | See "Floors without positioning". |
@@ -901,6 +936,17 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.17.0 (2026-10-28)
+
+No change for host apps' code.
+
+Added:
+
+- `ProximiMapView(isPaused:)`: the host app pauses and resumes the journey, for example from the audio
+  guide (Nagarro, 2026-10-28). See [Pausing the journey](#pausing-the-journey).
+- `ProximiMapEvent.journeyPaused`: "Add a stop" on an amenity, after `detourStarted`. `journeyResumed`
+  also comes from "Resume your Journey" on the card of a paused journey.
 
 ### 1.16.1 (2026-10-28)
 

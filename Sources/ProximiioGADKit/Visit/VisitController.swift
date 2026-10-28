@@ -63,6 +63,11 @@
 //  fix is in that gallery, the leg is drawn again from the visitor, to the artwork
 //  (`checkGalleryFirst`).
 //
+//  Paused (`pause()`, the host app's `ProximiMapView` `isPaused`): the dot moves and the route stays,
+//  but no artwork is visited, no off-route warning or wrong floor shows and the leg is not routed
+//  again. `resumeFromPause()` draws the leg again from the visitor; a personalised journey is ordered
+//  again from the visitor first, as after a detour.
+//
 import Foundation
 import Observation
 import Proximiio
@@ -76,6 +81,8 @@ final class VisitController {
     /// `true` for `GADSettings.offRouteWarningSeconds` after `farFromRoute`, `offRouteTooLong` or a
     /// wrong floor, until the visitor closes the warning, resumes the journey or adds a stop.
     private(set) var isOffRoute = false
+    /// `pause()` until `resumeFromPause()`.
+    private(set) var isPaused = false
     @ObservationIgnored private var offRouteWarning: Task<Void, Never>?
     /// Since when the fixes have been on a floor the route does not take.
     @ObservationIgnored private var wrongFloorSince: Date?
@@ -210,7 +217,7 @@ final class VisitController {
     func start(accessibility: RouteAccessibility) async {
         guard !isStarted else { return }
         isStarted = true
-        navigator.deviationPolicy = deviationPolicy
+        navigator.deviationPolicy = isPaused ? .askApp : deviationPolicy
         await navigator.setRouteOptions(accessibility.routeOptions)
         var isOrderedWithoutFix = false
         if !keepsOrder, navigator.journey.stops.allSatisfy({ $0.state == .pending }) {
@@ -272,6 +279,7 @@ final class VisitController {
                 }
             })
         case .farFromRoute, .offRouteTooLong:
+            guard !isPaused else { break }
             isOffRouteEpisode = true
             showOffRouteWarning()
         case .returnedToRoute:
@@ -287,7 +295,7 @@ final class VisitController {
     /// `GADSettings.artworkAdvanceDelay`. The geofence of any other artwork is ignored, and every artwork
     /// geofence is ignored during a detour.
     func artworkGeofenceEntered(remoteID: String?) {
-        guard managesProgress, navigator.detourStop == nil, let id = Self.activeStopID(forRemoteID: remoteID, in: navigator.journey, remoteIDs: artworkRemoteIDs) else { return }
+        guard managesProgress, !isPaused, navigator.detourStop == nil, let id = Self.activeStopID(forRemoteID: remoteID, in: navigator.journey, remoteIDs: artworkRemoteIDs) else { return }
         FieldLog.log("artwork geofence arrival: \(id) remote \(remoteID ?? "-")")
         scheduleDone(id)
     }
@@ -301,7 +309,7 @@ final class VisitController {
     func checkArtworkGeofences() {
         // Before the start the journey is still being ordered.
         guard managesProgress, isNavigating else { return }
-        guard navigator.detourStop == nil else {
+        guard navigator.detourStop == nil, !isPaused else {
             _ = outOfOrderDwell.update(inside: [], now: .now, dwell: settings.outOfOrderDwell)
             return
         }
@@ -353,7 +361,7 @@ final class VisitController {
     /// is drawn again from the visitor, to the artwork.
     func checkGalleryFirst() {
         defer { refreshGalleryAhead() }
-        guard isNavigating, navigator.detourStop == nil, !navigator.hasArrived, let stop = navigator.activeStop,
+        guard isNavigating, !isPaused, navigator.detourStop == nil, !navigator.hasArrived, let stop = navigator.activeStop,
               let gallery = galleryRouting.gallery(of: stop.coordinate), let position = session.position,
               gallery.gallery.contains(position.coordinate.proximiio, level: position.floor?.level)
         else { return }
@@ -371,7 +379,7 @@ final class VisitController {
     /// longer the active stop, the stops ahead are ordered again from the visitor and the leg leads
     /// to that artwork. At most every 5 s.
     func checkCloserArtwork() {
-        guard managesProgress, !keepsOrder, isNavigating, isOffRouteEpisode, navigator.detourStop == nil,
+        guard managesProgress, !keepsOrder, isNavigating, !isPaused, isOffRouteEpisode, navigator.detourStop == nil,
               let active = navigator.activeStop, Date.now.timeIntervalSince(lastCloserArtworkCheck) >= 5
         else { return }
         lastCloserArtworkCheck = .now
@@ -395,7 +403,7 @@ final class VisitController {
     /// starts when a fix is on a floor of the route again. Off on a floor without positioning
     /// (`isFloorGuideActive`).
     func checkWrongFloor(isFloorGuideActive: Bool) {
-        guard isNavigating, !isFloorGuideActive, navigator.activeStop != nil, !navigator.hasArrived,
+        guard isNavigating, !isPaused, !isFloorGuideActive, navigator.activeStop != nil, !navigator.hasArrived,
               let level = session.position?.floor?.level,
               let legs = session.routeRenderer?.geometry?.legs,
               !Self.isOnRouteFloor(level: level, legs: legs)
@@ -698,6 +706,37 @@ final class VisitController {
             await self.rerouting {
                 await self.navigator.resumeJourney()
                 if hadDetour { await self.orderRemaining() }
+            }
+            self.persist(self.navigator.journey)
+        }
+    }
+
+    /// Pauses the guidance: no artwork is visited, no off-route warning or wrong floor shows, and
+    /// the navigator leaves the leg where it is (`JourneyDeviationPolicy.askApp`). The dot moves and
+    /// the route stays. A detour keeps its leg.
+    func pause() {
+        guard !isPaused else { return }
+        isPaused = true
+        FieldLog.log("journey paused")
+        closeOffRouteWarning()
+        isOffRouteEpisode = false
+        wrongFloorSince = nil
+        navigator.deviationPolicy = .askApp
+    }
+
+    /// Ends `pause()`. The leg is drawn again from the visitor; a personalised journey is ordered
+    /// again from the visitor first. A detour keeps its leg.
+    func resumeFromPause() async {
+        guard isPaused else { return }
+        isPaused = false
+        FieldLog.log("journey resumed after a pause")
+        navigator.deviationPolicy = deviationPolicy
+        guard isNavigating, navigator.detourStop == nil else { return }
+        await serially { [weak self] in
+            guard let self else { return }
+            await self.rerouting {
+                await self.orderRemaining()
+                await self.navigator.resumeJourney()
             }
             self.persist(self.navigator.journey)
         }

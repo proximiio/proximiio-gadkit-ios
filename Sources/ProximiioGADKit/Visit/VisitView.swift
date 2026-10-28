@@ -84,6 +84,9 @@ struct VisitView: View {
     private let destination: Binding<ProximiDestination?>
     /// The destination the view routes to.
     @State private var routedDestination: RoutedDestination?
+    /// The host app's pause (`ProximiMapView`'s `isPaused`). "Resume your Journey" on the card of a
+    /// paused journey sets it back to `false`.
+    private let isPaused: Binding<Bool>
     /// The places are loaded and the journey started: a destination can be routed to.
     @State private var isReady = false
     /// `venue.settings` when the view was created.
@@ -103,6 +106,7 @@ struct VisitView: View {
     ///   - mode: Map or List when the screen opens.
     ///   - incoming: The host app's journey after a change (`ProximiMapView`).
     ///   - destination: See `destination`.
+    ///   - isPaused: See `isPaused`.
     ///   - onClose: See `onClose`.
     ///   - persist: Stores the journey after each change (`VisitController.persist`).
     ///   - onNavigator: See `onNavigator`.
@@ -114,6 +118,7 @@ struct VisitView: View {
         mode: VisitMode = .map,
         incoming: IncomingJourney? = nil,
         destination: Binding<ProximiDestination?> = .constant(nil),
+        isPaused: Binding<Bool> = .constant(false),
         persist: @escaping @MainActor (Journey?) -> Void = VisitStore.persist,
         onClose: (() -> Void)?,
         onNavigator: (@MainActor (JourneyNavigator) -> Void)? = nil
@@ -123,6 +128,7 @@ struct VisitView: View {
         self.options = options
         self.incoming = incoming
         self.destination = destination
+        self.isPaused = isPaused
         _mode = State(initialValue: mode)
         let settings = venue.settings
         self.settings = settings
@@ -252,6 +258,7 @@ struct VisitView: View {
                 for await event in controller.navigator.events {
                     // The navigator walks to an artwork visited out of order for a moment.
                     if case .legChanged(let stop, _) = event, stop.id == controller.passingStopID { continue }
+                    if controller.isPaused, Self.isRouteDeviation(event) { continue }
                     emit(.journey(event))
                     if case .detourEnded(let stop, _) = event, routedDestination?.placeID == (stop.poiID ?? stop.id) {
                         clearDestination()
@@ -274,6 +281,7 @@ struct VisitView: View {
                 refreshMapLayers()
                 // A journey without stops shows the map alone; the navigator would report it finished.
                 if hasStops {
+                    if isPaused.wrappedValue { controller.pause() }
                     await controller.start(accessibility: accessibility)
                     // A visitor who opens the journey inside the first artwork's geofence.
                     checkArrival()
@@ -285,6 +293,13 @@ struct VisitView: View {
                 destinationChanged(destination.wrappedValue)
             }
             .onChange(of: destination.wrappedValue) { _, destination in destinationChanged(destination) }
+            .onChange(of: isPaused.wrappedValue) { _, paused in
+                if paused {
+                    controller.pause()
+                } else {
+                    Task { await controller.resumeFromPause() }
+                }
+            }
             .task {
                 let events = await venue.sdk.geofenceEvents()
                 // The stream does not repeat the geofences entered before it started.
@@ -621,6 +636,15 @@ struct VisitView: View {
         if controller.session.journeyStopMarkerStyle != style { controller.session.journeyStopMarkerStyle = style }
     }
 
+    /// The navigator's reports of leaving and rejoining the route, which a paused journey does not
+    /// pass on. Pure; covered by tests.
+    static func isRouteDeviation(_ event: JourneyEvent) -> Bool {
+        switch event {
+        case .leftRoute, .farFromRoute, .offRouteTooLong, .returnedToRoute: true
+        default: false
+        }
+    }
+
     /// Whether the artworks' markers show. Pure; covered by tests.
     static func showsArtworkMarkers(guidesToGalleryFirst: Bool, hasGalleryAhead: Bool, isInGallery: Bool, isActiveStopInGallery: Bool) -> Bool {
         guard guidesToGalleryFirst else { return true }
@@ -803,7 +827,7 @@ struct VisitView: View {
         // Without `offRoutePrompt` the off-route state shows nothing and does not hold the report back.
         lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit
             || (options.contains(.offRoutePrompt) && controller.isOffRoute)
-            || isShowingWrapUp || floorGuide.isActive
+            || isShowingWrapUp || floorGuide.isActive || controller.isPaused
     }
 
     private func evaluateAmbiguity() {
@@ -897,6 +921,7 @@ struct VisitView: View {
                             } else {
                                 Task { await controller.detour(to: place) }
                                 emit(.detourStarted(place))
+                                emit(.journeyPaused)
                                 controller.session.followMyFloor()
                                 recentre(reason: "stop added")
                             }
@@ -927,6 +952,12 @@ struct VisitView: View {
                         places: places,
                         isOnFloorWithoutPositioning: floorGuide.isActive,
                         returningToLevel: returningToLevel,
+                        pausedText: controller.isPaused ? nextStopText ?? "" : nil,
+                        onResumeFromPause: {
+                            if isPaused.wrappedValue { isPaused.wrappedValue = false }
+                            Task { await controller.resumeFromPause() }
+                            emit(.journeyResumed)
+                        },
                         onResume: {
                             if case .onFloor = floorGuide.phase {
                                 returnOrigin = floorDestination?.coordinate
@@ -1068,11 +1099,13 @@ struct VisitView: View {
     }
 
     /// "Your next stop is Gallery 103." The gallery the leg ends at, else the next stop.
-    private var offRouteText: String {
-        guard let next = controller.galleryAhead?.gallery.name ?? controller.navigator.activeStop?.title else {
-            return String(localized: "Head back to your route.", bundle: .module)
-        }
+    private var nextStopText: String? {
+        guard let next = controller.galleryAhead?.gallery.name ?? controller.navigator.activeStop?.title else { return nil }
         return String(localized: "Your next stop is \(next).", bundle: .module)
+    }
+
+    private var offRouteText: String {
+        nextStopText ?? String(localized: "Head back to your route.", bundle: .module)
     }
 
     /// Shows the nearest place of `kind` on a card. "Add a stop" adds it as a journey detour (PM
@@ -1106,6 +1139,10 @@ private struct VisitCard: View {
     /// The next stop's floor on the way back from a floor without positioning: "NEXT STOP IS LEVEL 1"
     /// and "Head to Level 1 by lift or stairs".
     var returningToLevel: Int?
+    /// The subtitle of the card of a paused journey; `nil` while the journey is not paused.
+    var pausedText: String?
+    /// "Resume your Journey" on the card of a paused journey.
+    var onResumeFromPause: () -> Void = {}
     let onResume: () -> Void
 
     private var visitorGallery: Gallery? {
@@ -1126,7 +1163,14 @@ private struct VisitCard: View {
     }
 
     var body: some View {
-        if let detour = navigator.detourStop {
+        if let pausedText {
+            PlaceInfoCard(
+                title: String(localized: "Journey paused", bundle: .module),
+                subtitle: pausedText,
+                primary: "Resume your Journey",
+                onPrimary: onResumeFromPause
+            )
+        } else if let detour = navigator.detourStop {
             // An amenity detour (PM review 2026-10-12): no number, "Amenity · Level 1".
             PlaceInfoCard(
                 title: detour.title,

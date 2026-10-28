@@ -257,7 +257,7 @@ struct PlaceInfoCard: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).textStyle(.largeBodyBold)
-                Text(subtitle).textStyle(.bodySmallRegular)
+                if !subtitle.isEmpty { Text(subtitle).textStyle(.bodySmallRegular) }
             }
             HStack(spacing: 10) {
                 Button(action: onPrimary) { Text(primary, bundle: .module) }.buttonStyle(CardGhostButtonStyle())

@@ -81,4 +81,13 @@ struct OffRouteTests {
         #expect(hidden.detour.opacity == 1)
         #expect(hidden != MapStyle.journeyStops)
     }
+
+    /// A paused journey passes on no report of leaving or rejoining the route (Nagarro, 2026-10-28).
+    @Test func aPausedJourneyDropsTheRouteDeviationReports() {
+        #expect(VisitView.isRouteDeviation(.leftRoute(distance: 13)))
+        #expect(VisitView.isRouteDeviation(.farFromRoute(distance: 31)))
+        #expect(VisitView.isRouteDeviation(.offRouteTooLong(duration: 60)))
+        #expect(VisitView.isRouteDeviation(.returnedToRoute))
+        #expect(!VisitView.isRouteDeviation(.journeyFinished))
+    }
 }
