@@ -37,12 +37,15 @@
 //  still ahead are ordered again from the visitor. A curated tour (`keepsOrder`) is never ordered.
 //
 //  Off the route (PM, Monday "Personalized tour: off-route and re-route behaviour" and "Curated tour:
-//  off-route and recalculation", 2026-10-26): the visitor gets a warning (`isOffRoute`) once they are
-//  far from the route or off it for too long. In a personalised journey (`JourneyDeviationPolicy.askApp`)
-//  the leg stays where the visitor left it. When another open artwork is now the nearest stop, the
-//  stops ahead are ordered again from the visitor and the leg leads to it (`checkCloserArtwork`). A
-//  curated tour, and a journey without `ProximiMapView.Options.offRoutePrompt`, is routed again from
-//  the visitor (`.automatic`).
+//  off-route and recalculation", 2026-10-26 and 2026-10-28): the visitor gets a warning (`isOffRoute`)
+//  once they are `GADSettings.offRouteMeters` (12 m) off the route to the current destination
+//  (`leftRoute`), far from it, or off it for too long. The warning comes before any routing: with
+//  `ProximiMapView.Options.offRoutePrompt` the navigator routes nothing by itself
+//  (`JourneyDeviationPolicy.askApp`). After the warning a personalised journey keeps the leg where the
+//  visitor left it; when another open artwork is now the nearest stop, the stops ahead are ordered
+//  again from the visitor and the leg leads to it (`checkCloserArtwork`). A curated tour is routed
+//  again from the visitor after the warning (`reroutesAfterWarning`). A journey without the prompt is
+//  routed again by the navigator (`.automatic`).
 //
 //  The warning stays open for `GADSettings.offRouteWarningSeconds`, unless the visitor closes it; the
 //  routing after it does not close it (PM, Monday "Personalized tour: off-route and re-route behaviour",
@@ -199,7 +202,7 @@ final class VisitController {
         self.galleryRouting = routing
         self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules, guidanceRules: Self.artworkGuidanceRules, routing: routing)
         var deviation = navigator.deviationRules
-        deviation.farFromRouteMeters = settings.offRouteMeters
+        deviation.leftRouteMeters = settings.offRouteMeters
         deviation.offRouteTooLongSeconds = settings.offRouteSeconds
         navigator.deviationRules = deviation
         // The dot is drawn on the route within `routeSnapMeters`. Display only: guidance and
@@ -278,10 +281,12 @@ final class VisitController {
                     await self.rerouting { await self.orderRemaining() }
                 }
             })
-        case .farFromRoute, .offRouteTooLong:
+        case .leftRoute, .farFromRoute, .offRouteTooLong:
             guard !isPaused else { break }
+            let startsEpisode = !isOffRouteEpisode
             isOffRouteEpisode = true
             showOffRouteWarning()
+            if startsEpisode, reroutesAfterWarning { rerouteFromVisitor() }
         case .returnedToRoute:
             isOffRouteEpisode = false
         case .legChanged, .rerouted:
@@ -442,6 +447,24 @@ final class VisitController {
     nonisolated static func isOnRouteFloor(level: Double, legs: [RouteGeometry.Leg]) -> Bool {
         let ahead = legs.filter { !$0.isCompleted }
         return ahead.isEmpty || ahead.contains { VenueLevel.same($0.floor.level, level) }
+    }
+
+    /// A journey that keeps its order and shows the warning (`.askApp`, a curated tour) is routed
+    /// again from the visitor after the warning. A personalised journey keeps its leg.
+    private var reroutesAfterWarning: Bool {
+        deviationPolicy == .askApp && keepsOrder
+    }
+
+    /// Draws the leg again from the visitor, after the warning.
+    private func rerouteFromVisitor() {
+        FieldLog.log("off route: warning shown · leg drawn again from the visitor")
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self, self.isOffRouteEpisode else { return }
+                await self.rerouting { await self.navigator.resumeJourney() }
+                self.persist(self.navigator.journey)
+            }
+        })
     }
 
     /// Opens the off-route warning for `GADSettings.offRouteWarningSeconds`. A new episode while it

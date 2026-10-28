@@ -63,6 +63,11 @@ struct VisitView: View {
     /// The POI of the gallery the visitor is in, which the map does not draw (PM, Monday "Navigation
     /// to a gallery", 2026-10-26).
     @State private var visitorGalleryPlaceID: String?
+    /// The lift or stairs view of a ride to a floor with positioning (PM, Monday "Elevator/Staircase
+    /// animation", 2026-10-28: at every ride).
+    @State private var ride: FloorWithoutPositioningGuide.Change?
+    /// The rides whose view showed, by lift or stairs and floors: each shows once.
+    @State private var shownRides: Set<String> = []
     @State private var mapLayers = JourneyMapLayers()
     @State private var isShowingWrapUp = false
     /// Set by a button in a sheet or cover that leaves the visit: `onClose` runs after that
@@ -153,7 +158,9 @@ struct VisitView: View {
             managesProgress: options.contains(.progress),
             // Off the route a personalised journey keeps the leg; a curated tour is routed again
             // (PM, Monday, 2026-10-26).
-            deviationPolicy: options.contains(.offRoutePrompt) && options.contains(.progress) && !kind.keepsOrder ? .askApp : .automatic,
+            // With the warning the navigator routes nothing by itself: the warning comes first (PM,
+            // Monday "Curated tour: off-route and recalculation", 2026-10-28).
+            deviationPolicy: options.contains(.offRoutePrompt) ? .askApp : .automatic,
             settings: settings, persist: persist
         ))
         self.onClose = onClose
@@ -183,6 +190,10 @@ struct VisitView: View {
                 if case .changing(let change) = floorGuide.phase {
                     FloorChangeView(change: change)
                         .onTapGesture { floorGuide.showFloor() }
+                        .transition(.opacity)
+                } else if let ride {
+                    FloorChangeView(change: ride, showsNoPositionNote: false)
+                        .onTapGesture { withAnimation { self.ride = nil } }
                         .transition(.opacity)
                 }
             }
@@ -276,7 +287,6 @@ struct VisitView: View {
                 await loadVenueData()
                 await MapStyle.waitForCanvas(of: controller.session)
                 applyStopMarkers()
-                if let canvas = controller.session.canvas { MapStyle.registerStopIcons(on: canvas) }
                 // No walked legs: the map shows the trail of the current leg only (PM review 2026-10-12).
                 mapLayers.attach(to: controller.session)
                 refreshMapLayers()
@@ -440,6 +450,7 @@ struct VisitView: View {
                         markers: session.routeRenderer?.geometry?.markers ?? [],
                         destinationID: navigator.detourStop?.id ?? navigator.activeStop?.id
                     )
+                    checkRide()
                 }
             }
             // The session updates the guidance after the position on every fix; a fix without guidance
@@ -705,6 +716,28 @@ struct VisitView: View {
         applyStopMarkers()
     }
 
+    /// Shows the lift or stairs view for `GADSettings.levelChangeViewSeconds` when the visitor reaches
+    /// the lift or stairs of the route's next level change. A ride to a floor without positioning is
+    /// the floor guide's (`FloorWithoutPositioningGuide`).
+    private func checkRide() {
+        let session = controller.session
+        guard ride == nil, !floorGuide.isActive, let position = session.position,
+              let change = FloorWithoutPositioningGuide.reachedRide(
+                  coordinate: position.coordinate, level: position.floor?.level,
+                  markers: session.routeRenderer?.geometry?.markers ?? [], settings: settings
+              ),
+              !settings.levelsWithoutPositioning.contains(change.level),
+              shownRides.insert("\(change.coordinate.latitude),\(change.coordinate.longitude),\(change.from),\(change.level)").inserted
+        else { return }
+        FieldLog.log("ride: at the \(change.featureType) to L\(change.level)")
+        withAnimation { ride = change }
+        let seconds = settings.levelChangeViewSeconds
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(seconds))
+            if ride == change { withAnimation { ride = nil } }
+        }
+    }
+
     /// Reports `stopNearby` once per stop.
     private func checkStopNearby(position: VenuePosition?, guidance: RouteGuidance?) {
         if let stop = stopNearby.update(position: position, stop: controller.navigator.activeStop, guidance: guidance) {
@@ -937,13 +970,16 @@ struct VisitView: View {
                         }
                         .accessibilityLabel(Text("Centre on me", bundle: .module))
                         AccessibleRoutesButton(isOn: $accessibleRoutes) { emit(.accessibleRoutesChanged($0)) }
-                        GlassSquareButton(action: {
-                            floorGuide.leave()
-                            controller.session.followMyFloor()
-                        }) {
-                            Text(GuidanceText.floorLabel(controller.session.selectedFloor.level)).textStyle(.largeBodyBold)
-                        }
-                        .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .module))
+                        // The shown floor, a label and no button (PM, Monday "Current level button",
+                        // 2026-10-28).
+                        Text(GuidanceText.floorLabel(controller.session.selectedFloor.level))
+                            .textStyle(.largeBodyBold)
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 50, height: 50)
+                            .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .module))
+                            .accessibilityIdentifier("visitFloor")
                     }
                 }
                 if let place = selectedAmenity {
@@ -1408,7 +1444,8 @@ private struct SkipConfirmation: View {
             Button(String(localized: "Skip artwork", bundle: .module), action: onSkip).buttonStyle(.primary)
             Button(String(localized: "Keep it", bundle: .module), action: onKeep).buttonStyle(.textAction)
         }
-        .overlaySheetStyle()
+        // Less space under "Keep it" (PM, Monday "Skip artwork popup too large", 2026-10-28).
+        .overlaySheetStyle(bottomPadding: 12)
     }
 }
 

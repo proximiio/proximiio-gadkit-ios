@@ -178,6 +178,9 @@ final class JourneyMapLayers {
 
     private func install(on style: MLNStyle) {
         guard let canvas = session?.canvas else { return }
+        // The amenity glyphs of the detour markers, on every style: added once before the style had
+        // loaded, they were missing (PM, Monday "Amenity icon disappears sometimes", 2026-10-28).
+        MapStyle.registerStopIcons(on: canvas)
         if style.source(withIdentifier: Self.gallerySource) == nil {
             let source = MLNShapeSource(identifier: Self.gallerySource, shape: nil)
             style.addSource(source)
@@ -254,17 +257,16 @@ final class JourneyMapLayers {
     }
 
     /// A gallery's marker (PM, Monday "Gallery numbers in gallery navigation" and "Visited gallery
-    /// visualization", 2026-10-28). The destination is a red pill with a white border, the icon and the
-    /// whole title in white, its middle on the POI (RPR's second answer, 2026-10-28). A visited gallery
-    /// is its icon in the white 30 pt circle with the red border of a visited artwork, with its title
-    /// under it; the circle is in the middle of the image, so it sits on the POI. Without `icon`, a
-    /// picture frame.
+    /// visualization", 2026-10-28). The destination is a red pill with a white border and the whole
+    /// title in white, no icon, its middle on the POI (RPR's second answer and the PM, 2026-10-28). A
+    /// visited gallery is its icon in the white 30 pt circle with the red border of a visited artwork,
+    /// with its title under it; the circle is in the middle of the image, so it sits on the POI.
+    /// Without `icon`, a picture frame.
     static func galleryMarkerImage(name: String, icon: UIImage?, isDestination: Bool) -> UIImage {
         let red = UIColor(hex: 0xED3731)
         let ink = UIColor(hex: 0x2B2B2B)
-        let glyph = (icon ?? UIImage(systemName: "photo.artframe"))
-            .map { isDestination ? $0.withTintColor(.white, renderingMode: .alwaysOriginal) : $0 }
-        if isDestination { return galleryPill(name: name, glyph: glyph, red: red) }
+        if isDestination { return galleryPill(name: name, red: red) }
+        let glyph = icon ?? UIImage(systemName: "photo.artframe")
         let font = UIFont(name: "GuggenheimSansDisplay-SemiBold", size: 12) ?? .systemFont(ofSize: 12, weight: .semibold)
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
@@ -277,9 +279,9 @@ final class JourneyMapLayers {
         return UIGraphicsImageRenderer(size: size).image { _ in
             let circleRect = CGRect(x: (size.width - circle) / 2, y: gap + labelSize.height, width: circle, height: circle)
             let disk = UIBezierPath(ovalIn: circleRect.insetBy(dx: 1, dy: 1))
-            (isDestination ? red : UIColor.white).setFill()
+            UIColor.white.setFill()
             disk.fill()
-            (isDestination ? UIColor.white : red).setStroke()
+            red.setStroke()
             disk.lineWidth = 2
             disk.stroke()
             glyph?.draw(in: circleRect.insetBy(dx: 7, dy: 7))
@@ -292,15 +294,15 @@ final class JourneyMapLayers {
         }
     }
 
-    /// The destination gallery's red pill: 30 pt high, the icon and the title in white.
-    private static func galleryPill(name: String, glyph: UIImage?, red: UIColor) -> UIImage {
+    /// The destination gallery's red pill: 30 pt high, the title in white.
+    private static func galleryPill(name: String, red: UIColor) -> UIImage {
         let font = UIFont(name: "GuggenheimSansDisplay-SemiBold", size: 14) ?? .systemFont(ofSize: 14, weight: .semibold)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
         let text = name as NSString
         let textSize = text.size(withAttributes: attributes)
-        let icon: CGFloat = 16, gap: CGFloat = 6, inset: CGFloat = 12, height: CGFloat = 30
+        let inset: CGFloat = 12, height: CGFloat = 30
         let textWidth = min(ceil(textSize.width), 220)
-        let size = CGSize(width: inset + icon + gap + textWidth + inset + 2, height: height)
+        let size = CGSize(width: inset + textWidth + inset + 2, height: height)
         return UIGraphicsImageRenderer(size: size).image { _ in
             let pill = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), cornerRadius: height / 2 - 1)
             red.setFill()
@@ -308,8 +310,7 @@ final class JourneyMapLayers {
             UIColor.white.setStroke()
             pill.lineWidth = 2
             pill.stroke()
-            glyph?.draw(in: CGRect(x: inset, y: (height - icon) / 2, width: icon, height: icon))
-            text.draw(with: CGRect(x: inset + icon + gap, y: (height - ceil(textSize.height)) / 2, width: textWidth, height: ceil(textSize.height)),
+            text.draw(with: CGRect(x: inset + 1, y: (height - ceil(textSize.height)) / 2, width: textWidth, height: ceil(textSize.height)),
                       options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], attributes: attributes, context: nil)
         }
     }

@@ -18,6 +18,9 @@ struct GADSettingsTests {
         #expect(configuration.settings == .standard)
         #expect(GADSettings.standard.trackingLostAfter == 110)
         #expect(GADSettings.standard.stopNearbyMeters == 5)
+        // The warning at 12 m off the route (PM, Monday "Personalized tour: off-route and re-route
+        // behaviour", 2026-10-28).
+        #expect(GADSettings.standard.offRouteMeters == 12)
         #expect(GADSettings.standard.levelsWithoutPositioning == [0])
         #expect(GADSettings.standard.levelChangeViewSeconds == 5)
     }

@@ -98,14 +98,16 @@ extension View {
         modifier(GlassSurface(shape: RoundedRectangle(cornerRadius: cornerRadius), strength: strength))
     }
 
-    /// White bottom-sheet content (Figma `Overlay`, node 6902:45589): 40 pt padding, centred.
-    /// The sheet is as tall as its content, so long texts wrap instead of being truncated.
-    func overlaySheetStyle() -> some View {
+    /// White bottom-sheet content (Figma `Overlay`, node 6902:45589): 40 pt padding, centred, or
+    /// `bottomPadding` at the bottom. The sheet is as tall as its content, so long texts wrap instead
+    /// of being truncated.
+    func overlaySheetStyle(bottomPadding: CGFloat = 40) -> some View {
         self
             .multilineTextAlignment(.center)
             .foregroundStyle(Palette.ink)
             .padding(.horizontal, 30)
-            .padding(.vertical, 40)
+            .padding(.top, 40)
+            .padding(.bottom, bottomPadding)
             .frame(maxWidth: .infinity)
             .modifier(FittedSheetHeight())
             .presentationCornerRadius(50)

@@ -87,12 +87,14 @@ struct GalleryFirstRoutingTests {
         #expect(visited == ["g101", "g303"])
     }
 
-    /// The marker is the gallery's icon in a 30 pt circle with its full name under it, the circle in
-    /// the middle of the image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
-    @MainActor @Test func theMarkerIsTheIconWithTheNameUnderIt() {
+    /// The destination is a 30 pt pill with the full name and no icon; a visited gallery is its icon in
+    /// a 30 pt circle with its name under it (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+    @MainActor @Test func theDestinationIsAPillWithTheNameOnly() {
         let named = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", icon: nil, isDestination: true)
-        #expect(named.size.width > 100)
+        let withIcon = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", icon: UIImage(systemName: "square"), isDestination: true)
+        #expect(named.size.width > 80)
         #expect(named.size.height == 30)
+        #expect(withIcon.size == named.size)
         let visited = JourneyMapLayers.galleryMarkerImage(name: "G1", icon: UIImage(systemName: "square"), isDestination: false)
         #expect(visited.size.width == 30)
         let marker = JourneyMapLayers.GalleryMarker(coordinate: .init(latitude: 0, longitude: 0), level: 3, name: "G303 Language",

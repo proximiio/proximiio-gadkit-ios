@@ -46,6 +46,17 @@ struct FloorWithoutPositioningTests {
         }
     }
 
+    /// Every ride gets the lift or stairs view, not only one to a floor without positioning (PM,
+    /// Monday "Elevator/Staircase animation", 2026-10-28).
+    @Test func everyRideIsReachedNearItsLiftOrStairs() {
+        let toLevel4 = [Self.marker("staircase", from: 1, to: 3), Self.marker("staircase", from: 3, to: 4)]
+        let ride = FloorWithoutPositioningGuide.reachedRide(coordinate: Self.north(1), level: 1, markers: toLevel4, settings: .standard)
+        #expect(ride?.level == 4)
+        #expect(ride?.from == 1)
+        #expect(FloorWithoutPositioningGuide.reachedRide(coordinate: Self.north(8), level: 1, markers: toLevel4, settings: .standard) == nil)
+        #expect(FloorWithoutPositioningGuide.reachedChange(coordinate: Self.north(1), level: 1, markers: toLevel4, settings: .standard) == nil)
+    }
+
     @Test func aFloorWithPositioningIsNoChange() {
         let toLevel4 = [Self.marker("staircase", from: 1, to: 3), Self.marker("staircase", from: 3, to: 4)]
         #expect(FloorWithoutPositioningGuide.reachedChange(coordinate: Self.north(1), level: 1, markers: toLevel4, settings: .standard) == nil)

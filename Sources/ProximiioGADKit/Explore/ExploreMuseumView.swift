@@ -244,6 +244,9 @@ struct ExploreMuseumView: View {
     // MARK: Panel
 
     /// A list or the legend over the lower part of the map. Dragging its top edge down closes it.
+    /// The height over which the lists fade out above the tab bar.
+    private static let listFadeHeight: CGFloat = 90
+
     private func panelView(_ panel: ExplorePanel) -> some View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
@@ -273,11 +276,14 @@ struct ExploreMuseumView: View {
                         case .legend: legend
                         }
                     }
-                    // The rows fade out above the tab bar: its glass shows the text under it.
+                    // The last row can scroll above the fade.
+                    .contentMargins(.bottom, Self.listFadeHeight, for: .scrollContent)
+                    // The rows fade out above the tab bar: its glass shows the text under it (PM,
+                    // Monday "Explore museum: spaces list fade", 2026-10-28: 30 pt did not hide them).
                     .mask {
                         VStack(spacing: 0) {
                             Rectangle()
-                            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 30)
+                            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: Self.listFadeHeight)
                             Color.clear.frame(height: proxy.safeAreaInsets.bottom + 16 + 50 + 6)
                         }
                     }

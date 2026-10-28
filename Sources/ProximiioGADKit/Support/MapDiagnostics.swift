@@ -7,7 +7,8 @@
 //  floor, the zoom and the style's fonts the glyph server does not have. For the floor plan that is
 //  missing on the journey map at a high zoom (PM, Monday "Floorplan disappears zometimes",
 //  2026-10-27): a MapLibre shape source takes the venue's collection whole or not at all.
-//  Also the time from a map view's appearance to the map showing the venue (2026-10-28).
+//  Also the time from a map view's appearance to the map showing the venue and to its first fully
+//  drawn frame (`ProximiioMapSession.venueDrawing`, map 6.0.0-beta.56; 2026-10-28).
 //
 import Combine
 import Foundation
@@ -60,6 +61,9 @@ enum MapDiagnostics {
         var features: Int?
         var featuresSeconds: Double?
         var cameraSeconds: Double?
+        /// The first frame drawn with the venue's features, tiles, icons and labels
+        /// (`VenueDrawing.drawn`).
+        var drawnSeconds: Double?
 
         /// The venue's first style, its features and the camera, whichever came last.
         var shownSeconds: Double? {
@@ -67,15 +71,16 @@ enum MapDiagnostics {
             return max(style.seconds, featuresSeconds, cameraSeconds)
         }
 
-        /// - Parameter closedSeconds: when the view went before the map showed the venue.
+        /// - Parameter closedSeconds: when the view went before the map drew the venue.
         func line(closedSeconds: Double? = nil) -> String {
             var parts = styles.map { "style \($0.source) \(Self.text($0.seconds))" }
             if let features, let featuresSeconds { parts.append("features \(features) \(Self.text(featuresSeconds))") }
             if let cameraSeconds { parts.append("camera ready \(Self.text(cameraSeconds))") }
-            if let shownSeconds {
-                parts.append("shown \(Self.text(shownSeconds))" + (openSeconds.map { ", \(Self.text(shownSeconds + $0)) after open()" } ?? ""))
+            if let shownSeconds { parts.append("shown \(Self.text(shownSeconds))") }
+            if let drawnSeconds {
+                parts.append("drawn \(Self.text(drawnSeconds))" + (openSeconds.map { ", \(Self.text(drawnSeconds + $0)) after open()" } ?? ""))
             } else if let closedSeconds {
-                parts.append("closed \(Self.text(closedSeconds)) before shown")
+                parts.append("closed \(Self.text(closedSeconds)) before drawn")
             }
             return "map timing \(name): " + parts.joined(separator: " · ")
         }
@@ -95,13 +100,15 @@ enum MapDiagnostics {
     }
 
     /// Records `Timing` from the session's published state, which the map sets on the main
-    /// thread, and writes it once: when the map shows the venue, or at `close()`. A style the map
-    /// takes after it showed the venue gets a line of its own.
+    /// thread, and writes it once: when the map has drawn the venue, or at `close()`. A style the
+    /// map takes, or a drawing of the venue, after that gets a line of its own: two drawings in one
+    /// opening mean the style was loaded twice.
     @MainActor
     final class TimingRecorder {
         private let start = ContinuousClock.now
         private var timing = Timing()
         private var styleSubscription: AnyCancellable?
+        private var drawingSubscription: AnyCancellable?
         private var subscriptions: [AnyCancellable] = []
         private var isWritten = false
 
@@ -111,6 +118,9 @@ enum MapDiagnostics {
             MapDiagnostics.openedAt = nil
             styleSubscription = session.$styleSource.removeDuplicates().sink { [weak self] source in
                 MainActor.assumeIsolated { self?.styleChanged(source) }
+            }
+            drawingSubscription = session.$venueDrawing.removeDuplicates().sink { [weak self] drawing in
+                MainActor.assumeIsolated { self?.drawingChanged(drawing) }
             }
             subscriptions = [
                 session.$featureCount.first { $0 > 0 }.sink { [weak self] count in
@@ -122,10 +132,22 @@ enum MapDiagnostics {
             ]
         }
 
-        /// Writes what was recorded, unless the map showed the venue before, and stops.
+        /// Writes what was recorded, unless the map drew the venue before, and stops.
         func close() {
             write(closedSeconds: MapDiagnostics.seconds(since: start))
             styleSubscription = nil
+            drawingSubscription = nil
+        }
+
+        private func drawingChanged(_ drawing: ProximiioMapSession.VenueDrawing) {
+            guard drawing == .drawn else { return }
+            let seconds = MapDiagnostics.seconds(since: start)
+            if isWritten {
+                FieldLog.log("map timing \(timing.name): drawn again \(Timing.text(seconds))")
+            } else {
+                timing.drawnSeconds = seconds
+                write(closedSeconds: nil)
+            }
         }
 
         private func styleChanged(_ source: ProximiioMapSession.StyleSource) {
@@ -133,26 +155,19 @@ enum MapDiagnostics {
             let style = Timing.Style(source: String(describing: source), isVenue: source.isVenue,
                                      seconds: MapDiagnostics.seconds(since: start))
             if isWritten {
-                FieldLog.log("map timing \(timing.name): style \(style.source) \(Timing.text(style.seconds)) after shown")
+                FieldLog.log("map timing \(timing.name): style \(style.source) \(Timing.text(style.seconds)) after drawn")
             } else {
                 timing.styles.append(style)
-                writeIfShown()
             }
         }
 
         private func featuresShown(_ count: Int) {
             timing.features = count
             timing.featuresSeconds = MapDiagnostics.seconds(since: start)
-            writeIfShown()
         }
 
         private func cameraReady() {
             timing.cameraSeconds = MapDiagnostics.seconds(since: start)
-            writeIfShown()
-        }
-
-        private func writeIfShown() {
-            if timing.shownSeconds != nil { write(closedSeconds: nil) }
         }
 
         private func write(closedSeconds: Double?) {

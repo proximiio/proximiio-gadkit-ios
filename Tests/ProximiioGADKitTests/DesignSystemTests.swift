@@ -61,19 +61,20 @@ struct MapDiagnosticsTests {
 
     /// The map shows the venue when its first venue style, its features and the camera are all
     /// there (user, 2026-10-28).
-    @Test func theTimingNamesEachStepAndTheLastOneShowsTheMap() {
+    @Test func theTimingNamesEachStepAndTheDrawnFrame() {
         var timing = MapDiagnostics.Timing(name: "explore")
         timing.styles = [.init(source: "fallback(reason: \"x\")", isVenue: false, seconds: 0.1),
                          .init(source: "cache", isVenue: true, seconds: 0.412)]
         timing.features = 968
         timing.featuresSeconds = 2.104
         #expect(timing.shownSeconds == nil)
-        #expect(timing.line(closedSeconds: 2.5) == "map timing explore: style fallback(reason: \"x\") 0.10 s · style cache 0.41 s · features 968 2.10 s · closed 2.50 s before shown")
+        #expect(timing.line(closedSeconds: 2.5) == "map timing explore: style fallback(reason: \"x\") 0.10 s · style cache 0.41 s · features 968 2.10 s · closed 2.50 s before drawn")
         timing.cameraSeconds = 1.9
         #expect(timing.shownSeconds == 2.104)
-        #expect(timing.line(closedSeconds: 2.5) == "map timing explore: style fallback(reason: \"x\") 0.10 s · style cache 0.41 s · features 968 2.10 s · camera ready 1.90 s · shown 2.10 s")
-        #expect(MapDiagnostics.Timing(name: "journey").line(closedSeconds: 0.05) == "map timing journey: closed 0.05 s before shown")
+        #expect(timing.line(closedSeconds: 2.5) == "map timing explore: style fallback(reason: \"x\") 0.10 s · style cache 0.41 s · features 968 2.10 s · camera ready 1.90 s · shown 2.10 s · closed 2.50 s before drawn")
+        #expect(MapDiagnostics.Timing(name: "journey").line(closedSeconds: 0.05) == "map timing journey: closed 0.05 s before drawn")
+        timing.drawnSeconds = 2.6
         timing.openSeconds = 1.02
-        #expect(timing.line().hasSuffix(" · shown 2.10 s, 3.12 s after open()"))
+        #expect(timing.line().hasSuffix(" · shown 2.10 s · drawn 2.60 s, 3.62 s after open()"))
     }
 }

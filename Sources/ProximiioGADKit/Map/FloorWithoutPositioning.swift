@@ -153,14 +153,21 @@ final class FloorWithoutPositioningGuide {
     /// positioning and the visitor is within `levelChangerReachedMeters` of it. Pure; covered by
     /// tests.
     nonisolated static func reachedChange(coordinate: MapCoordinate, level: Double?, markers: [RouteGeometry.Marker], settings: GADSettings) -> Change? {
+        guard let change = reachedRide(coordinate: coordinate, level: level, markers: markers, settings: settings),
+              settings.levelsWithoutPositioning.contains(change.level) else { return nil }
+        return change
+    }
+
+    /// The route's next level change from the visitor's floor when the visitor is within
+    /// `levelChangerReachedMeters` of its lift or stairs, to any floor. Pure; covered by tests.
+    nonisolated static func reachedRide(coordinate: MapCoordinate, level: Double?, markers: [RouteGeometry.Marker], settings: GADSettings) -> Change? {
         let pending = markers.filter { !$0.isCompleted }
         guard let level, let marker = pending.first(where: { VenueLevel.same($0.from.level, level) }) else { return nil }
         let end = GuidanceText.rideEnd(
             featureType: marker.featureType, coordinate: marker.coordinate,
             from: marker.from.level, to: marker.to.level, markers: pending
         )
-        guard settings.levelsWithoutPositioning.contains(end),
-              GeoMath.haversineDistance(from: coordinate.proximiio, to: marker.coordinate.proximiio) <= settings.levelChangerReachedMeters
+        guard GeoMath.haversineDistance(from: coordinate.proximiio, to: marker.coordinate.proximiio) <= settings.levelChangerReachedMeters
         else { return nil }
         return Change(level: end, from: Int(level.rounded()), featureType: marker.featureType, coordinate: marker.coordinate)
     }
@@ -187,10 +194,12 @@ final class FloorWithoutPositioningGuide {
     }
 }
 
-/// The lift or stairs view on the way to a floor without positioning: the animation, "Take the lift
-/// to level 0" and that the position is not shown there. A tap ends it.
+/// The lift or stairs view at a ride: the animation, "Take the lift to level 0" and, on the way to a
+/// floor without positioning, that the position is not shown there. A tap ends it.
 struct FloorChangeView: View {
     let change: FloorWithoutPositioningGuide.Change
+    /// "Your position is not shown on this level."
+    var showsNoPositionNote = true
 
     private var icon: GADIcon { change.featureType == "elevator" ? .elevator : .stairs }
 
@@ -227,9 +236,11 @@ struct FloorChangeView: View {
                 Text(GuidanceText.rideText(featureType: change.featureType, level: change.level))
                     .textStyle(.h1Bold)
                     .multilineTextAlignment(.center)
-                Text("Your position is not shown on this level.", bundle: .module)
-                    .textStyle(.bodySmallRegular)
-                    .multilineTextAlignment(.center)
+                if showsNoPositionNote {
+                    Text("Your position is not shown on this level.", bundle: .module)
+                        .textStyle(.bodySmallRegular)
+                        .multilineTextAlignment(.center)
+                }
             }
             .padding(.horizontal, 40)
         }

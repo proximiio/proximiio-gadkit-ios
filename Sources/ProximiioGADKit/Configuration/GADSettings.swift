@@ -49,8 +49,9 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Route
 
-    /// Metres from the route before "Looks like you've left your route".
-    public var offRouteMeters: Double = 30
+    /// Metres from the route to the current destination, for 3 fixes, before "Looks like you've left
+    /// your route" (PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-28).
+    public var offRouteMeters: Double = 12
     /// Seconds off the route before "Looks like you've left your route", at any distance.
     public var offRouteSeconds: TimeInterval = 300
     /// Seconds "Looks like you've left your route" stays open, unless the visitor closes it.

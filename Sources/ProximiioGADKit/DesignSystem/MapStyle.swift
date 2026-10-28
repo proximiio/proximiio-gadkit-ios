@@ -111,7 +111,7 @@ enum MapStyle {
         let ink = MapColor(hex: 0x2B2B2B)
         let white = MapColor(hex: 0xFFFFFF)
         let visited = JourneyStopMarkerStyle.Appearance(fillColor: white, strokeColor: marker, strokeWidthPoints: 2, labelColor: ink)
-        return JourneyStopMarkerStyle(
+        var style = JourneyStopMarkerStyle(
             done: visited,
             active: .init(fillColor: marker, strokeColor: white, strokeWidthPoints: 2, labelColor: white),
             pending: .init(fillColor: white, strokeColor: markerStroke, strokeWidthPoints: 1, labelColor: ink),
@@ -124,6 +124,10 @@ enum MapStyle {
             labelWeight: .medium,
             labelFontName: "GuggenheimSansDisplay-Medium"
         )
+        // The visitor's dot under the stop numbers (RPR, Monday "Stop markers.", 2026-10-28; map
+        // 6.0.0-beta.56).
+        style.drawsAbovePosition = true
+        return style
     }()
 
     /// `journeyStops` with the artworks' markers invisible; the detour keeps its marker. A stop marker

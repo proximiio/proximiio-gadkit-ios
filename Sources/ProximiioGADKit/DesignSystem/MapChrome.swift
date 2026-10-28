@@ -37,10 +37,24 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
     /// The handle area at the top: the map does not pan there (PM, Monday "More space for the pull
     /// down functionality", 2026-10-26).
     private static var handleAreaHeight: CGFloat { 44 }
+    /// The fades of the map: down to the Map / List control and search at the top, up from the
+    /// bottom over about the stop card.
+    private static var topFade: CGFloat { 110 }
+    private static var bottomFade: CGFloat { 170 }
 
     var body: some View {
         ZStack {
-            map.softEdges(cornerRadius: 50)
+            map
+                .softEdges(cornerRadius: 50)
+                // The map fades out under the controls at the top and the card at the bottom (RPR,
+                // Monday "Map fade at top & bottom", 2026-10-28).
+                .mask {
+                    VStack(spacing: 0) {
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: Self.topFade)
+                        Rectangle()
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: Self.bottomFade)
+                    }
+                }
             VStack(spacing: 0) {
                 handleArea
                 Spacer(minLength: 0).allowsHitTesting(false)
@@ -129,21 +143,39 @@ struct MapLoadingSpinner: View {
     }
 }
 
-/// "Map | List" toggle: the system's segmented control, 150 pt wide. iOS draws the control and its
-/// glass (Figma "Glass review", "System controls", 2026-10-24).
+/// "Map | List" toggle: two buttons on glass, in place of the system's segmented control.
 struct MapListToggle: View {
     @Binding var showsList: Bool
 
+    /// 150 × 50 pt glass with 16 pt corners; the selected part has a black outline (Figma frame of the
+    /// PM, Monday "Native elements", 2026-10-28).
     var body: some View {
-        Picker(selection: $showsList) {
-            Text("Map", bundle: .module).tag(false)
-            Text("List", bundle: .module).tag(true)
-        } label: {
-            EmptyView()
+        HStack(spacing: 0) {
+            segment("Map", isSelected: !showsList) { showsList = false }
+            segment("List", isSelected: showsList) { showsList = true }
         }
-        .pickerStyle(.segmented)
-        .controlSize(.large)
-        .frame(width: 150)
+        .padding(4)
+        .frame(width: 150, height: 50)
+        .glassSurface(RoundedRectangle(cornerRadius: 16), strength: .frosted)
+    }
+
+    private func segment(_ title: LocalizedStringKey, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title, bundle: .module)
+                .textStyle(.largeBodyRegular)
+                .foregroundStyle(Palette.ink)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Palette.white.opacity(0.6))
+                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1.5))
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

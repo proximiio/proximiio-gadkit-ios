@@ -39,9 +39,11 @@ public struct ProximiMapView: View {
         /// "Skip this artwork?" after a swipe on a stop in the list. Without it the view reports
         /// `skipRequested` only, and the host app decides.
         public static let skipPrompt = Options(rawValue: 1 << 6)
-        /// "Looks like you've left your route" with "Dismiss". With `progress`, a personalised journey
-        /// keeps the leg where the visitor left it until another artwork is nearer. Without it the
-        /// view reports `offRoute` only, and the route follows the visitor who left it.
+        /// "Looks like you've left your route" with "Dismiss", `GADSettings.offRouteMeters` off the route
+        /// and before any routing. After it, with `progress`, a personalised journey keeps the leg
+        /// where the visitor left it until another artwork is nearer; other journeys are routed again
+        /// from the visitor. Without it the view reports `offRoute` only, and the route follows the
+        /// visitor who left it.
         public static let offRoutePrompt = Options(rawValue: 1 << 7)
         /// "Probably at …" when the position is uncertain near the active stop. Without it the view
         /// reports `positionUncertain`.

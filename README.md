@@ -36,8 +36,8 @@ repository. From 1.0.0 a minor or patch version does not break the public API. N
 cases come in minor versions; a `switch` with `default` keeps compiling. The [Changelog](#changelog)
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.66 and `proximiio-map-ios-binary`
-6.0.0-beta.55 exactly. The host app needs no dependency on them. A host app that also depends on
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.67 and `proximiio-map-ios-binary`
+6.0.0-beta.57 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -226,7 +226,7 @@ The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
-- uses `proximiio-sdk-ios-binary` 6.0.0-beta.66, the version this package pins;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.67, the version this package pins;
 - closes the view when the SDK stops on a refused token (`syncFailed(reason: "unauthorized")`,
   `tokenStatus == .rejected`). The map drops the venue and the navigator ends. After a new successful
   `authenticate()` and `start()`, a new view draws the journey again;
@@ -250,7 +250,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `.bottomBar` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
 | `.background` | The package's background image around the map card. | Transparent. |
 | `.skipPrompt` | "Skip this artwork?" after a swipe on a stop. "Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it. | A swipe reports `skipRequested` only. |
-| `.offRoutePrompt` | "Looks like you've left your route" with "Dismiss", in place of the stop card, for `GADSettings.offRouteWarningSeconds` unless the visitor closes it. With `.progress` a personalised journey keeps the leg where the visitor left it until another open artwork is the nearest stop; then the stops ahead are ordered again from the visitor. A curated tour is routed again from the visitor. A visitor on a floor the route does not take for `GADSettings.wrongFloorSeconds` gets the warning too, and the leg is drawn again from the visitor: to the nearest open artwork in a personalised journey, to the next stop in a curated tour. | The route follows a visitor who left it. `offRoute` reports it. |
+| `.offRoutePrompt` | "Looks like you've left your route" with "Dismiss", in place of the stop card, for `GADSettings.offRouteWarningSeconds` unless the visitor closes it. It shows `GADSettings.offRouteMeters` (12 m) off the route to the current destination, before any routing: the navigator routes nothing by itself. After it, with `.progress`, a personalised journey keeps the leg where the visitor left it until another open artwork is the nearest stop; then the stops ahead are ordered again from the visitor. A curated tour, and a journey without `.progress`, is routed again from the visitor. A visitor on a floor the route does not take for `GADSettings.wrongFloorSeconds` gets the warning too, and the leg is drawn again from the visitor: to the nearest open artwork in a personalised journey, to the next stop in a curated tour. | The route follows a visitor who left it. `offRoute` reports it. |
 | `.uncertainPositionPrompt` | "Probably at …" when the position is uncertain near the active stop. | `positionUncertain` reports it. |
 | `.leaveTourPrompt` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `.bottomBar` and `onClose`). | Back calls `onClose` at once. |
 | `.prompts` | All four prompts above. | |
@@ -419,8 +419,8 @@ The view's navigator differs from a navigator with the map library's default rul
 | | The view's navigator |
 |---|---|
 | `.stopSkipped`, `.legChanged`, `.journeyFinished` | Sent when the view applies a change of the binding (`update(to:)`). |
-| `.farFromRoute`, `.offRouteTooLong` | After `GADSettings.offRouteMeters` (30 m) and `GADSettings.offRouteSeconds` (300 s). |
-| Off the route | With `.offRoutePrompt` and `.progress` a personalised journey keeps the leg (`deviationPolicy` `.askApp`). Otherwise the route follows the visitor (`.automatic`). |
+| `.leftRoute`, `.offRouteTooLong` | After `GADSettings.offRouteMeters` (12 m, for 3 fixes) and `GADSettings.offRouteSeconds` (300 s). `.farFromRoute` at the map library's 30 m. |
+| Off the route | With `.offRoutePrompt` the navigator routes nothing by itself (`deviationPolicy` `.askApp`); the view routes after the warning. Without it the route follows the visitor (`.automatic`). |
 | `.stopReached` and the cue `.arrived` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
 | The cue `.approachingDestination` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
 
@@ -511,8 +511,8 @@ In a personalised journey, a leg to an artwork in a gallery the visitor is not i
 gallery. The artwork's `metadata.gallery_id` names the gallery: the gallery geofence
 (`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. The route ends
 at the POI. The map fills the gallery's polygon feature (else the geofence's outline) with the floor's
-colour. At the POI it draws a red pill with a white border, the icon of the POI's amenity and the POI's
-title in white ("G303 Language"); the POI's own icon is hidden, and so are the numbered artwork markers
+colour. At the POI it draws a red pill with a white border and the POI's title in white ("G303
+Language"), no icon; the POI's own icon is hidden, and so are the numbered artwork markers
 (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). The stop
 card names the POI with the icon of its amenity and no stop number. The POI of the gallery the visitor
 is in is not drawn (PM, Monday "Navigation to a gallery", 2026-10-26). The numbered artwork markers
@@ -738,7 +738,7 @@ let configuration = GADConfiguration(
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `geofenceExitDelay` | 5 s | Time outside an entered geofence or privacy zone before the SDK reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK default 3 s). Enters are reported at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. 0 reports the exit at the first position outside. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
-| `offRouteMeters`, `offRouteSeconds` | 30 m, 300 s | "Looks like you've left your route": this far from the route, or off it this long. |
+| `offRouteMeters`, `offRouteSeconds` | 12 m, 300 s | "Looks like you've left your route": this far from the route to the current destination for 3 fixes, or off it this long. |
 | `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
@@ -868,12 +868,14 @@ the time stamp is ISO 8601 in UTC with the date and milliseconds (`FieldLog.time
 Two lines time the start and each map:
 
 - `map: ready · 237 places · start 4.92 s`: the time `start()` took.
-- `map timing explore: style cache 0.01 s · features 968 1.32 s · camera ready 1.32 s · shown 1.32 s, 2.34 s after open()`:
+- `map timing explore: style cache 0.01 s · features 968 1.32 s · camera ready 1.32 s · shown 1.32 s · drawn 1.80 s, 2.82 s after open()`:
   the time from the map view's appearance to each style the map took, the first venue features on the
-  map and the camera framing the venue. `shown` is the last of the first venue style, the features and
-  the camera; after a screen opened with `open(_:)`, the time from that call follows. A view closed earlier writes `closed … before shown`. A style the map takes later gets a
-  line with `after shown`. The map library does not report when MapLibre has drawn the tiles, icons and
-  labels, so `shown` comes before that.
+  map, the camera framing the venue, and the first frame MapLibre drew with the venue's features,
+  tiles, icons and labels (`drawn`, the map's `venueDrawing`, map 6.0.0-beta.56). `shown` is the last of
+  the first venue style, the features and the camera. After a screen opened with `open(_:)`, the time
+  from that call follows `drawn`. A view closed earlier writes `closed … before drawn`. A style the
+  map takes later gets a line with `after drawn`, and a second drawing a line `drawn again`: the style
+  was loaded twice.
 
 ## Debug builds
 
@@ -950,14 +952,43 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
-### 1.19.1 (2026-10-28)
+### 1.20.0 (2026-10-28)
 
-**Breaking** for a host app that depends on `lottie-ios`: the package depends on `lottie-spm` (from
-4.5.0), the package Nagarro's app uses, in place of `lottie-ios` of 1.19.0. Such an app moves to
-`lottie-spm`. Other host apps change nothing.
+**Breaking:**
+- `proximiio-sdk-ios-binary` 6.0.0-beta.67 and `proximiio-map-ios-binary` 6.0.0-beta.57. A host app that
+  depends on them sets the same versions. SDK 6.0.0-beta.67: venue records deleted on the server leave
+  the phone within about 15 minutes. Map 6.0.0-beta.56: no second load of a stored style that equals the
+  organisation's. With DerivedData of an earlier map version, Xcode 26.3 and 27.0 reported "value of type
+  'ProximiioMapSession' has no member '$venueDrawing'"; Product › Clean Build Folder clears it.
+- For a host app that depends on `lottie-ios`: the package depends on `lottie-spm` (from 4.5.0), the
+  package Nagarro's app uses, in place of `lottie-ios` of 1.19.0. Such an app moves to `lottie-spm`.
 
 Changed:
 
+- The journey map draws the stop numbers over the visitor's dot (`drawsAbovePosition`, map
+  6.0.0-beta.56; RPR, Monday "Stop markers.", 2026-10-28).
+- Off the route (PM, Monday "Personalized tour: off-route and re-route behaviour" and "Curated tour:
+  off-route and recalculation", 2026-10-28): "Looks like you've left your route" shows
+  `GADSettings.offRouteMeters` off the route to the current destination, now 12 m (was 30 m), also when
+  the visitor heads to another artwork. With `.offRoutePrompt` the navigator routes nothing by itself;
+  the warning comes first, then a curated tour is routed again from the visitor and a personalised
+  journey is ordered again when another artwork is nearer. Before, a curated tour was routed again every
+  10 s before the warning.
+- The lift or stairs view, with its animation and "Take the stairs to level 3", shows at every ride of
+  the route, not only on the way to a floor without positioning (PM, Monday "Elevator/Staircase
+  animation", 2026-10-28). "Your position is not shown on this level." stays for those floors.
+- The amenity glyphs of the detour markers are added to the map style at every style load. Added once
+  before the style had loaded, they were missing (PM, Monday "Amenity icon disappears sometimes").
+- The floor on the journey map is a label, not a button (PM, Monday "Current level button").
+- "Skip this artwork?" has less space under "Keep it" (PM, Monday "Skip artwork popup too large").
+- Explore Museum: the lists fade out over 90 pt above the tab bar, was 30 pt (PM, Monday "Explore museum:
+  spaces list fade").
+- The Map / List control is two buttons on glass with 16 pt corners; the selected part has a black
+  outline (PM, Monday "Native elements", Figma frame of 2026-10-28).
+- The map fades out under the controls at the top and the card at the bottom (RPR, Monday "Map fade at
+  top & bottom").
+- The field log's map timing ends at the first frame the map drew with the venue (`drawn`,
+  `venueDrawing`).
 - A gallery is visited when its artworks of the journey are all visited or skipped and at least one is
   visited (the customer, Monday "Visited gallery visualization", 2026-10-28). Before, one visited
   artwork was enough.
@@ -972,8 +1003,8 @@ Changed:
 - The search shortcuts have a white haze behind them (RPR, Monday "White blur behind amenity list").
 - `GADSettings.followZoom` is 18.8, was 19 (RPR, Monday "Need to determine correct zoom levels
   on-site").
-- The destination gallery is a red pill with a white border, the icon of its amenity and its title in
-  white (RPR, Monday "Gallery numbers in gallery navigation", 2026-10-28, second answer).
+- The destination gallery is a red pill with a white border and its title in white, no icon (RPR and
+  the PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
 - The journey map knows every gallery with a `gallery_id`, named by its POI. The gallery outlines were
   named by a POI whose title says "gallery"; after the GAD POIs were renamed ("G101 Pop Culture") only
   three galleries were known, so no other gallery showed as visited (PM, Monday "Visited gallery
