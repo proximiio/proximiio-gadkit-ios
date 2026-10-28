@@ -153,6 +153,14 @@ struct WristbandCopyTests {
             .hasSuffix("privacy zone since \(since.formatted(.iso8601))") == true)
     }
 
+    /// The bind line names the band as scanned and the relay's binding (relay-api, 2026-10-28).
+    @Test func bindLineNamesTheBandAndTheBinding() {
+        let id = UUID(uuidString: "594694A5-83FA-432D-B1A4-7641E885231D")!
+        #expect(BindingLog.bind(label: "GAD-0042", bindingID: id) == "tag GAD-0042 · binding 594694a5-83fa-432d-b1a4-7641e885231d")
+        #expect(BindingLog.bind(label: "GAD-0042", error: BlueiotBindingError.tagNotAvailable(requestID: "r1"))
+            .hasPrefix("tag GAD-0042 · failed: tagNotAvailable"))
+    }
+
     @Test func onlyThePrivacyZoneSignalIsPrivate() {
         let session = BlueiotBindingSession(bindingID: UUID(), endsAt: .distantFuture, tokenExpiresAt: .distantFuture)
         let since = Date(timeIntervalSince1970: 1_792_400_000)

@@ -865,6 +865,9 @@ FieldLog.logLaunch()
 `FieldLogShareButton()` opens the share sheet with the file. A line is `[GAD] <time stamp> <message>`;
 the time stamp is ISO 8601 in UTC with the date and milliseconds (`FieldLog.timeStamp`).
 
+Each bind writes `wristband bind: tag <label> · binding <id>`, or `tag <label> · failed: <error>`. The label
+is the band's id as scanned; the relay team looks the band up by it.
+
 Two lines time the start and each map:
 
 - `map: ready · 237 places · start 4.92 s`: the time `start()` took.
@@ -951,6 +954,15 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.20.1 (2026-10-28)
+
+No change for host apps' code.
+
+Added:
+
+- The field log names the band at each bind: `wristband bind: tag <label> · binding <id>` (relay-api,
+  2026-10-28: the PM's log had the binding but not the band).
 
 ### 1.20.0 (2026-10-28)
 

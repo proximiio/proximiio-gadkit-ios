@@ -2,9 +2,11 @@
 //  BindingLog.swift
 //  ProximiioGADKit
 //
-//  Field log text for the wristband binding: the session of an
-//  active state and the binding client's diagnostics. The session line holds the relay's binding
-//  id, which the relay-api logs also hold. No line holds a tag id, a visitor id or a token.
+//  Field log text for the wristband binding: the bind, the session of an
+//  active state and the binding client's diagnostics. The bind and session lines hold the relay's
+//  binding id, which the relay-api logs also hold. The bind line holds the band's label as
+//  scanned, so the relay team can look up the band without asking the tester (relay-api,
+//  2026-10-28). No line holds a visitor id or a token.
 //
 //  Times are ISO 8601 in UTC, like the `FieldLog` time stamps.
 //
@@ -31,6 +33,16 @@ enum BindingLog {
         default: break
         }
         return parts.joined(separator: " · ")
+    }
+
+    /// "tag <label> · binding <id>" after a bind.
+    static func bind(label: String, bindingID: UUID) -> String {
+        "tag \(label) · binding \(bindingID.uuidString.lowercased())"
+    }
+
+    /// "tag <label> · failed: <error>" after a refused or failed bind.
+    static func bind(label: String, error: any Error) -> String {
+        "tag \(label) · failed: \(error)"
     }
 
     /// Every counter of `diagnostics` on one line. `lastError` and `lastRequestID` are added
