@@ -40,9 +40,9 @@ lists every change; changes that need a change in the host app are marked **Brea
 6.0.0-beta.55 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
-The package depends on `https://github.com/airbnb/lottie-ios` from 4.5.0, up to the next major
+The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
 version, for the lift and stairs animations. A host app that uses Lottie adds the same package
-(`lottie-ios`), so both share one `Lottie` module; `lottie-spm` next to it gives two modules with that
+(`lottie-spm`), so both share one `Lottie` module; `lottie-ios` next to it gives two modules with that
 name.
 
 A host app that draws its journey with the map library's `ProximiioMapView` and its own
@@ -952,7 +952,9 @@ dependencies; the entry says what to change. Entries before 1.0.0 name the types
 
 ### 1.19.1 (2026-10-28)
 
-No change for host apps' code.
+**Breaking** for a host app that depends on `lottie-ios`: the package depends on `lottie-spm` (from
+4.5.0), the package Nagarro's app uses, in place of `lottie-ios` of 1.19.0. Such an app moves to
+`lottie-spm`. Other host apps change nothing.
 
 Changed:
 
