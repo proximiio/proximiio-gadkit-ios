@@ -72,6 +72,12 @@ public struct GADSettings: Equatable, Sendable {
     /// Zoom of the follow while the visitor is in a gallery during a personalised journey, or `nil`
     /// for `followZoom` (PM, Monday "Navigation to a gallery", 2026-10-27).
     public var galleryFollowZoom: Double? = 20
+    /// The journey map shows the visitor at this zoom for `startZoomSeconds` before it follows them:
+    /// when the journey starts, on the first fix and when the position comes back. `nil` follows at
+    /// once (PM, Monday "Zoom level at start + navigation", 2026-10-29).
+    public var startZoom: Double? = 18
+    /// How long the journey map stays at `startZoom`.
+    public var startZoomSeconds: TimeInterval = 2
     /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
     /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
     public var minimumZoom: Double?

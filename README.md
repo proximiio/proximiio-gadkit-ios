@@ -530,16 +530,23 @@ Language"), no icon, and the numbered artwork markers are hidden (PM, Monday "Ga
 gallery navigation", 2026-10-28). The stop card names the POI with the icon of its amenity and no stop
 number. Every other gallery's POI is a white pill with a black outline and the title; the POIs' own
 icons are hidden. The gallery the visitor is in has no pill (PM, Monday "Navigation to a gallery",
-2026-10-26) and no destination fill: the venue's own gallery colour, under the artworks and furniture,
-with the artwork numbers (2026-10-28). A curated tour shows every gallery's pill in the white style. The numbered artwork markers
-also stay hidden while the visitor is outside every gallery, unless the active artwork is outside
-every gallery too. The destination gallery is filled over the venue's artworks, furniture and inner
-walls (2026-10-27).
+2026-10-26) and no fill: the venue's own gallery colour, under the artworks and furniture, with the
+artwork numbers (2026-10-28). The numbered artwork markers also stay hidden while the visitor is
+outside every gallery, unless the active artwork is outside every gallery too. The destination
+gallery is filled over the venue's artworks, furniture and inner walls (2026-10-27). Every other
+gallery is filled with the venue style's gallery colour (`proximiio-gallery`) over its artworks and
+furniture, under the inner walls: the artworks and furniture show only in the gallery the visitor is
+in (PM, Monday "Artwork + furniture polygons", 2026-10-29).
 
-A gallery is visited when its artworks of the journey are all visited or skipped and at least one is
-visited (the customer, 2026-10-28): the map fills it with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4
-#FDC1A8), over the venue's artworks, furniture and inner walls. Its POI is a white pill with a red
-outline and the title (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+A curated tour routes straight to the artwork, but shows the galleries as a personalised journey
+does: the gallery of the active artwork is the destination, pill and fill (PM, Monday "Gallery
+numbers in gallery navigation", 2026-10-29).
+
+A gallery is visited when its artworks of the journey are all visited or skipped, at least one is
+visited (the customer, 2026-10-28), and the visitor is out of it (PM, 2026-10-29): the map fills it
+with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4 #FDC1A8), over the
+venue's artworks, furniture and inner walls. Its POI is a white pill with a red outline and the title
+(PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
 
 The first fix inside the gallery geofence routes the leg again from the visitor, to the artwork. A
 leg that starts in the artwork's gallery ends at the artwork. An artwork without `gallery_id`, or
@@ -761,6 +768,8 @@ let configuration = GADConfiguration(
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `followZoom` | 18.8 | Zoom of "Centre on me", of the first position and of the follow. |
 | `galleryFollowZoom` | 20 | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
+| `startZoom` | 18 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
+| `startZoomSeconds` | 2 | How long the journey map stays at `startZoom`. |
 | `minimumZoom`, `maximumZoom` | `nil` | The zoom levels the visitor cannot go beyond on every map of the package, or the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
 | `mapLoadingTimeout` | 20 s | The longest time a map shows its spinner while the venue's features are not on the map. |
@@ -972,6 +981,31 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.24.0 (2026-10-29)
+
+No change for host apps' code.
+
+Added:
+
+- `GADSettings.startZoom` (18) and `startZoomSeconds` (2): the journey map shows the visitor at zoom 18
+  for 2 s, then follows them at the follow zoom. It does this when the journey starts, on the first fix
+  and when the position comes back. `nil` follows at once (PM, Monday "Zoom level at start +
+  navigation", 2026-10-29).
+
+Changed (PM, Monday, 2026-10-29):
+
+- The journey map fills every gallery but the visitor's: the gallery the leg ends at with the
+  destination colour, a visited gallery with the visited colour, every other gallery with the venue
+  style's gallery colour over its artworks and furniture. The artworks and furniture show only in the
+  gallery the visitor is in; artworks outside the galleries show as before ("Artwork + furniture
+  polygons").
+- A curated tour shows the galleries' pills and fills as a personalised journey does: the gallery of
+  the active artwork is the destination, a visited gallery is visited ("Gallery numbers in gallery
+  navigation"). Its route, list and instructions are unchanged.
+- A gallery is marked as visited once the visitor is out of it ("Visited gallery visualization").
+- Field log: `gallery fills: visitor in <gallery> · destination <gallery> · <n> visited · <n> standard`
+  on each change, and `start zoom (<reason>) · zoom <z> for <s> s`.
 
 ### 1.23.0 (2026-10-29)
 

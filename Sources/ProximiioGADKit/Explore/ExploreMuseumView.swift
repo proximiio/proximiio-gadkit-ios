@@ -468,7 +468,7 @@ struct ExploreMuseumView: View {
     private func applyMapLayers() {
         let focus = selected?.kind == .space ? selected?.id : nil
         let fills = catalog.spaces.compactMap { item -> JourneyMapLayers.GalleryFill? in
-            item.gallery.map { JourneyMapLayers.GalleryFill(gallery: $0, isDestination: focus == nil || focus == item.id) }
+            item.gallery.map { JourneyMapLayers.GalleryFill(gallery: $0, style: focus == nil || focus == item.id ? .destination : .visited) }
         }
         mapLayers.update(fills: fills, level: level)
     }

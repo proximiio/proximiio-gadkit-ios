@@ -78,13 +78,27 @@ struct GalleryFirstRoutingTests {
     /// A gallery is visited when its artworks of the journey are all visited or skipped, at least one
     /// visited (the customer, Monday "Visited gallery visualization", 2026-10-28).
     @MainActor @Test func aGalleryIsVisitedWhenAllItsArtworksAreDoneOrSkipped() {
-        let visited = VisitView.visitedGalleries([
+        let stops: [(gallery: String, state: JourneyStop.State)] = [
             ("g101", .done), ("g101", .skipped),
             ("g104", .done), ("g104", .pending),
             ("g106", .skipped),
             ("g303", .done),
-        ])
-        #expect(visited == ["g101", "g303"])
+        ]
+        #expect(VisitView.visitedGalleries(stops, visitorGallery: nil) == ["g101", "g303"])
+        // Not while the visitor is still in it (PM, 2026-10-29).
+        #expect(VisitView.visitedGalleries(stops, visitorGallery: "g101") == ["g303"])
+    }
+
+    /// The gallery the visitor is in has no fill, so its artworks and furniture show; every other
+    /// gallery is destination, visited or the standard colour (PM, Monday "Artwork + furniture
+    /// polygons", 2026-10-29).
+    @MainActor @Test func everyGalleryButTheVisitorsHasAFill() {
+        let visited: Set<String> = ["g101"]
+        #expect(VisitView.fillStyle(of: "g101", destination: "g303", visited: visited, visitorGallery: nil) == .visited)
+        #expect(VisitView.fillStyle(of: "g303", destination: "g303", visited: visited, visitorGallery: nil) == .destination)
+        #expect(VisitView.fillStyle(of: "g104", destination: "g303", visited: visited, visitorGallery: nil) == .standard)
+        #expect(VisitView.fillStyle(of: "g104", destination: "g303", visited: visited, visitorGallery: "g104") == nil)
+        #expect(VisitView.fillStyle(of: "g303", destination: "g303", visited: visited, visitorGallery: "g303") == nil)
     }
 
     /// Every gallery is a 30 pt pill with its full name, the same size in each style; each style has

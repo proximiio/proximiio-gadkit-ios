@@ -34,8 +34,15 @@ import UIKit
 @MainActor
 final class JourneyMapLayers {
     struct GalleryFill: Equatable {
+        enum Style: String {
+            /// The venue style's gallery colour, over the artworks and furniture.
+            case standard
+            case visited
+            case destination
+        }
+
         var gallery: Gallery
-        var isDestination: Bool
+        var style: Style
     }
 
     /// A lift, stairs or escalator where the route changes floor.
@@ -92,6 +99,9 @@ final class JourneyMapLayers {
     private static let gallerySource = "gad-journey-galleries"
     private static let destinationLayer = "gad-gallery-destination"
     private static let visitedLayer = "gad-gallery-visited"
+    private static let standardLayer = "gad-gallery-standard"
+    /// The organisation style's furniture, above its artworks.
+    private static let furnitureLayer = "proximiio-furniture"
     /// The organisation style's inner walls, above its artworks and furniture.
     private static let innerWallLayer = "proximiio-inner_wall"
     private static let connectorSource = "gad-route-connector"
@@ -191,15 +201,28 @@ final class JourneyMapLayers {
             // visualization", 2026-10-28), under labels, POI icons, the route and the stop markers. On
             // a style without inner walls the visited galleries are over the floor plan.
             let visited = MLNFillStyleLayer(identifier: Self.visitedLayer, source: source)
-            visited.predicate = NSPredicate(format: "destination == %@", NSNumber(value: false))
+            visited.predicate = NSPredicate(format: "style == %@", GalleryFill.Style.visited.rawValue)
             if style.layer(withIdentifier: Self.innerWallLayer) == nil {
                 canvas.addLayer(visited, at: .aboveVenueFills)
             } else {
                 canvas.addLayer(visited, at: .above(layerID: Self.innerWallLayer))
             }
             let destination = MLNFillStyleLayer(identifier: Self.destinationLayer, source: source)
-            destination.predicate = NSPredicate(format: "destination == %@", NSNumber(value: true))
+            destination.predicate = NSPredicate(format: "style == %@", GalleryFill.Style.destination.rawValue)
             canvas.addLayer(destination, at: .above(layerID: Self.visitedLayer))
+            // The other galleries in the venue style's gallery colour over their artworks and
+            // furniture, under the inner walls (PM, Monday "Artwork + furniture polygons",
+            // 2026-10-29).
+            let standard = MLNFillStyleLayer(identifier: Self.standardLayer, source: source)
+            standard.predicate = NSPredicate(format: "style == %@", GalleryFill.Style.standard.rawValue)
+            let venueGallery = style.layer(withIdentifier: Self.venueGalleryLayer) as? MLNFillStyleLayer
+            standard.fillColor = venueGallery?.fillColor ?? NSExpression(forConstantValue: UIColor(hex: 0xE6E6E6))
+            standard.fillOpacity = venueGallery?.fillOpacity ?? NSExpression(forConstantValue: 1)
+            if style.layer(withIdentifier: Self.furnitureLayer) == nil {
+                canvas.addLayer(standard, at: .below(layerID: Self.visitedLayer))
+            } else {
+                canvas.addLayer(standard, at: .above(layerID: Self.furnitureLayer))
+            }
         }
         if style.source(withIdentifier: Self.connectorSource) == nil {
             let source = MLNShapeSource(identifier: Self.connectorSource, shape: nil)
@@ -350,7 +373,7 @@ final class JourneyMapLayers {
             let features = fills.filter { sameLevel($0.gallery.level) }.map { fill -> MLNPolygonFeature in
                 var points = fill.gallery.ring.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
                 let feature = MLNPolygonFeature(coordinates: &points, count: UInt(points.count))
-                feature.attributes = ["destination": NSNumber(value: fill.isDestination)]
+                feature.attributes = ["style": fill.style.rawValue]
                 return feature
             }
             source.shape = MLNShapeCollectionFeature(shapes: features)

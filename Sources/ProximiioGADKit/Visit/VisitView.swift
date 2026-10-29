@@ -63,6 +63,13 @@ struct VisitView: View {
     /// The POI of the gallery the visitor is in, which the map does not draw (PM, Monday "Navigation
     /// to a gallery", 2026-10-26).
     @State private var visitorGalleryPlaceID: String?
+    /// The gallery of `galleries` the visitor is in. Its artworks and furniture show; every other
+    /// gallery has a fill (PM, Monday "Artwork + furniture polygons", 2026-10-29).
+    @State private var visitorGalleryID: String?
+    /// The follow that starts after `GADSettings.startZoomSeconds` at `startZoom`.
+    @State private var startZoomFollow: Task<Void, Never>?
+    /// The last field-log line of the gallery fills.
+    @State private var galleryFillLine: String?
     /// The ride whose end floor the map shows after the lift or stairs view (`holdFloor(of:)`).
     @State private var rideFloor: FloorWithoutPositioningGuide.Change?
     /// The lift or stairs view of a ride to a floor with positioning (PM, Monday "Elevator/Staircase
@@ -301,7 +308,7 @@ struct VisitView: View {
                 }
                 // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
                 // map did not turn until "Centre on me").
-                if controller.session.position != nil { recentre(withHeading: true, reason: "journey started") }
+                if controller.session.position != nil { showVisitorThenFollow(withHeading: true, reason: "journey started") }
                 isReady = true
                 destinationChanged(destination.wrappedValue)
             }
@@ -430,6 +437,7 @@ struct VisitView: View {
             .onDisappear {
                 monitor.stop()
                 liveActivity.end()
+                startZoomFollow?.cancel()
             }
             // No tracking or wristband alerts: the host app handles the wristband states
             // (PM 2026-10-15).
@@ -438,7 +446,7 @@ struct VisitView: View {
                 applyPositionStyle(for: health)
             }
             .onChange(of: controller.session.position == nil) { _, hasNoPosition in
-                if !hasNoPosition { recentre(reason: "first position") }
+                if !hasNoPosition { showVisitorThenFollow(reason: "first position") }
             }
             .followsVisitorFloor(controller.session, venue: venue, isPaused: floorGuide.isActive || rideFloor != nil)
             .onChange(of: ride) { shown, now in
@@ -646,33 +654,54 @@ struct VisitView: View {
     }
 
     /// The galleries whose artworks of the journey are all visited or skipped, at least one visited
-    /// (the customer, Monday "Visited gallery visualization", 2026-10-28).
+    /// (the customer, Monday "Visited gallery visualization", 2026-10-28), once the visitor is out of
+    /// them (PM, 2026-10-29).
     private var visitedGalleryIDs: Set<String> {
         let stops = controller.navigator.journey.stops.filter { $0.kind != .detour }.map { stop in
             (gallery: Gallery.containing(stop.coordinate.proximiio, level: stop.floor?.level, in: galleries)?.id, state: stop.state)
         }
-        return Self.visitedGalleries(stops.compactMap { stop in stop.gallery.map { ($0, stop.state) } })
+        return Self.visitedGalleries(stops.compactMap { stop in stop.gallery.map { ($0, stop.state) } }, visitorGallery: visitorGalleryID)
     }
 
-    /// The galleries of `stops` whose stops are all done or skipped, at least one done. Pure; covered
-    /// by tests.
-    static func visitedGalleries(_ stops: [(gallery: String, state: JourneyStop.State)]) -> Set<String> {
+    /// The galleries of `stops` whose stops are all done or skipped, at least one done, except
+    /// `visitorGallery`. Pure; covered by tests.
+    static func visitedGalleries(_ stops: [(gallery: String, state: JourneyStop.State)], visitorGallery: String?) -> Set<String> {
         Set(Dictionary(grouping: stops, by: \.gallery).compactMap { gallery, stops in
             let states = stops.map(\.state)
+            guard gallery != visitorGallery else { return nil }
             return states.allSatisfy { $0 == .done || $0 == .skipped } && states.contains(.done) ? gallery : nil
         })
     }
 
+    /// The gallery of the active stop, unless the visitor is in it.
+    private var activeStopGallery: Gallery? {
+        let gallery = controller.navigator.activeStop.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries) }
+        return gallery?.id == visitorGalleryID ? nil : gallery
+    }
+
+    /// The fill of a gallery on the journey map: none for the gallery the visitor is in, so its
+    /// artworks and furniture show, else destination, visited or the standard gallery colour. Pure;
+    /// covered by tests.
+    static func fillStyle(of gallery: String, destination: String?, visited: Set<String>, visitorGallery: String?) -> JourneyMapLayers.GalleryFill.Style? {
+        if gallery == visitorGallery { return nil }
+        if gallery == destination { return .destination }
+        return visited.contains(gallery) ? .visited : .standard
+    }
+
     /// Each gallery's name at its POI, but not the gallery the visitor is in (PM, Monday "Navigation
-    /// to a gallery", 2026-10-26). In a personalised journey the gallery the leg ends at is the
-    /// destination and a visited gallery is visited; a curated tour shows every name in the standard
-    /// style (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+    /// to a gallery", 2026-10-26): the gallery the leg ends at is the destination, a visited gallery is
+    /// visited. A curated tour shows them as a personalised journey does (PM, Monday "Gallery numbers
+    /// in gallery navigation", 2026-10-29).
     private var galleryMarkers: [JourneyMapLayers.GalleryMarker] {
-        let visited = kind.guidesToGalleryFirst ? galleries.filter { visitedGalleryIDs.contains($0.id) } : []
-        let ahead = kind.guidesToGalleryFirst ? controller.galleryAhead?.placeID : nil
+        let visited = galleries.filter { visitedGalleryIDs.contains($0.id) }
+        let ahead = controller.galleryAhead?.placeID
+        let destinationGallery = ahead == nil ? activeStopGallery : nil
         return galleryDestinations.filter { $0.placeID != visitorGalleryPlaceID }.map { destination in
-            let isVisited = visited.contains { $0.id == destination.shown.id || $0.contains(destination.entry, level: destination.gallery.level) }
-            let style: JourneyMapLayers.GalleryMarker.Style = destination.placeID == ahead ? .destination : isVisited ? .visited : .standard
+            let isGallery = { (gallery: Gallery) in
+                gallery.id == destination.shown.id || gallery.contains(destination.entry, level: destination.gallery.level)
+            }
+            let isDestination = destination.placeID == ahead || destinationGallery.map(isGallery) == true
+            let style: JourneyMapLayers.GalleryMarker.Style = isDestination ? .destination : visited.contains(where: isGallery) ? .visited : .standard
             return JourneyMapLayers.GalleryMarker(coordinate: destination.entry, level: destination.gallery.level,
                                                   name: destination.gallery.name, style: style)
         }
@@ -711,8 +740,10 @@ struct VisitView: View {
         let placeID = position.flatMap { position in
             galleryDestinations.first { $0.gallery.contains(position.coordinate.proximiio, level: position.floor?.level) }?.placeID
         }
-        guard placeID != visitorGalleryPlaceID else { return }
+        let galleryID = position.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries)?.id }
+        guard placeID != visitorGalleryPlaceID || galleryID != visitorGalleryID else { return }
         visitorGalleryPlaceID = placeID
+        visitorGalleryID = galleryID
         refreshMapLayers()
         applyStopMarkers()
     }
@@ -769,23 +800,27 @@ struct VisitView: View {
 
     /// Stop markers and gallery fills for the current journey and floor.
     private func refreshMapLayers() {
-        let active = controller.navigator.activeStop
-        let destination = active.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries) }
         let visited = visitedGalleryIDs
-        // The gallery the visitor is in has no destination fill: the venue's own gallery colour, under
-        // the artworks and furniture, with the artwork numbers (PM, Monday "Navigation to a gallery",
-        // 2026-10-28).
-        let visitorGallery = galleryDestinations.first { $0.placeID == visitorGalleryPlaceID }?.shown.id
         // Gallery first: the outline of the gallery geofence the leg ends at, in place of the
-        // outline that holds the artwork.
+        // outline that holds the artwork. The gallery the visitor is in has no fill: the venue's own
+        // gallery colour, under the artworks and furniture, with the artwork numbers (PM, Monday
+        // "Navigation to a gallery", 2026-10-28).
         let galleryAhead = controller.galleryAhead
-        var fills = galleries.compactMap { gallery -> JourneyMapLayers.GalleryFill? in
-            if gallery.id == destination?.id, galleryAhead == nil {
-                return gallery.id == visitorGallery ? nil : .init(gallery: gallery, isDestination: true)
-            }
-            return visited.contains(gallery.id) ? .init(gallery: gallery, isDestination: false) : nil
+        let destination = galleryAhead?.shown.id ?? activeStopGallery?.id
+        var fills = galleries.compactMap { gallery in
+            Self.fillStyle(of: gallery.id, destination: destination, visited: visited, visitorGallery: visitorGalleryID)
+                .map { JourneyMapLayers.GalleryFill(gallery: gallery, style: $0) }
         }
-        if let galleryAhead { fills.append(.init(gallery: galleryAhead.shown, isDestination: true)) }
+        if let galleryAhead, !galleries.contains(where: { $0.id == galleryAhead.shown.id }) {
+            fills.append(.init(gallery: galleryAhead.shown, style: .destination))
+        }
+        let line = "gallery fills: visitor in \(galleries.first { $0.id == visitorGalleryID }?.name ?? "none") · destination "
+            + "\(fills.first { $0.style == .destination }?.gallery.name ?? "none") · \(fills.filter { $0.style == .visited }.count) visited · "
+            + "\(fills.filter { $0.style == .standard }.count) standard"
+        if line != galleryFillLine {
+            galleryFillLine = line
+            FieldLog.log(line)
+        }
         mapLayers.update(fills: fills, level: controller.session.selectedFloor.level)
         mapLayers.updateGalleryMarkers(galleryMarkers)
         applyHiddenFeatures()
@@ -869,10 +904,32 @@ struct VisitView: View {
         refreshLevelChanger()
     }
 
-    /// `recentre` with a field-log line naming the caller.
+    /// `recentre` with a field-log line naming the caller. Ends a pending `showVisitorThenFollow`.
     private func recentre(withHeading: Bool? = nil, reason: String) {
+        startZoomFollow?.cancel()
+        startZoomFollow = nil
         FieldLog.log("recentre (\(reason)) · heading \(withHeading.map(String.init) ?? "default") · mode before \(controller.session.cameraMode)")
         controller.session.recentre(withHeading: withHeading)
+    }
+
+    /// Shows the visitor at `GADSettings.startZoom` for `startZoomSeconds`, then follows them at the
+    /// follow zoom: when the journey starts, on the first fix and when the position comes back (PM,
+    /// Monday "Zoom level at start + navigation", 2026-10-29). Without `startZoom` it follows at once.
+    private func showVisitorThenFollow(withHeading: Bool? = nil, reason: String) {
+        guard let zoom = settings.startZoom, let position = controller.session.position else {
+            return recentre(withHeading: withHeading, reason: reason)
+        }
+        startZoomFollow?.cancel()
+        FieldLog.log("start zoom (\(reason)) · zoom \(zoom) for \(settings.startZoomSeconds) s")
+        // The camera write lets go of the follow; `recentre` takes it again.
+        let centre = CLLocationCoordinate2D(latitude: position.coordinate.latitude, longitude: position.coordinate.longitude)
+        controller.session.camera.setCenter(centre, zoom: zoom, animated: true)
+        let seconds = settings.startZoomSeconds
+        startZoomFollow = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            recentre(withHeading: withHeading, reason: "\(reason), after the start zoom")
+        }
     }
 
     private static let connectorEndMeters = 2.0

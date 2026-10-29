@@ -23,6 +23,9 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.offRouteMeters == 12)
         #expect(GADSettings.standard.levelsWithoutPositioning == [0])
         #expect(GADSettings.standard.levelChangeViewSeconds == 5)
+        // Zoom 18 for 2 s, then the follow (PM, Monday "Zoom level at start + navigation", 2026-10-29).
+        #expect(GADSettings.standard.startZoom == 18)
+        #expect(GADSettings.standard.startZoomSeconds == 2)
     }
 
     /// PM, Monday "Navigation to a gallery" and "Curated tours: zoom level", 2026-10-27; RPR, "Need to
