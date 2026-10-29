@@ -31,7 +31,8 @@ struct VisitView: View {
     @State private var monitor: TrackingMonitor
     @State private var places: [VenuePlace] = []
     /// The search shortcuts' choice and order (`in_search`, `search_order`).
-    @State private var searchListing = AmenityListing.all
+    /// The amenity shortcuts of the search, from the amenities' `in_search` and `search_order`.
+    @State private var searchShortcuts: [AmenityShortcut] = []
     /// Name of the geofence (gallery) the visitor is in, from `sdk.geofenceEvents()`.
     @State private var currentGallery: String?
     @State private var liveActivity: VisitLiveActivity
@@ -593,10 +594,10 @@ struct VisitView: View {
         let features = await venue.data.features()
         let amenities = await venue.data.amenities()
         places = VenuePlace.all(in: features, amenities: amenities)
-        searchListing = .search(amenities)
         let scale = UIScreen.main.scale
         amenityIcons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
                                   uniquingKeysWith: { first, _ in first })
+        searchShortcuts = AmenityListing.search(amenities).searchShortcuts(places: places, amenities: amenities, icons: amenityIcons)
         controller.artworkRemoteIDs = Dictionary(
             places.compactMap { place in place.remoteID.map { (place.id, $0) } },
             uniquingKeysWith: { first, _ in first }
@@ -1031,9 +1032,9 @@ struct VisitView: View {
                     }
                     .accessibilityLabel(Text("Search", bundle: .module))
                     if isShowingAmenities {
-                        AmenityChipList(kinds: searchListing.shortcuts(places: places)) { kind in
+                        AmenityChipList(shortcuts: searchShortcuts) { shortcut in
                             isShowingAmenities = false
-                            detour(to: kind)
+                            detour(to: shortcut)
                         }
                     }
                 }
@@ -1276,10 +1277,10 @@ struct VisitView: View {
 
     /// Shows the nearest place of `kind` on a card. "Add a stop" adds it as a journey detour (PM
     /// review 2026-10-12).
-    private func detour(to kind: AmenityKind) {
+    private func detour(to shortcut: AmenityShortcut) {
         let here = controller.session.position
         let from = here.map { ProximiioCoordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude) }
-        selectedAmenity = kind.nearest(in: places, from: from, level: here?.floor?.level)
+        selectedAmenity = shortcut.nearest(in: places, from: from, level: here?.floor?.level)
         if let selectedAmenity { emit(.amenitySelected(selectedAmenity)) }
     }
 

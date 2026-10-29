@@ -28,7 +28,8 @@ struct MuseumMapView: View {
     }
     @State private var places: [VenuePlace] = []
     /// The search shortcuts' choice and order (`in_search`, `search_order`).
-    @State private var searchListing = AmenityListing.all
+    /// The amenity shortcuts of the search, from the amenities' `in_search` and `search_order`.
+    @State private var availableAmenities: [AmenityShortcut] = []
     @State private var selectedPlace: VenuePlace?
     @State private var destination: VenuePlace?
     @State private var routeError: String?
@@ -46,7 +47,7 @@ struct MuseumMapView: View {
     }
 
     @State private var isShowingAmenities = false
-    @State private var selectedAmenity: AmenityKind?
+    @State private var selectedAmenity: AmenityShortcut?
     @State private var detailPlace: VenuePlace?
 
     var body: some View {
@@ -148,9 +149,9 @@ struct MuseumMapView: View {
             PlaceSearchSheet(places: places, shortcuts: availableAmenities) { place in
                 isSearching = false
                 selectedPlace = place
-            } onPickAmenity: { kind in
+            } onPickAmenity: { shortcut in
                 isSearching = false
-                routeToNearest(kind)
+                routeToNearest(shortcut)
             }
             .presentationDetents([.large])
         }
@@ -167,7 +168,7 @@ struct MuseumMapView: View {
                     }
                     .accessibilityLabel(Text("Search", bundle: .module))
                     if isShowingAmenities {
-                        AmenityChipList(kinds: availableAmenities, selected: selectedAmenity) { kind in
+                        AmenityChipList(shortcuts: availableAmenities, selected: selectedAmenity) { kind in
                             selectedAmenity = kind
                             isShowingAmenities = false
                             routeToNearest(kind)
@@ -255,10 +256,6 @@ struct MuseumMapView: View {
         .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(session.selectedFloor.level))", bundle: .module))
     }
 
-    private var availableAmenities: [AmenityKind] {
-        searchListing.shortcuts(places: places)
-    }
-
     /// The route's next step. On a floor without positioning the guidance follows fixes from
     /// another floor, so the card says that the position is not shown.
     private var instruction: String? {
@@ -277,7 +274,10 @@ struct MuseumMapView: View {
         let features = await venue.data.features()
         let amenities = await venue.data.amenities()
         places = VenuePlace.all(in: features, amenities: amenities)
-        searchListing = .search(amenities)
+        let scale = UIScreen.main.scale
+        let icons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
+                               uniquingKeysWith: { first, _ in first })
+        availableAmenities = AmenityListing.search(amenities).searchShortcuts(places: places, amenities: amenities, icons: icons)
         let levelChangers = LevelChangerPlace.all(in: features)
         mapLayers.updateLevelChangers(levelChangers)
         mapLayers.updateCones(VenueCone.all(in: features))
@@ -296,7 +296,7 @@ struct MuseumMapView: View {
     }
 
     /// Routes to the nearest place of `kind`, preferring the visitor's floor.
-    private func routeToNearest(_ kind: AmenityKind) {
+    private func routeToNearest(_ kind: AmenityShortcut) {
         let here = session.position
         let from = here.map { ProximiioCoordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude) }
         guard let place = kind.nearest(in: places, from: from, level: here?.floor?.level) else { return }

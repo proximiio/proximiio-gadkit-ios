@@ -17,6 +17,7 @@
 //
 import Foundation
 import Proximiio
+import UIKit
 
 struct AmenityListing: Equatable, Sendable {
     /// The order of each amenity that has one, by amenity id.
@@ -88,16 +89,43 @@ struct AmenityListing: Equatable, Sendable {
     /// else the kinds of `AmenityKind.shortcuts` without those whose flag is false; by the data's
     /// order, then in the order of `AmenityKind.allCases`. Pure; covered by tests.
     func shortcuts(places: [VenuePlace]) -> [AmenityKind] {
-        let ranked = AmenityKind.allCases.compactMap { kind -> (AmenityKind, Double)? in
+        Self.ordered(rankedKinds(places: places)).map(\.0)
+    }
+
+    /// The search's shortcuts: the kinds of `shortcuts(places:)`, and, when an amenity has the flag
+    /// true, each other amenity with the flag true and a place, with its title in the app language
+    /// and its icon from `icons` (by amenity id). By the data's order, then kinds before the others.
+    /// Pure; covered by tests.
+    func searchShortcuts(places: [VenuePlace], amenities: [ProximiioAmenity], icons: [String: UIImage] = [:],
+                         language: String = AppLanguage.current) -> [AmenityShortcut] {
+        var ranked = rankedKinds(places: places).map { (AmenityShortcut($0.0), $0.1) }
+        if isLimitedToIncluded {
+            let kinds = AmenityKind.kinds(of: amenities)
+            let placed = Set(places.compactMap(\.amenityID))
+            for amenity in amenities where kinds[amenity.id] == nil && placed.contains(amenity.id) {
+                guard let rank = rank(of: amenity.id) else { continue }
+                let title = amenity.title(language: language) ?? amenity.title ?? amenity.id
+                ranked.append((AmenityShortcut(amenityID: amenity.id, title: title, icon: icons[amenity.id]), rank))
+            }
+        }
+        return Self.ordered(ranked).map(\.0)
+    }
+
+    private func rankedKinds(places: [VenuePlace]) -> [(AmenityKind, Double)] {
+        AmenityKind.allCases.compactMap { kind -> (AmenityKind, Double)? in
             let matching = places.filter(kind.matches)
             guard !matching.isEmpty else { return nil }
             let isFlagged = matching.contains { $0.amenityID.map(included.contains) ?? false }
             guard AmenityKind.shortcuts.contains(kind) || isFlagged else { return nil }
             return matching.compactMap { rank(of: $0.amenityID) }.min().map { (kind, $0) }
         }
-        return ranked.enumerated()
+    }
+
+    /// By rank, then in the given order.
+    private static func ordered<T>(_ ranked: [(T, Double)]) -> [(T, Double)] {
+        ranked.enumerated()
             .sorted { $0.element.1 != $1.element.1 ? $0.element.1 < $1.element.1 : $0.offset < $1.offset }
-            .map(\.element.0)
+            .map(\.element)
     }
 
     private static func flag(_ value: JSONValue?) -> Bool? {

@@ -253,9 +253,9 @@ struct SquareGlassButtonStyle: PrimitiveButtonStyle {
 /// than the space it gets scrolls and fades out at the bottom (PM, Monday "Amenity search when list
 /// is long", 2026-10-29).
 struct AmenityChipList: View {
-    let kinds: [AmenityKind]
-    var selected: AmenityKind?
-    let onPick: (AmenityKind) -> Void
+    let shortcuts: [AmenityShortcut]
+    var selected: AmenityShortcut?
+    let onPick: (AmenityShortcut) -> Void
     @State private var contentSize: CGSize = .zero
     @State private var visibleHeight: CGFloat = 0
 
@@ -266,17 +266,18 @@ struct AmenityChipList: View {
         let scrolls = Self.scrolls(contentHeight: contentSize.height, visibleHeight: visibleHeight)
         ScrollView(.vertical) {
             VStack(alignment: .trailing, spacing: 5) {
-                ForEach(kinds) { kind in
-                    Button { onPick(kind) } label: {
+                ForEach(shortcuts) { shortcut in
+                    Button { onPick(shortcut) } label: {
                         HStack(spacing: 5) {
-                            kind.icon.image.resizable().scaledToFit().frame(width: 16, height: 16)
-                            Text(kind.title)
+                            shortcut.image?.resizable().scaledToFit().frame(width: 16, height: 16)
+                            // One line, as in the design; a long title widens the chip.
+                            Text(shortcut.title).lineLimit(1).fixedSize()
                         }
                         .padding(.horizontal, -6)
                     }
                     // Frosted: on the clear glass the titles were hard to read over the map
                     // (PM 2026-10-15, "Search menu transparency").
-                    .buttonStyle(.small(selected: kind == selected, strength: .frosted))
+                    .buttonStyle(.small(selected: shortcut == selected, strength: .frosted))
                 }
             }
             .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }

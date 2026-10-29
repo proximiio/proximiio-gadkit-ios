@@ -985,6 +985,21 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.26.0 (2026-10-29)
+
+No change for host apps' code.
+
+Changed:
+
+- The maps' amenity search lists every amenity with `metadata.in_search` true that has a place, also
+  one that is none of the built-in kinds (Women's restroom, Men's restroom, Café, Help Desk, Prayer
+  Room, Stairs, Elevator, Museum Shop). Such an amenity shows with its title in the app language and
+  its icon from the venue data, in its `search_order`, and the shortcut leads to its nearest place.
+  Before, only the built-in kinds showed: "Learning & Engagement", "Single Artist Gallery",
+  "Performance Gallery" and "Artwork" did not (PM, 2026-10-29). Without an amenity flagged true the
+  shortcuts stay the built-in ones.
+- A chip's title stays on one line.
+
 ### 1.25.0 (2026-10-29)
 
 **Breaking:**

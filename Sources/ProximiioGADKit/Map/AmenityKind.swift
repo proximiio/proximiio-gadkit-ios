@@ -111,12 +111,7 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
     /// walking distance. The venue comes first because the GAD data has a café on level 1 of the
     /// DCT office, 11 km away, and the Guggenheim café on level 0 (2026-10-15).
     func nearest(in places: [VenuePlace], from coordinate: ProximiioCoordinate?, level: Double?) -> VenuePlace? {
-        let matching = places.filter(matches)
-        guard let coordinate else { return matching.first }
-        guard let closest = TrackingMonitor.nearest(to: coordinate, level: nil, in: matching) else { return nil }
-        let venue = matching.filter { $0.placeID == closest.placeID }
-        let sameLevel = level.map { level in venue.filter { VenueLevel.same($0.level, level) } } ?? []
-        return TrackingMonitor.nearest(to: coordinate, level: nil, in: sameLevel.isEmpty ? venue : sameLevel)
+        AmenityShortcut.nearest(of: places.filter(matches), from: coordinate, level: level)
     }
 }
 

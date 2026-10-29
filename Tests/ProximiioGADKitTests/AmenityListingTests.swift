@@ -51,6 +51,31 @@ struct AmenityListingTests {
         #expect(listing.shortcuts(places: Self.places) == [.womensRestroom, .mensRestroom, .cafe, .prayerRoom, .museumShop])
     }
 
+    /// An amenity with the flag true that is none of the kinds is a shortcut too, with its own title, in
+    /// the data's order among the kinds; one without a place is left out (PM, 2026-10-29: the galleries
+    /// and Learning & Engagement did not show).
+    @Test func flaggedAmenitiesOutsideTheKindsAreShortcuts() {
+        let amenities = [
+            Self.amenity("a-women", "Women's Restroom", ["in_search": .string("true"), "search_order": .number(1)]),
+            Self.amenity("a-learning", "Learning & Engagement", ["in_search": .string("true"), "search_order": .number(6)]),
+            Self.amenity("a-shop", "Museum Shop", ["in_search": .string("true"), "search_order": .number(5)]),
+            Self.amenity("a-gallery", "Single Artist Gallery", ["in_search": .string("true"), "search_order": .number(7)]),
+            Self.amenity("a-empty", "Performance Gallery", ["in_search": .string("true"), "search_order": .number(8)]),
+        ]
+        let places = Self.places + [
+            Self.place("p-learning", "Studio", amenity: "a-learning"),
+            Self.place("p-gallery", "G205 Pauliina", amenity: "a-gallery"),
+        ]
+        let shortcuts = AmenityListing.search(amenities).searchShortcuts(places: places, amenities: amenities, language: "en")
+        #expect(shortcuts.map(\.title) == ["Women’s restroom", "Museum Shop", "Learning & Engagement", "Single Artist Gallery"])
+        #expect(shortcuts.map(\.kind) == [.womensRestroom, .museumShop, nil, nil])
+        #expect(shortcuts[2].matches(places.first { $0.id == "p-learning" }!))
+        #expect(!shortcuts[2].matches(places.first { $0.id == "p-gallery" }!))
+        // Without a flag true the shortcuts are the kinds alone.
+        let unflagged = AmenityListing.all.searchShortcuts(places: places, amenities: amenities)
+        #expect(unflagged.map(\.kind) == AmenityKind.shortcuts)
+    }
+
     /// The GAD data on 2026-10-28: only Museum Shop has `in_search` true, so it is the only shortcut.
     @Test func oneFlaggedAmenityIsTheOnlyShortcut() {
         let listing = AmenityListing.search([

@@ -9,10 +9,10 @@ import SwiftUI
 
 struct PlaceSearchSheet: View {
     let places: [VenuePlace]
-    /// The amenity shortcuts, in order (`AmenityListing.shortcuts(places:)`).
-    let shortcuts: [AmenityKind]
+    /// The amenity shortcuts, in order (`AmenityListing.searchShortcuts(places:amenities:icons:language:)`).
+    let shortcuts: [AmenityShortcut]
     let onPick: (VenuePlace) -> Void
-    let onPickAmenity: (AmenityKind) -> Void
+    let onPickAmenity: (AmenityShortcut) -> Void
 
     @State private var query = ""
 
@@ -23,9 +23,17 @@ struct PlaceSearchSheet: View {
                     Section {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                ForEach(shortcuts) { kind in
-                                    Button { onPickAmenity(kind) } label: {
-                                        Label(kind.title, systemImage: kind.symbol)
+                                ForEach(shortcuts) { shortcut in
+                                    Button { onPickAmenity(shortcut) } label: {
+                                        Label {
+                                            Text(shortcut.title)
+                                        } icon: {
+                                            if let kind = shortcut.kind {
+                                                Image(systemName: kind.symbol)
+                                            } else {
+                                                shortcut.image?.resizable().scaledToFit().frame(width: 16, height: 16)
+                                            }
+                                        }
                                             .textStyle(.bodySmallRegular)
                                             .padding(.horizontal, 12)
                                             .frame(minHeight: 36)
