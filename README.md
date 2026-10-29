@@ -982,6 +982,16 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.24.1 (2026-10-29)
+
+No change for host apps' code.
+
+Changed:
+
+- A long amenity list under the search button scrolls and fades out at the bottom, above the map's
+  buttons, on the journey map and the museum map (PM, Monday "Amenity search when list is long",
+  2026-10-29). A list that fits does not scroll.
+
 ### 1.24.0 (2026-10-29)
 
 No change for host apps' code.

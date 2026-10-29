@@ -178,6 +178,8 @@ struct MuseumMapView: View {
                     }
                 }
             }
+            // A long amenity list takes the free height before the spacer; it scrolls past that.
+            .layoutPriority(1)
             Spacer()
             HStack(alignment: .bottom) {
                 Spacer()

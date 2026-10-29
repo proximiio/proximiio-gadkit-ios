@@ -59,6 +59,14 @@ struct MapDiagnosticsTests {
         #expect(snapshot.line == "map state museum: features 968 · dropped 0 · style organization · L1 · zoom 20.0 · camera ready true · missing fonts Guggenheim Sans Bold, Open Sans Bold")
     }
 
+    /// A list taller than its space scrolls and fades out (PM, Monday "Amenity search when list is
+    /// long", 2026-10-29).
+    @Test func aLongAmenityListScrolls() {
+        #expect(AmenityChipList.scrolls(contentHeight: 400, visibleHeight: 300))
+        #expect(!AmenityChipList.scrolls(contentHeight: 300, visibleHeight: 300))
+        #expect(!AmenityChipList.scrolls(contentHeight: 300, visibleHeight: 0))
+    }
+
     /// The selection follows the finger and stays inside the control (Monday "Native elements",
     /// 2026-10-28 evening).
     @Test func theMapListSelectionSlidesWithTheFinger() {

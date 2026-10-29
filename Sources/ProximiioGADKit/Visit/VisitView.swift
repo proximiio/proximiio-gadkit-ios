@@ -1039,6 +1039,8 @@ struct VisitView: View {
                 }
             }
             .padding(.top, 22)
+            // A long amenity list takes the free height before the spacer; it scrolls past that.
+            .layoutPriority(1)
             Spacer()
             if !showsList {
                 HStack {

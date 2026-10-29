@@ -249,26 +249,58 @@ struct SquareGlassButtonStyle: PrimitiveButtonStyle {
     }
 }
 
-/// Amenity shortcuts as a right-aligned stack of small chips (Figma search state).
+/// Amenity shortcuts as a right-aligned stack of small chips (Figma search state). A list taller
+/// than the space it gets scrolls and fades out at the bottom (PM, Monday "Amenity search when list
+/// is long", 2026-10-29).
 struct AmenityChipList: View {
     let kinds: [AmenityKind]
     var selected: AmenityKind?
     let onPick: (AmenityKind) -> Void
+    @State private var contentSize: CGSize = .zero
+    @State private var visibleHeight: CGFloat = 0
+
+    /// The height of the fade at the bottom of a list that scrolls.
+    static let fadeHeight: CGFloat = 44
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 5) {
-            ForEach(kinds) { kind in
-                Button { onPick(kind) } label: {
-                    HStack(spacing: 5) {
-                        kind.icon.image.resizable().scaledToFit().frame(width: 16, height: 16)
-                        Text(kind.title)
+        let scrolls = Self.scrolls(contentHeight: contentSize.height, visibleHeight: visibleHeight)
+        ScrollView(.vertical) {
+            VStack(alignment: .trailing, spacing: 5) {
+                ForEach(kinds) { kind in
+                    Button { onPick(kind) } label: {
+                        HStack(spacing: 5) {
+                            kind.icon.image.resizable().scaledToFit().frame(width: 16, height: 16)
+                            Text(kind.title)
+                        }
+                        .padding(.horizontal, -6)
                     }
-                    .padding(.horizontal, -6)
+                    // Frosted: on the clear glass the titles were hard to read over the map
+                    // (PM 2026-10-15, "Search menu transparency").
+                    .buttonStyle(.small(selected: kind == selected, strength: .frosted))
                 }
-                // Frosted: on the clear glass the titles were hard to read over the map
-                // (PM 2026-10-15, "Search menu transparency").
-                .buttonStyle(.small(selected: kind == selected, strength: .frosted))
             }
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
+        // The chips' glass reaches past the list's edges.
+        .scrollClipDisabled()
+        // The last chip scrolls out of the fade.
+        .contentMargins(.bottom, scrolls ? Self.fadeHeight : 0, for: .scrollContent)
+        .frame(width: contentSize.width > 0 ? contentSize.width : nil)
+        .frame(maxHeight: contentSize.height > 0 ? contentSize.height : nil)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { visibleHeight = $0 }
+        .mask {
+            VStack(spacing: 0) {
+                Color.black
+                if scrolls {
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: Self.fadeHeight)
+                }
+            }
+            // Past the edges, so the chips' shadows stay; at the bottom only when nothing fades.
+            .padding(.horizontal, -24)
+            .padding(.top, -24)
+            .padding(.bottom, scrolls ? 0 : -24)
         }
         // A white haze behind the list, so the map behind it shows less (RPR, Monday "White blur
         // behind amenity list", 2026-10-28).
@@ -278,6 +310,11 @@ struct AmenityChipList: View {
                 .blur(radius: 18)
                 .allowsHitTesting(false)
         }
+    }
+
+    /// Whether the chips need more height than the list has. Pure; covered by tests.
+    nonisolated static func scrolls(contentHeight: CGFloat, visibleHeight: CGFloat) -> Bool {
+        visibleHeight > 0 && contentHeight > visibleHeight + 0.5
     }
 }
 
