@@ -18,8 +18,8 @@
 //    (`LevelChangerPlace`; Monday "All level changers visible", 2026-10-15)
 //  - the amenity picked in the menu: the red marker with its white icon (`PlaceFraming`)
 //  - the building's cones on the shown floor, each an image of the design's metal gradient
-//    (`VenueCone`, `ConeShading`; PM, Monday "Cone visualization", 2026-10-29), over the floor plan
-//    and under the gallery fills and the venue style's cone outlines
+//    (`VenueCone`, `ConeShading`; PM, Monday "Cone visualization", 2026-10-29), over the floors and
+//    under the galleries; the venue style's cone outlines in the design's colour
 //
 //  The stop markers are the map library's (`MapStyle.journeyStops`).
 //
@@ -232,6 +232,7 @@ final class JourneyMapLayers {
         applyConnector(on: style)
         applyLevelChanger(on: style)
         applyCones(on: style)
+        styleConeOutlines(on: style)
     }
 
     private func applyLevelChanger(on style: MLNStyle) {
@@ -370,6 +371,18 @@ final class JourneyMapLayers {
     }
 
     private static func coneID(_ id: String) -> String { "gad-cone-\(id)" }
+    /// The venue style's gallery fill; the cone images go under it.
+    private static let venueGalleryLayer = "proximiio-gallery"
+    /// The venue style's cone outlines.
+    private static let coneOutlineLayer = "proximiio-cones"
+
+    /// The cones' outline in the design's colour and width, on each style.
+    private func styleConeOutlines(on style: MLNStyle) {
+        guard let outline = style.layer(withIdentifier: Self.coneOutlineLayer) as? MLNLineStyleLayer else { return }
+        outline.lineColor = NSExpression(forConstantValue: UIColor(hex: ConeShading.outlineColor))
+        outline.lineOpacity = NSExpression(forConstantValue: ConeShading.outlineOpacity)
+        outline.lineWidth = NSExpression(forConstantValue: ConeShading.outlineWidth)
+    }
 
     /// Shows the cones of the shown floor and hides the others. A cone's image, source and layer are
     /// made when its floor first shows; a changed cone gets a new image.
@@ -403,9 +416,13 @@ final class JourneyMapLayers {
             } else if let source = style.source(withIdentifier: id) {
                 let raster = MLNRasterStyleLayer(identifier: id, source: source)
                 raster.rasterFadeDuration = NSExpression(forConstantValue: 0)
-                // Over the floor plan, under the gallery fills of `apply(on:)`: a cone that is a
-                // gallery keeps the gallery's colour.
-                canvas.addLayer(raster, at: .aboveVenueFills)
+                // Over the floors, under the venue's galleries and the gallery fills of `apply(on:)`:
+                // a cone that is a gallery keeps the gallery's colour.
+                if style.layer(withIdentifier: Self.venueGalleryLayer) == nil {
+                    canvas.addLayer(raster, at: .aboveVenueFills)
+                } else {
+                    canvas.addLayer(raster, at: .below(layerID: Self.venueGalleryLayer))
+                }
             }
         }
     }

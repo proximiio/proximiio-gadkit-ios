@@ -957,6 +957,20 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.22.1 (2026-10-29)
+
+No change for host apps' code.
+
+Changed (closer to the Figma kiosk "Spaces - level 3", the user's comparison of 2026-10-29):
+
+- A cone image starts with the design's floor colour #FAFAFB under the gradient; the cones were grey
+  where the venue's floor showed through.
+- The cones are under the venue style's galleries (`proximiio-gallery`), so a cone that is a gallery
+  keeps the gallery's colour on every map.
+- The cones' outline is the design's: the style's `proximiio-cones` line in #95A6B5 at 48 % opacity,
+  1.28 pt (was #B2B2B2, 1 px).
+- The white edge inside the outline is 0.34 m, half the design's 3.2 px line.
+
 ### 1.22.0 (2026-10-29)
 
 No change for host apps' code.

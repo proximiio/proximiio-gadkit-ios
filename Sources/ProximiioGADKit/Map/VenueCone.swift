@@ -2,15 +2,16 @@
 //  VenueCone.swift
 //  ProximiioGADKit
 //
-//  The building's cones: the polygon features of type `cone`, nine on each floor. The maps fill each
-//  cone with the metal gradient of the design (Figma "0 - DPT Map Kiosk", layers
-//  `L4-architectural-cones`; PM, Monday "Cone visualization", 2026-10-29). A map style fills a polygon
+//  The building's cones: the polygon features of type `cone`, nine on each floor. The maps draw each
+//  cone as in the design (Figma "0 - DPT Map Kiosk", "Spaces - level 3", layers
+//  `L3-architectural-cones`; PM, Monday "Cone visualization", 2026-10-29). A map style fills a polygon
 //  with one colour only, so the package draws each cone as an image in the cone's coordinates
-//  (`JourneyMapLayers`). The venue style keeps the cones' grey outline (`proximiio-cones`).
+//  (`JourneyMapLayers`), and draws the outline with the venue style's `proximiio-cones` line.
 //
-//  The gradient runs across the cone, perpendicular to its long axis: #D4DEE6, #F8FAFC at 22 %,
-//  #E8EEF2 at 46 %, #CBD6DF at 78 %, #AEBCC9, at 32 % opacity. A white edge at 18 % opacity
-//  lines the inside of the outline.
+//  The image: the design's floor colour #FAFAFB under the cone, the gradient across the cone,
+//  perpendicular to its long axis (#D4DEE6, #F8FAFC at 22 %, #E8EEF2 at 46 %, #CBD6DF at 78 %,
+//  #AEBCC9, at 32 % opacity), and a white edge at 18 % opacity inside the outline. The design's
+//  1 px is about 0.21 m (its longest cone on level 3 is 610 px, 130 m in the venue data).
 //
 import CoreGraphics
 import Proximiio
@@ -41,10 +42,16 @@ struct ConeShading {
     static let stops: [(color: UInt32, location: CGFloat)] = [
         (0xD4DEE6, 0), (0xF8FAFC, 0.22), (0xE8EEF2, 0.46), (0xCBD6DF, 0.78), (0xAEBCC9, 1),
     ]
+    /// The design's floor under the cones.
+    static let base: UInt32 = 0xFAFAFB
     static let opacity: CGFloat = 0.32
     static let edgeOpacity: CGFloat = 0.18
-    /// The visible width of the white edge inside the outline.
-    static let edgeMeters: Double = 0.5
+    /// The visible width of the white edge inside the outline: half the design's 3.2 px line.
+    static let edgeMeters: Double = 0.34
+    /// The outline of the design: 1.28 pt, #95A6B5 at 48 % opacity.
+    static let outlineColor: UInt32 = 0x95A6B5
+    static let outlineOpacity: Double = 0.48
+    static let outlineWidth: Double = 1.28
 
     /// Draws `cone` at `pixelsPerMeter`, at most `maxPixels` on the longer side. `nil` for a cone
     /// without an area.
@@ -72,6 +79,8 @@ struct ConeShading {
             path.closeSubpath()
             cg.addPath(path)
             cg.clip()
+            cg.setFillColor(UIColor(hex: base).cgColor)
+            cg.fill(CGRect(origin: .zero, size: size))
             let colors = stops.map { UIColor(hex: $0.color).cgColor } as CFArray
             var locations = stops.map(\.location)
             if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: &locations) {
