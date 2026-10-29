@@ -75,6 +75,10 @@ enum MapStyle {
         // (DAILY-CALL R16).
         .with(chrome: MapOptions.Chrome(showsAttribution: false, allowsTilting: false))
         options.recentreZoom = settings.followZoom
+        // The heading-up map turns more slowly and ignores small heading changes (Nagarro: the
+        // rotation is too fast; map 6.0.0-beta.58).
+        options.bearingSettlingTime = settings.bearingSettlingTime
+        options.bearingDeadband = settings.bearingDeadband
         return options.with(minimumZoom: settings.minimumZoom, maximumZoom: settings.maximumZoom)
     }
 
@@ -127,6 +131,13 @@ enum MapStyle {
         // The visitor's dot under the stop numbers (RPR, Monday "Stop markers.", 2026-10-28; map
         // 6.0.0-beta.56).
         style.drawsAbovePosition = true
+        // Markers that would overlap show as one, with a black badge holding the number of the others
+        // in white (RPR design, PM Monday "Clustering", 2026-10-29; map 6.0.0-beta.58).
+        style.groupsOverlapping = true
+        style.groupBadge = .init(fillColor: ink, strokeColor: white, strokeWidthPoints: 1, labelColor: white)
+        style.groupBadgeDiameterPoints = 16
+        style.groupBadgeFontSize = 10
+        style.groupBadgeFontName = "GuggenheimSansDisplay-Medium"
         return style
     }()
 
@@ -139,6 +150,8 @@ enum MapStyle {
         style.pending.opacity = 0
         style.passed.opacity = 0
         style.skipped.opacity = 0
+        // No badge over the invisible markers.
+        style.groupsOverlapping = false
         return style
     }()
 

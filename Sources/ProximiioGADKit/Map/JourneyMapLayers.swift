@@ -108,6 +108,11 @@ final class JourneyMapLayers {
     private static let connectorLayer = "gad-route-connector"
     private static let changerSource = "gad-level-changer"
     private static let changerLayer = "gad-level-changer"
+    /// The standard and visited gallery names. They give way to each other, to the destination's
+    /// name and to the stop markers (Monday, the PM's crowded map of 2026-10-29).
+    private static let galleryNameLayer = "gad-gallery-names"
+    /// The destination gallery's name, always shown.
+    private static let destinationNameLayer = "gad-gallery-destination-name"
 
     private weak var session: ProximiioMapSession?
     private var styleToken: MapCanvasToken?
@@ -246,12 +251,27 @@ final class JourneyMapLayers {
             let source = MLNShapeSource(identifier: Self.changerSource, shape: nil)
             style.addSource(source)
             let layer = MLNSymbolStyleLayer(identifier: Self.changerLayer, source: source)
+            layer.predicate = NSPredicate(format: "kind == %@", PointKind.changer.rawValue)
             layer.iconImageName = NSExpression(forKeyPath: "image")
             layer.iconAllowsOverlap = NSExpression(forConstantValue: true)
             layer.iconIgnoresPlacement = NSExpression(forConstantValue: true)
             // The highlighted level changer over the others.
             layer.symbolSortKey = NSExpression(forKeyPath: "sort")
             canvas.addLayer(layer, at: .above(.route))
+            // MapLibre places the symbols of the upper layers first: the stop markers, then the
+            // destination's name, then the other names, each where nothing placed before it is.
+            let names = MLNSymbolStyleLayer(identifier: Self.galleryNameLayer, source: source)
+            names.predicate = NSPredicate(format: "kind == %@", PointKind.galleryName.rawValue)
+            names.iconImageName = NSExpression(forKeyPath: "image")
+            names.iconAllowsOverlap = NSExpression(forConstantValue: false)
+            // The visited galleries' names before the others.
+            names.symbolSortKey = NSExpression(forKeyPath: "sort")
+            canvas.addLayer(names, at: .above(layerID: Self.changerLayer))
+            let destination = MLNSymbolStyleLayer(identifier: Self.destinationNameLayer, source: source)
+            destination.predicate = NSPredicate(format: "kind == %@", PointKind.destinationName.rawValue)
+            destination.iconImageName = NSExpression(forKeyPath: "image")
+            destination.iconAllowsOverlap = NSExpression(forConstantValue: true)
+            canvas.addLayer(destination, at: .above(layerID: Self.galleryNameLayer))
         }
         apply(on: style)
         applyConnector(on: style)
@@ -277,12 +297,8 @@ final class JourneyMapLayers {
             if style.image(forName: name) == nil {
                 session?.canvas?.floors.register(Self.galleryMarkerImage(name: marker.name, style: marker.style), named: name)
             }
-            let sort = switch marker.style {
-            case .destination: 3
-            case .visited: 1
-            case .standard: 0
-            }
-            features.append(Self.point(marker.coordinate, image: name, sort: sort))
+            let kind: PointKind = marker.style == .destination ? .destinationName : .galleryName
+            features.append(Self.point(marker.coordinate, image: name, sort: marker.style == .visited ? 0 : 1, kind: kind))
         }
         source.shape = MLNShapeCollectionFeature(shapes: features)
     }
@@ -317,10 +333,17 @@ final class JourneyMapLayers {
         }
     }
 
-    private static func point(_ coordinate: ProximiioCoordinate, image: String, sort: Int) -> MLNPointFeature {
+    /// The layer a point of the level changer source goes to.
+    private enum PointKind: String {
+        case changer
+        case galleryName
+        case destinationName
+    }
+
+    private static func point(_ coordinate: ProximiioCoordinate, image: String, sort: Int, kind: PointKind = .changer) -> MLNPointFeature {
         let feature = MLNPointFeature()
         feature.coordinate = CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        feature.attributes = ["image": image, "sort": NSNumber(value: sort)]
+        feature.attributes = ["image": image, "sort": NSNumber(value: sort), "kind": kind.rawValue]
         return feature
     }
 

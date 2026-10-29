@@ -28,6 +28,26 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.startZoomSeconds == 2)
     }
 
+    /// The heading-up map turns in 1.5 s and ignores changes under 5° (Nagarro, 2026-10-29; map
+    /// 6.0.0-beta.58).
+    @Test @MainActor func theMapTurnsSlowlyAndIgnoresSmallHeadingChanges() {
+        var settings = GADSettings.standard
+        #expect(MapStyle.options(settings: settings).bearingSettlingTime == 1.5)
+        #expect(MapStyle.options(settings: settings).bearingDeadband == 5)
+        settings.bearingSettlingTime = 2
+        settings.bearingDeadband = 0
+        #expect(MapStyle.options(settings: settings).bearingSettlingTime == 2)
+        #expect(MapStyle.options(settings: settings).bearingDeadband == 0)
+    }
+
+    /// Overlapping stop markers show as one with a count badge, but not while they are hidden (PM,
+    /// Monday "Clustering", 2026-10-29).
+    @Test @MainActor func overlappingStopMarkersAreGrouped() {
+        #expect(GADSettings.standard.groupsStopMarkers)
+        #expect(MapStyle.journeyStops.groupsOverlapping)
+        #expect(!MapStyle.journeyStopsHidden.groupsOverlapping)
+    }
+
     /// PM, Monday "Navigation to a gallery" and "Curated tours: zoom level", 2026-10-27; RPR, "Need to
     /// determine correct zoom levels on-site", 2026-10-28.
     @Test @MainActor func theFollowZoomIs18Point8And20InAGalleryOfAPersonalisedJourney() {

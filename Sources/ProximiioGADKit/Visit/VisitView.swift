@@ -711,12 +711,13 @@ struct VisitView: View {
     /// gallery, and while the visitor is outside every gallery and the active artwork is in one
     /// (PM, Monday "Navigation to a gallery", 2026-10-26 and 2026-10-27).
     private func applyStopMarkers() {
-        let style = Self.showsArtworkMarkers(
+        var style = Self.showsArtworkMarkers(
             guidesToGalleryFirst: kind.guidesToGalleryFirst && !galleryDestinations.isEmpty,
             hasGalleryAhead: controller.galleryAhead != nil,
             isInGallery: visitorGalleryPlaceID != nil,
             isActiveStopInGallery: controller.navigator.activeStop?.group != nil
         ) ? MapStyle.journeyStops : MapStyle.journeyStopsHidden
+        if !settings.groupsStopMarkers { style.groupsOverlapping = false }
         if controller.session.journeyStopMarkerStyle != style { controller.session.journeyStopMarkerStyle = style }
     }
 

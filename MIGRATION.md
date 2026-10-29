@@ -1,8 +1,8 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.20.0 uses SDK
-6.0.0-beta.67 and Map 6.0.0-beta.57.
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.25.0 uses SDK
+6.0.0-beta.68 and Map 6.0.0-beta.58.
 
 Each change has a mark:
 
@@ -20,7 +20,7 @@ Each change has a mark:
 | SDK 6.0.0-beta.59 | `BlueiotBindingError` has three new cases (relay-api 0.11): `swapBandsApart(requestID:)` (code 18), `swapAtReception(requestID:)` (code 19) and `signingUnavailable(retryAfter:requestID:)` (code 20). Before, the first two arrived as `.unexpected(code:status:message:requestID:)` and the third as `.server(status: 503, requestID:)`. | An exhaustive `switch` over `BlueiotBindingError` without `default` does not compile. Add the three cases. The SDK's texts: "Hold your current wristband next to the new one and scan again.", "Your wristband isn't reachable. Please swap it at the reception desk." and, for `signingUnavailable`, a retry after `retryAfter` seconds. | **Required** with an exhaustive `switch` |
 | SDK 6.0.0-beta.64, Map 6.0.0-beta.51 | New cases `BlueiotBindingSignal.privacyZone(since:)`, `ProximiioDiagnostics.NoPositionReason.privacyZone` and `PositionStage.privacyZone`. | An exhaustive `switch` over these enums without `default` does not compile. Add the case. | **Required** with an exhaustive `switch` |
 
-The other versions up to SDK 6.0.0-beta.67 and Map 6.0.0-beta.57 have no source break.
+The other versions up to SDK 6.0.0-beta.68 and Map 6.0.0-beta.58 have no source break.
 `ProximiioConfiguration.init` gains the defaulted `geofenceExitDelay:` in SDK 6.0.0-beta.63; existing
 calls compile unchanged.
 
@@ -56,6 +56,8 @@ calls compile unchanged.
 | SDK 6.0.0-beta.67 | A place, floor, department, geofence, privacy zone or input deleted on the server leaves the phone within about 15 minutes, also when the change log missed the deletion. Each removal comes as `SyncEvent.deleted` and through `venueDataChanges()`. | | Info |
 | Map 6.0.0-beta.56 | A stored style that equals the organisation's is not loaded again. | | Info |
 | Map 6.0.0-beta.57 | After a refused token, a map view attached later starts no position stream until the next `start()`. | | Info |
+| SDK 6.0.0-beta.68 | `features()` and `geofences()` return the decoded rows from memory until the store changes (sync pass, download, deletion, `stop()`). `loadCachedRouteNetwork()` returns the installed path count without decoding while the stored features are unchanged. Before, each `features()` call decoded every stored feature: about 0.5 s for the GAD venue on the simulator. | | Info |
+| Map 6.0.0-beta.58 | A map screen reads `features()` once when it opens; changed features come through `venueDataChanges()`. | | Info |
 
 ### Added
 
@@ -86,6 +88,10 @@ All Info.
   font stacks the glyph server answered "not found" for; `lastError` names them too).
 - Map 6.0.0-beta.56: `ProximiioMapSession.venueDrawing` (`pending`, `drawn` at the first frame drawn with
   the venue's features, `idle`), `JourneyStopMarkerStyle.drawsAbovePosition` (`false` by default).
+- Map 6.0.0-beta.58: `JourneyStopMarkerStyle.groupsOverlapping` (`false` by default),
+  `groupingSpacingPoints`, `groupBadge`, `groupBadgeDiameterPoints`, `groupBadgeFontSize`,
+  `groupBadgeFontName`; `JourneyStopGroup`, `JourneyStopRenderer.group(at:)` and `onGroupTap`;
+  `MapOptions.bearingSettlingTime` (0.9 s by default) and `bearingDeadband` (0°).
 
 ### Fixed
 
@@ -129,10 +135,10 @@ The SDK and Map changelogs of these versions have the full entries.
 
 ### Step 1: Dependencies (Required)
 
-- Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.20.0`,
+- Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.25.0`,
   and the product `ProximiioGADKit` to the app target.
-- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.67` and `proximiio-map-ios-binary` to exactly
-  `6.0.0-beta.57`. ProximiioGADKit pins these versions; with other versions the packages do not
+- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.68` and `proximiio-map-ios-binary` to exactly
+  `6.0.0-beta.58`. ProximiioGADKit pins these versions; with other versions the packages do not
   resolve.
 - ProximiioGADKit does not re-export the SDK and the Map. Files that use their types keep
   `import Proximiio` and `import ProximiioMap`. The file that shows the map adds

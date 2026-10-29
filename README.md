@@ -36,8 +36,8 @@ repository. From 1.0.0 a minor or patch version does not break the public API. N
 cases come in minor versions; a `switch` with `default` keeps compiling. The [Changelog](#changelog)
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.67 and `proximiio-map-ios-binary`
-6.0.0-beta.57 exactly. The host app needs no dependency on them. A host app that also depends on
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.68 and `proximiio-map-ios-binary`
+6.0.0-beta.58 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -226,7 +226,7 @@ The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
-- uses `proximiio-sdk-ios-binary` 6.0.0-beta.67, the version this package pins;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.68, the version this package pins;
 - closes the view when the SDK stops on a refused token (`syncFailed(reason: "unauthorized")`,
   `tokenStatus == .rejected`). The map drops the venue and the navigator ends. After a new successful
   `authenticate()` and `start()`, a new view draws the journey again;
@@ -770,6 +770,9 @@ let configuration = GADConfiguration(
 | `galleryFollowZoom` | 20 | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
 | `startZoom` | 18 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
 | `startZoomSeconds` | 2 | How long the journey map stays at `startZoom`. |
+| `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
+| `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
+| `bearingDeadband` | 5° | Heading changes smaller than this do not turn the map (`MapOptions.bearingDeadband`, map default 0°). |
 | `minimumZoom`, `maximumZoom` | `nil` | The zoom levels the visitor cannot go beyond on every map of the package, or the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
 | `mapLoadingTimeout` | 20 s | The longest time a map shows its spinner while the venue's features are not on the map. |
@@ -981,6 +984,37 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.25.0 (2026-10-29)
+
+**Breaking:**
+- `proximiio-sdk-ios-binary` 6.0.0-beta.68 and `proximiio-map-ios-binary` 6.0.0-beta.58. A host app that
+  depends on them sets the same versions. SDK 6.0.0-beta.68 returns `features()` and `geofences()` from
+  memory until the store changes; map 6.0.0-beta.58 reads `features()` once per map screen. With
+  DerivedData of an earlier map version, the build reports "value of type 'JourneyStopMarkerStyle' has no
+  member 'groupsOverlapping'"; Product › Clean Build Folder clears it.
+
+Added:
+
+- Journey stop markers that would overlap show as one marker: the active stop if it is in the group,
+  else the first in journey order, with a 16 pt black badge at its top-right corner holding the number
+  of the others in white (RPR design; PM, Monday "Clustering", 2026-10-29; map 6.0.0-beta.58). Only
+  stops on the same floor group; the detour marker never does. A tap on a group zooms in until it
+  splits. `GADSettings.groupsStopMarkers` (`true`) turns it off.
+- `GADSettings.bearingSettlingTime` (1.5 s) and `bearingDeadband` (5°): the heading-up map turns more
+  slowly and ignores small heading changes (Nagarro: the rotation is too fast, 2026-10-29). The map
+  library's defaults are 0.9 s and 0°.
+
+Changed:
+
+- Map start with SDK 6.0.0-beta.68 and map 6.0.0-beta.58 (simulator, cold launch, from the screen's
+  opening to the drawn map): journey 1.13–1.29 s (2.46–2.76 s with 1.22.2), Explore Museum 0.87–1.41 s
+  (2.41–2.64 s), `ProximiMapView` 0.9–1.2 s without `prepare(sdk:)` (about 3.7 s). The venue's features
+  are on the map 0.03–0.12 s after the screen appears. Installing the route network for a hosted view
+  takes 0.01 s.
+- The galleries' names give way to each other and to the stop markers: of names that would overlap, one
+  shows, a visited gallery's first. The destination's name always shows. Zoomed out, every name showed
+  over the others (the PM's screenshot, 2026-10-29).
 
 ### 1.24.1 (2026-10-29)
 

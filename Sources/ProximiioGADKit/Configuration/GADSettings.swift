@@ -78,6 +78,9 @@ public struct GADSettings: Equatable, Sendable {
     public var startZoom: Double? = 18
     /// How long the journey map stays at `startZoom`.
     public var startZoomSeconds: TimeInterval = 2
+    /// `true` shows journey stop markers that would overlap as one marker with a badge holding the
+    /// number of the others (PM, Monday "Clustering", 2026-10-29).
+    public var groupsStopMarkers = true
     /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
     /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
     public var minimumZoom: Double?
@@ -87,6 +90,12 @@ public struct GADSettings: Equatable, Sendable {
     /// library's adaptive smoothing), which shows a fix a moment later (PM, Monday "Visual delay",
     /// 2026-10-23).
     public var smoothsPosition = false
+    /// Seconds the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`,
+    /// map default 0.9). Nagarro found the rotation too fast (2026-10-29).
+    public var bearingSettlingTime: TimeInterval = 1.5
+    /// Heading changes smaller than this, in degrees, do not turn the map (`MapOptions.bearingDeadband`,
+    /// map default 0).
+    public var bearingDeadband: Double = 5
     /// The longest time in seconds the maps show their spinner while the map library draws the
     /// venue. The spinner goes when the venue's features are on the map, when the map reports an
     /// error, or after this time.
