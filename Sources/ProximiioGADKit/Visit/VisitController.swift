@@ -38,8 +38,11 @@
 //
 //  Off the route (PM, Monday "Personalized tour: off-route and re-route behaviour" and "Curated tour:
 //  off-route and recalculation", 2026-10-26 and 2026-10-28): the visitor gets a warning (`isOffRoute`)
-//  once they are `GADSettings.offRouteMeters` (12 m) off the route to the current destination
-//  (`leftRoute`), far from it, or off it for too long. The warning comes before any routing: with
+//  once they are `GADSettings.offRouteMeters` (12 m) off the leg to the current destination
+//  (`checkLegDeviation`), also where a later leg of the journey passes, or off the whole journey
+//  (`leftRoute`), far from it, or off it for too long. The navigator's `leftRoute` measures against
+//  every leg still to walk, so a visitor heading to another artwork got no warning (PM's log of
+//  2026-10-28, 22:39 UTC: 56 m off the leg). The warning comes before any routing: with
 //  `ProximiMapView.Options.offRoutePrompt` the navigator routes nothing by itself
 //  (`JourneyDeviationPolicy.askApp`). After the warning a personalised journey keeps the leg where the
 //  visitor left it; when another open artwork is now the nearest stop, the stops ahead are ordered
@@ -99,7 +102,11 @@ final class VisitController {
     }
     /// From `farFromRoute` or `offRouteTooLong` until the visitor is back on the route or a new leg
     /// starts. The warning can be closed meanwhile.
-    @ObservationIgnored private var isOffRouteEpisode = false
+    @ObservationIgnored private var isOffRouteEpisode = false {
+        didSet { if !isOffRouteEpisode { isLegOffRouteEpisode = false } }
+    }
+    /// The episode started off the leg (`checkLegDeviation`); it ends when the visitor is back on it.
+    @ObservationIgnored private var isLegOffRouteEpisode = false
     @ObservationIgnored private var lastCloserArtworkCheck = Date.distantPast
     /// The stop the navigator walks to for a moment while an artwork visited out of order moves
     /// ahead. `VisitView` reports no `nextStop` for it.
@@ -128,8 +135,10 @@ final class VisitController {
     private let settings: GADSettings
 
     /// Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance
-    /// off; the artwork geofence is the only arrival.
-    static let artworkGuidanceRules = RouteFollowRules(arrivalDwellSeconds: .infinity)
+    /// off; the artwork geofence is the only arrival. Off the leg beyond `GADSettings.offRouteMeters`.
+    private var artworkGuidanceRules: RouteFollowRules {
+        RouteFollowRules(arrivalDwellSeconds: .infinity, offRouteMeters: settings.offRouteMeters)
+    }
 
     /// Guidance on a leg to an amenity detour: arrival within 2.5 × the fix accuracy, between
     /// `amenityArrivalMinimumMeters` and `amenityArrivalMaximumMeters`, for `amenityArrivalDwell`.
@@ -141,7 +150,8 @@ final class VisitController {
                 minimumMeters: settings.amenityArrivalMinimumMeters,
                 maximumMeters: settings.amenityArrivalMaximumMeters
             ),
-            arrivalDwellSeconds: settings.amenityArrivalDwell
+            arrivalDwellSeconds: settings.amenityArrivalDwell,
+            offRouteMeters: settings.offRouteMeters
         )
     }
 
@@ -200,7 +210,9 @@ final class VisitController {
         self.session = session
         let routing = GalleryFirstRouting(inner: ProximiioJourneyRouting(sdk: session.sdk))
         self.galleryRouting = routing
-        self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules, guidanceRules: Self.artworkGuidanceRules, routing: routing)
+        self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules,
+                                          guidanceRules: RouteFollowRules(arrivalDwellSeconds: .infinity, offRouteMeters: settings.offRouteMeters),
+                                          routing: routing)
         var deviation = navigator.deviationRules
         deviation.leftRouteMeters = settings.offRouteMeters
         deviation.offRouteTooLongSeconds = settings.offRouteSeconds
@@ -399,6 +411,47 @@ final class VisitController {
                 await self.rerouting { await self.apply(proposal) }
             }
         })
+    }
+
+    /// Called on every guidance update. The visitor `GADSettings.offRouteMeters` off the leg to the
+    /// current destination (`RouteGuidance.isOffRoute`) gets the warning, as for the navigator's
+    /// `leftRoute`, also where a later leg of the journey passes (PM, Monday "Personalized tour:
+    /// off-route and re-route behaviour", 2026-10-28). Back within two thirds of that distance the
+    /// episode ends. Only with the warning (`.askApp`); not while paused, during a detour or on a
+    /// floor without positioning.
+    func checkLegDeviation(_ guidance: RouteGuidance?, isFloorGuideActive: Bool) {
+        guard deviationPolicy == .askApp, isNavigating, !isPaused, !isFloorGuideActive, navigator.detourStop == nil,
+              let guidance, !guidance.hasArrived
+        else { return }
+        switch Self.legDeviation(isOffRoute: guidance.isOffRoute, meters: guidance.offRouteMeters, threshold: settings.offRouteMeters,
+                                 isEpisode: isOffRouteEpisode, isLegEpisode: isLegOffRouteEpisode) {
+        case .none:
+            break
+        case .ends:
+            isOffRouteEpisode = false
+        case .warns:
+            FieldLog.log("off route: \(String(format: "%.1f", guidance.offRouteMeters)) m off the leg to \(navigator.activeStop?.title ?? "-")")
+            isOffRouteEpisode = true
+            isLegOffRouteEpisode = true
+            showOffRouteWarning()
+            if reroutesAfterWarning { rerouteFromVisitor() }
+        }
+    }
+
+    enum LegDeviation: Equatable {
+        case none
+        /// A new episode: the warning shows.
+        case warns
+        /// The visitor is back on the leg: the episode `checkLegDeviation` started ends.
+        case ends
+    }
+
+    /// What one guidance update off or on the leg does. An open episode, of the leg or of the whole
+    /// journey, shows no second warning; the leg's episode ends within two thirds of `threshold`, so
+    /// a visitor on the boundary gets one warning. Pure; covered by tests.
+    nonisolated static func legDeviation(isOffRoute: Bool, meters: Double, threshold: Double, isEpisode: Bool, isLegEpisode: Bool) -> LegDeviation {
+        if isOffRoute { return isEpisode ? .none : .warns }
+        return isLegEpisode && meters <= threshold * 2 / 3 ? .ends : .none
     }
 
     /// Called on every fix. A visitor on a floor the route ahead does not take for
@@ -704,7 +757,7 @@ final class VisitController {
         // distance, the legs after it by the artwork geofence only.
         navigator.guidanceRules = detourGuidanceRules
         await navigator.detour(to: stop)
-        navigator.guidanceRules = Self.artworkGuidanceRules
+        navigator.guidanceRules = artworkGuidanceRules
         return stop.id
     }
 

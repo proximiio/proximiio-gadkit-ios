@@ -49,8 +49,10 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Route
 
-    /// Metres from the route to the current destination, for 3 fixes, before "Looks like you've left
-    /// your route" (PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-28).
+    /// Metres from the leg to the current destination before "Looks like you've left your route",
+    /// also where a later leg passes; and from every leg still to walk, for 3 fixes, before the
+    /// navigator's `leftRoute` (PM, Monday "Personalized tour: off-route and re-route behaviour",
+    /// 2026-10-28).
     public var offRouteMeters: Double = 12
     /// Seconds off the route before "Looks like you've left your route", at any distance.
     public var offRouteSeconds: TimeInterval = 300

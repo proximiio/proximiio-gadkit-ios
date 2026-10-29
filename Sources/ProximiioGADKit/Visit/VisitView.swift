@@ -475,6 +475,7 @@ struct VisitView: View {
             }
             .onReceive(controller.navigator.$guidance) { guidance in
                 checkStopNearby(position: controller.session.position, guidance: guidance)
+                controller.checkLegDeviation(guidance, isFloorGuideActive: floorGuide.isActive)
             }
             .onChange(of: controller.navigator.activeStop?.id) { _, _ in
                 checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)

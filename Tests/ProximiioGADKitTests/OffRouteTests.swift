@@ -90,4 +90,15 @@ struct OffRouteTests {
         #expect(VisitView.isRouteDeviation(.returnedToRoute))
         #expect(!VisitView.isRouteDeviation(.journeyFinished))
     }
+
+    /// The warning follows the leg to the current destination: 13 m off it warns also where a later
+    /// leg passes, once per episode; back within 8 m the episode ends (PM's log of 2026-10-28, 22:39 UTC).
+    @Test func theLegOffRouteWarnsOncePerEpisode() {
+        #expect(VisitController.legDeviation(isOffRoute: true, meters: 13, threshold: 12, isEpisode: false, isLegEpisode: false) == .warns)
+        #expect(VisitController.legDeviation(isOffRoute: true, meters: 40, threshold: 12, isEpisode: true, isLegEpisode: true) == .none)
+        #expect(VisitController.legDeviation(isOffRoute: false, meters: 10, threshold: 12, isEpisode: true, isLegEpisode: true) == .none)
+        #expect(VisitController.legDeviation(isOffRoute: false, meters: 7, threshold: 12, isEpisode: true, isLegEpisode: true) == .ends)
+        // An episode of the whole journey ends with the navigator's `returnedToRoute`, not here.
+        #expect(VisitController.legDeviation(isOffRoute: false, meters: 2, threshold: 12, isEpisode: true, isLegEpisode: false) == .none)
+    }
 }

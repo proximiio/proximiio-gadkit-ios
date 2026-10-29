@@ -250,7 +250,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `.bottomBar` | A bar with Back (with `onClose`) and a Map / List button. | No bar. The host app draws its own. |
 | `.background` | The package's background image around the map card. | Transparent. |
 | `.skipPrompt` | "Skip this artwork?" after a swipe on a stop. "Skip artwork" reports `stopSkipped`; the stop is skipped with `.progress`, else the host app skips it. | A swipe reports `skipRequested` only. |
-| `.offRoutePrompt` | "Looks like you've left your route" with "Dismiss", in place of the stop card, for `GADSettings.offRouteWarningSeconds` unless the visitor closes it. It shows `GADSettings.offRouteMeters` (12 m) off the route to the current destination, before any routing: the navigator routes nothing by itself. After it, with `.progress`, a personalised journey keeps the leg where the visitor left it until another open artwork is the nearest stop; then the stops ahead are ordered again from the visitor. A curated tour, and a journey without `.progress`, is routed again from the visitor. A visitor on a floor the route does not take for `GADSettings.wrongFloorSeconds` gets the warning too, and the leg is drawn again from the visitor: to the nearest open artwork in a personalised journey, to the next stop in a curated tour. | The route follows a visitor who left it. `offRoute` reports it. |
+| `.offRoutePrompt` | "Looks like you've left your route" with "Dismiss", in place of the stop card, for `GADSettings.offRouteWarningSeconds` unless the visitor closes it. It shows `GADSettings.offRouteMeters` (12 m) off the leg to the current destination, also where a later leg of the journey passes, before any routing: the navigator routes nothing by itself. After it, with `.progress`, a personalised journey keeps the leg where the visitor left it until another open artwork is the nearest stop; then the stops ahead are ordered again from the visitor. A curated tour, and a journey without `.progress`, is routed again from the visitor. A visitor on a floor the route does not take for `GADSettings.wrongFloorSeconds` gets the warning too, and the leg is drawn again from the visitor: to the nearest open artwork in a personalised journey, to the next stop in a curated tour. | The route follows a visitor who left it. `offRoute` reports it. |
 | `.uncertainPositionPrompt` | "Probably at …" when the position is uncertain near the active stop. | `positionUncertain` reports it. |
 | `.leaveTourPrompt` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `.bottomBar` and `onClose`). | Back calls `onClose` at once. |
 | `.prompts` | All four prompts above. | |
@@ -419,7 +419,7 @@ The view's navigator differs from a navigator with the map library's default rul
 | | The view's navigator |
 |---|---|
 | `.stopSkipped`, `.legChanged`, `.journeyFinished` | Sent when the view applies a change of the binding (`update(to:)`). |
-| `.leftRoute`, `.offRouteTooLong` | After `GADSettings.offRouteMeters` (12 m, for 3 fixes) and `GADSettings.offRouteSeconds` (300 s). `.farFromRoute` at the map library's 30 m. |
+| `.leftRoute`, `.offRouteTooLong` | After `GADSettings.offRouteMeters` (12 m, for 3 fixes) off every leg still to walk, and `GADSettings.offRouteSeconds` (300 s). `.farFromRoute` at the map library's 30 m. The warning of `.offRoutePrompt` also follows the leg to the current destination (`RouteGuidance.isOffRoute`). |
 | Off the route | With `.offRoutePrompt` the navigator routes nothing by itself (`deviationPolicy` `.askApp`); the view routes after the warning. Without it the route follows the visitor (`.automatic`). |
 | `.stopReached` and the cue `.arrived` | Only for a detour to an amenity. A leg to an artwork never reports an arrival (`arrivalDwellSeconds` is infinite): the visitor reaches an artwork by entering its geofence, which the host app's `geofenceEvents()` reports. |
 | The cue `.approachingDestination` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery (see "Gallery first"); other legs end at the artwork. |
@@ -739,7 +739,7 @@ let configuration = GADConfiguration(
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `geofenceExitDelay` | 5 s | Time outside an entered geofence or privacy zone before the SDK reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK default 3 s). Enters are reported at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. 0 reports the exit at the first position outside. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
-| `offRouteMeters`, `offRouteSeconds` | 12 m, 300 s | "Looks like you've left your route": this far from the route to the current destination for 3 fixes, or off it this long. |
+| `offRouteMeters`, `offRouteSeconds` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, or off the journey this long. Back within two thirds of the distance the visitor is on the leg again. |
 | `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
@@ -956,6 +956,19 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.21.1 (2026-10-29)
+
+No change for host apps' code.
+
+Fixed:
+
+- "Looks like you've left your route" follows the leg to the current destination: 12 m off it shows
+  the warning, also where a later leg of the journey passes (Monday "Personalized tour: off-route and
+  re-route behaviour"). The PM's log of 2026-10-28, 22:39 UTC: a visitor 56 m off the leg, heading to
+  another artwork, got no warning, because the map library's `leftRoute` measures against every leg
+  still to walk. 1.20.0 said the warning came at 12 m from the route to the current destination; it
+  did not. The leg follow rules now use `GADSettings.offRouteMeters` too.
 
 ### 1.21.0 (2026-10-29)
 
