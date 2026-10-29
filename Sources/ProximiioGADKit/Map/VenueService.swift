@@ -26,8 +26,8 @@ final class VenueService {
     /// Times and distances of the screens, from `GADConfiguration.settings`. A screen reads them
     /// when it opens, so a change applies to the next one.
     var settings: GADSettings
-    /// Changes of the venue data while the app runs (`Proximiio.venueDataChanges()`). Screens read
-    /// the data again on a change.
+    /// The venue's features, geofences and amenities in memory, and the changes of the venue data
+    /// while the app runs (`Proximiio.venueDataChanges()`). Screens read the data again on a change.
     let data: VenueDataRefresh
     /// The binding client whose provider delivers the wristband's positions. `nil` on the host
     /// app's SDK.
@@ -37,11 +37,14 @@ final class VenueService {
     /// Writes the attached binding provider's samples to `FieldLog`.
     private var sampleLog: Task<Void, Never>?
 
-    private init(sdk: Proximiio, binding: BlueiotWristbandBinding?, settings: GADSettings) {
+    /// The venue data of the hosted screens. The next hosted screen on the same SDK reuses it.
+    private static var hostedData: VenueDataRefresh?
+
+    private init(sdk: Proximiio, binding: BlueiotWristbandBinding?, settings: GADSettings, data: VenueDataRefresh? = nil) {
         self.sdk = sdk
         self.settings = settings
         self.binding = binding
-        data = VenueDataRefresh(sdk: sdk)
+        self.data = data ?? VenueDataRefresh(sdk: sdk)
     }
 
     /// The SDK configuration for `backend`. Separate from `start` so tests can check it.
@@ -135,25 +138,33 @@ final class VenueService {
         await data.start()
     }
 
-    /// A venue on the host app's started SDK. Installs the route network from the SDK's feature
-    /// cache, or downloads it when the cache has no path. Requests no permission and attaches no
-    /// position provider. Call `stop()` when the screen closes.
+    /// A venue on the host app's started SDK. Requests no permission and attaches no position
+    /// provider.
+    ///
+    /// The first call on an SDK installs the route network from the SDK's feature cache, or
+    /// downloads it when the cache has no path, and starts reading the venue data. The later calls
+    /// on the same SDK reuse the route network and the data in memory, which follows
+    /// `venueDataChanges()` also while no screen is open. After the SDK stopped, which ends the
+    /// stream of the changes, or when the SDK had no features, the next call starts again.
     static func hosted(sdk: Proximiio, settings: GADSettings) async -> VenueService {
-        if await sdk.loadCachedRouteNetwork() == 0 {
+        if let data = hostedData, data.sdk === sdk, data.isFollowing, await !data.features().isEmpty {
+            return VenueService(sdk: sdk, binding: nil, settings: settings, data: data)
+        }
+        let started = ContinuousClock.now
+        var paths = await sdk.loadCachedRouteNetwork()
+        if paths == 0 {
             do {
-                _ = try await sdk.loadRouteNetwork()
+                paths = try await sdk.loadRouteNetwork()
             } catch {
                 FieldLog.log("hosted map: route network not loaded: \(error.localizedDescription)")
             }
         }
-        let venue = VenueService(sdk: sdk, binding: nil, settings: settings)
-        await venue.data.start()
-        return venue
-    }
-
-    /// Ends the follow-up of the venue data changes.
-    func stop() {
-        data.stop()
+        FieldLog.log("hosted map: route network \(paths) paths in \(MapDiagnostics.Timing.text(MapDiagnostics.seconds(since: started)))")
+        hostedData?.stop()
+        let data = VenueDataRefresh(sdk: sdk)
+        hostedData = data
+        await data.start()
+        return VenueService(sdk: sdk, binding: nil, settings: settings, data: data)
     }
 
     /// Fetches the organisation's map style in the background. The map library writes it to

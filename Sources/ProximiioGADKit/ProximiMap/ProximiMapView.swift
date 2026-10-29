@@ -145,6 +145,22 @@ public struct ProximiMapView: View {
         self.onNavigator = onNavigator
     }
 
+    /// Prepares the `ProximiMapView`s and `ProximiExploreView`s on `sdk` before the first one opens:
+    /// installs the route network and reads the venue's features, geofences and amenities into
+    /// memory. Optional. Without it the first view does this when it opens, and the map library's
+    /// own read of the features waits behind it: with the GAD venue a read of the features took
+    /// about 0.5 s on the simulator (2026-10-29).
+    ///
+    /// Call it after the SDK started, for example when the visitor finishes onboarding. The views
+    /// use the data until the SDK stops; a call while the data is in memory reads nothing.
+    @MainActor
+    public static func prepare(sdk: Proximiio) async {
+        let venue = await VenueService.hosted(sdk: sdk, settings: .standard)
+        _ = await venue.data.features()
+        _ = await venue.data.geofences()
+        _ = await venue.data.amenities()
+    }
+
     public var body: some View {
         Group {
             if let loaded = model.loaded {
@@ -175,7 +191,6 @@ public struct ProximiMapView: View {
             await model.start(sdk: sdk, settings: settings, options: options, journey: $journey)
         }
         .onChange(of: journey) { _, journey in model.journeyChanged(journey) }
-        .onDisappear { model.stop() }
     }
 }
 
@@ -212,7 +227,8 @@ final class HostedMapModel {
     @ObservationIgnored private var revision = 0
     @ObservationIgnored private var isStarting = false
 
-    /// Loads the venue and shows `journey`. After `stop()`, follows the venue data changes again.
+    /// Loads the venue and shows `journey`. Called again when the view is back on screen, it follows
+    /// the venue data changes again if the SDK stopped in between.
     func start(sdk: Proximiio, settings: GADSettings, options: ProximiMapView.Options, journey: Binding<ProximiJourney>) async {
         if let venue {
             await venue.data.start()
@@ -234,9 +250,9 @@ final class HostedMapModel {
 
     private func loadPlaces() async {
         guard let venue else { return }
-        let features = await venue.sdk.features()
-        places = VenuePlace.all(in: features, amenities: (try? await venue.sdk.amenities()) ?? [])
-        galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
+        let features = await venue.data.features()
+        places = VenuePlace.all(in: features, amenities: await venue.data.amenities())
+        galleries = await Gallery.load(from: venue.sdk, features: features, geofences: await venue.data.geofences(), places: places)
     }
 
     /// Starts the screen with `journey`.
@@ -295,10 +311,6 @@ final class HostedMapModel {
         FieldLog.log("hosted map event: \(event)")
         guard let mapped = ProximiMap.event(for: event, places: places) else { return }
         onEvent?(mapped)
-    }
-
-    func stop() {
-        venue?.stop()
     }
 }
 

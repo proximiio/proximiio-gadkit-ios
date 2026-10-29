@@ -272,8 +272,8 @@ struct MuseumMapView: View {
     /// "Amenity · Level 1" or "Level 1".
     /// Places and level changers, at the start and after a change of the venue data.
     private func loadPlaces() async {
-        let features = await venue.sdk.features()
-        let amenities = (try? await venue.sdk.amenities()) ?? []
+        let features = await venue.data.features()
+        let amenities = await venue.data.amenities()
         places = VenuePlace.all(in: features, amenities: amenities)
         searchListing = .search(amenities)
         let levelChangers = LevelChangerPlace.all(in: features)

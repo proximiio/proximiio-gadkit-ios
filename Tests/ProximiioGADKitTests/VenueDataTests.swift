@@ -74,8 +74,9 @@ struct VenueDataTests {
         #expect(VenueDataRefresh.changes(from: old, to: old.reversed()).isEmpty)
     }
 
-    /// The open map redraws a changed style and amenity catalogue itself.
-    @Test func theScreensFollowFeaturesGeofencesFloorsAndPlaces() {
-        #expect(VenueDataRefresh.watchedKinds == [.features, .geofences, .floors, .places])
+    /// The open map redraws a changed style itself. The screens read the amenity catalogue for the
+    /// icons and lists, so a change of it reads it again.
+    @Test func theScreensFollowFeaturesGeofencesFloorsPlacesAndAmenities() {
+        #expect(VenueDataRefresh.watchedKinds == [.features, .geofences, .floors, .places, .amenities])
     }
 }

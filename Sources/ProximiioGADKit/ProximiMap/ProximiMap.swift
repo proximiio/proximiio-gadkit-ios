@@ -215,9 +215,9 @@ public final class ProximiMap {
     }
 
     private func loadPlaces(from venue: VenueService) async {
-        let features = await venue.sdk.features()
-        places = VenuePlace.all(in: features, amenities: (try? await venue.sdk.amenities()) ?? [])
-        galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
+        let features = await venue.data.features()
+        places = VenuePlace.all(in: features, amenities: await venue.data.amenities())
+        galleries = await Gallery.load(from: venue.sdk, features: features, geofences: await venue.data.geofences(), places: places)
     }
 
     /// The API kept refusing the token for at least two hours. The SDK has stopped and deleted the
@@ -494,6 +494,11 @@ public final class ProximiMap {
     private func runDebugLaunch(venue: VenueService) async {
         let launch = DebugLaunch.current
         await launch.run(with: venue, wristband: session)
+        if launch.hostedMap, launch.hostedPrepare {
+            let started = ContinuousClock.now
+            await ProximiMapView.prepare(sdk: venue.sdk)
+            DebugLaunch.log("hosted map: prepared in \(MapDiagnostics.Timing.text(MapDiagnostics.seconds(since: started)))")
+        }
         // With `-hostedMap` the museum map is `ProximiExploreView`.
         if launch.openMap { return open(.museumMap) }
         let ids = launch.visitStops.compactMap { VenuePlace.matching($0, in: places).first?.id }

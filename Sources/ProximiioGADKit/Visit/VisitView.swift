@@ -582,8 +582,8 @@ struct VisitView: View {
     /// Places, artwork areas, galleries and level changers, at the start and after a change of the
     /// venue data.
     private func loadVenueData() async {
-        let features = await venue.sdk.features()
-        let amenities = (try? await venue.sdk.amenities()) ?? []
+        let features = await venue.data.features()
+        let amenities = await venue.data.amenities()
         places = VenuePlace.all(in: features, amenities: amenities)
         searchListing = .search(amenities)
         let scale = UIScreen.main.scale
@@ -601,13 +601,13 @@ struct VisitView: View {
         mapLayers.updateLevelChangers(levelChangers)
         mapLayers.updateCones(VenueCone.all(in: features))
         hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
-        let geofences = await venue.sdk.geofences()
+        let geofences = await venue.data.geofences()
         controller.artworkAreas = VisitController.artworkAreas(of: geofences)
         let destinations = Gallery.destinations(geofences: geofences, places: places, features: features)
         galleryDestinations = Array(destinations.values)
         applyHiddenFeatures()
         controller.setGalleryFirst(isEnabled: kind.guidesToGalleryFirst, places: places, destinations: destinations)
-        galleries = await Gallery.load(from: venue.sdk, features: features, places: places)
+        galleries = await Gallery.load(from: venue.sdk, features: features, geofences: geofences, places: places)
         galleryNames = Gallery.names(places: places)
         FieldLog.log("galleries: \(galleries.map { "\($0.name) L\(Int($0.level))" }.joined(separator: ", ")) · \(galleryNames.count) named by id · \(destinations.count) for gallery first")
     }

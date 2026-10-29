@@ -111,6 +111,8 @@ final class JourneyMapLayers {
     private var cones: [VenueCone] = []
     /// The cones' images, drawn when their floor first shows.
     private var coneShadings: [String: ConeShading] = [:]
+    /// The image each cone's source on the map was given, by cone id.
+    private var coneImagesOnMap: [String: ObjectIdentifier] = [:]
 
     func attach(to session: ProximiioMapSession) {
         self.session = session
@@ -387,15 +389,20 @@ final class JourneyMapLayers {
         )
     }
 
-    /// Shows the cones of the shown floor and hides the others. A cone's image, source and layer are
-    /// made when its floor first shows; a changed cone gets a new image.
+    /// Puts the cones of the shown floor on the map and takes the others off. A cone's image is made
+    /// when its floor first shows and kept; a changed cone gets a new image. The other floors' cones are
+    /// removed, not hidden: MapLibre does not load an image source whose layer is hidden, and an unloaded
+    /// source keeps every frame from counting as fully rendered, so `venueDrawing` never became `.drawn`
+    /// (GADKit 1.22.0 to 1.22.2).
     private func applyCones(on style: MLNStyle) {
         guard let canvas = session?.canvas else { return }
         for cone in cones {
             let id = Self.coneID(cone.id)
             let layer = style.layer(withIdentifier: id)
             guard sameLevel(cone.level) else {
-                layer?.isVisible = false
+                if let layer { style.removeLayer(layer) }
+                if let source = style.source(withIdentifier: id) { style.removeSource(source) }
+                coneImagesOnMap[cone.id] = nil
                 continue
             }
             if coneShadings[cone.id] == nil { coneShadings[cone.id] = ConeShading.make(cone) }
@@ -407,16 +414,15 @@ final class JourneyMapLayers {
                 CLLocationCoordinate2D(latitude: shading.north, longitude: shading.east)
             )
             if let source = style.source(withIdentifier: id) as? MLNImageSource {
-                if source.image !== shading.image {
+                if coneImagesOnMap[cone.id] != ObjectIdentifier(shading.image) {
                     source.coordinates = quad
                     source.image = shading.image
                 }
             } else {
                 style.addSource(MLNImageSource(identifier: id, coordinateQuad: quad, image: shading.image))
             }
-            if let layer {
-                layer.isVisible = true
-            } else if let source = style.source(withIdentifier: id) {
+            coneImagesOnMap[cone.id] = ObjectIdentifier(shading.image)
+            if layer == nil, let source = style.source(withIdentifier: id) {
                 let raster = MLNRasterStyleLayer(identifier: id, source: source)
                 raster.rasterFadeDuration = NSExpression(forConstantValue: 0)
                 // Over the floors, under the venue's galleries and the gallery fills of `apply(on:)`:

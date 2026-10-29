@@ -399,9 +399,9 @@ struct ExploreMuseumView: View {
 
     /// The lists, at the start and after a change of the venue data.
     private func load() async {
-        let features = await venue.sdk.features()
-        let geofences = await venue.sdk.geofences()
-        let amenities = (try? await venue.sdk.amenities()) ?? []
+        let features = await venue.data.features()
+        let geofences = await venue.data.geofences()
+        let amenities = await venue.data.amenities()
         let places = VenuePlace.all(in: features, amenities: amenities)
         let scale = UIScreen.main.scale
         amenityIcons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },

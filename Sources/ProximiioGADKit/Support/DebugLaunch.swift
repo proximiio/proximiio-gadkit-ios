@@ -18,6 +18,8 @@
 //    -visitAutoAdvance                    with -visit: advance 5 m after leaving a stop
 //    -hostedMap                           with -visit: open the visit in ProximiMapView on the app's SDK;
 //                                         with -openMap: open ProximiExploreView
+//    -hostedPrepare                       with -hostedMap: call ProximiMapView.prepare(sdk:) before the view
+//                                         opens
 //    -hostedDestination <title>           with -hostedMap: after 5 s set the destination to the place with
 //                                         this title, else the first whose title contains it, by its
 //                                         properties.id (as proximiio-mcp)
@@ -45,6 +47,8 @@ import Foundation
     public var visitList = false
     /// `-hostedMap`: `ProximiMap` opens the visit in `ProximiMapView` instead of its journey screen.
     public var hostedMap = false
+    /// `-hostedPrepare`: `ProximiMapView.prepare(sdk:)` before the hosted view opens.
+    public var hostedPrepare = false
     /// `-hostedDestination`: the title of the place `ProximiMapView` gets as its destination.
     public var hostedDestination: String?
     /// `-visitKind`. The host app passes it to `VisitView`.
@@ -79,6 +83,7 @@ import Foundation
         visitAutoAdvance = arguments.contains("-visitAutoAdvance")
         visitList = arguments.contains("-visitList")
         hostedMap = arguments.contains("-hostedMap")
+        hostedPrepare = arguments.contains("-hostedPrepare")
         hostedDestination = value(after: "-hostedDestination")
         visitKind = value(after: "-visitKind").flatMap(JourneyKind.init(rawValue:)) ?? .personalised
         visitStops = value(after: "-visit")?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? []
@@ -94,7 +99,7 @@ import Foundation
     @MainActor
     func run(with venue: VenueService, wristband: WristbandSession) async {
         if listJourneys {
-            let titles = VenuePlace.all(in: await venue.sdk.features(), amenities: []).map { "\($0.title) [L\(Int($0.level))]" }
+            let titles = VenuePlace.all(in: await venue.data.features(), amenities: []).map { "\($0.title) [L\(Int($0.level))]" }
             Self.log("places: \(titles.joined(separator: ", "))")
             do {
                 for journey in try await venue.sdk.journeys() {

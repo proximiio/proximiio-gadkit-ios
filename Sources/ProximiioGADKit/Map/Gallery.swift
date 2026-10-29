@@ -123,8 +123,8 @@ struct Gallery: Identifiable, Equatable, Sendable {
     /// (or the named polygon geofences when there are none) that hold none of their POIs. The outlines
     /// alone are named by a POI whose title says "gallery"; the GAD POIs renamed to "G101 Pop Culture"
     /// on 2026-10-28 left only three galleries (PM, Monday "Visited gallery visualization").
-    static func load(from sdk: Proximiio, features: [ProximiioFeature], places: [VenuePlace]) async -> [Gallery] {
-        let geofences = await sdk.geofences()
+    static func load(from sdk: Proximiio, features: [ProximiioFeature], geofences: [ProximiioGeofence],
+                     places: [VenuePlace]) async -> [Gallery] {
         let galleries = Array(destinations(geofences: geofences, places: places, features: features).values)
         var outlines = all(features: features, places: places)
         if outlines.isEmpty {

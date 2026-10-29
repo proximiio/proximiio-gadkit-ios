@@ -237,9 +237,23 @@ The host app:
 - stores the journey and moves it on. The view stores nothing but the accessible routes button
   (`UserDefaults`, key `ProximiioGADKit.accessibleRoutes`).
 
-The view installs the route network from the SDK's feature cache when it opens, or downloads it when
-the cache has no path. While it is on screen it follows the SDK's `venueDataChanges()` and downloads
-nothing (see "Venue data changes"). It requests no permission and posts no notification.
+The first `ProximiMapView` or `ProximiExploreView` on an SDK installs the route network from the SDK's
+feature cache, or downloads it when the cache has no path. The views keep the venue's features,
+geofences and amenities in memory and follow the SDK's `venueDataChanges()`, also after they closed,
+so the next view on the same SDK opens without reading them again (see "Venue data changes"). After
+the SDK stopped, the next view installs the route network and reads the data again. The view
+requests no permission and posts no notification.
+
+`ProximiMapView.prepare(sdk:)` does the first view's work ahead. It is optional. Call it after the SDK
+started, for example when the visitor finishes onboarding; the first view then opens like the later
+ones. With the GAD venue a read of the features takes about 0.5 s on the simulator, and the map
+library's own read of them waits behind it.
+
+```swift
+try await sdk.authenticate()
+try await sdk.start()
+await ProximiMapView.prepare(sdk: sdk)
+```
 
 ### Options
 
@@ -543,13 +557,15 @@ The backend changes POIs, paths, lifts and geofences while the app runs. The SDK
 the changes every `ProximiioConfiguration.syncInterval` (300 s by default). The screens follow
 `Proximiio.venueDataChanges()` (SDK 6.0.0-beta.61) and download nothing themselves. The SDK names
 changed features only while its store holds the whole feature collection, that is after a
-`loadRouteNetwork()` on this install. After a change:
+`loadRouteNetwork()` on this install. The package keeps the features, geofences and amenities in
+memory and reads a kind again only when `venueDataChanges()` names it. After a change:
 
 - The open map draws the new POIs, amenity icons, floors, places and geofences (map 6.0.0-beta.47).
 - The SDK has rebuilt the route network from the changed features. The open journey routes its legs
   again (`JourneyNavigator.routeNetworkChanged()`); a leg on the line already drawn stays as it is.
 - The stop picker, the Explore Museum lists, the journey list, the galleries, the artwork geofences
-  and the lift outlines use the new data.
+  and the lift outlines use the new data. The amenity icons and lists also follow a change of the
+  amenity catalogue (`.amenities`).
 - On the open journey screen a stop whose POI changed takes the new title, position, floor and
   gallery (`JourneyNavigator.replace(_:)`), and the leg to it is routed again when it moved. A
   reached or done stop keeps its values.
@@ -956,6 +972,44 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.23.0 (2026-10-29)
+
+No change for host apps' code.
+
+Added:
+
+- `ProximiMapView.prepare(sdk:)`: installs the route network and reads the venue's features,
+  geofences and amenities for the `ProximiMapView`s and `ProximiExploreView`s on the SDK, before the
+  first one opens. Optional; without it the first view does this when it opens. From the view's
+  opening to the drawn map (simulator, cold launch, the host app's SDK started): `ProximiMapView`
+  about 3.7 s with 1.22.2, 1.3–1.55 s after `prepare(sdk:)`; `ProximiExploreView` 2.41–2.64 s with
+  1.22.2, 1.53–2.00 s after `prepare(sdk:)`.
+
+Changed (Nagarro: "the map takes 2–2.5 s to start"):
+
+- The package reads the venue's features, geofences and amenities from the SDK once and keeps them in
+  memory. It reads a kind again only when `venueDataChanges()` names it. Each screen used to read them
+  itself: the journey screen read the features two or three times. The SDK decodes every stored feature
+  on each `features()` call (0.5 s for the GAD venue's 995 features on the simulator) and serves one
+  call at a time, so the map library's own read of the features waited behind them. Venue on the map
+  after the screen appeared (simulator, cold launch): Explore Museum 1.05–1.29 s before, 0.60–0.79 s
+  after; journey 1.53–1.72 s before, 0.74–0.89 s after; `ProximiMapView` 1.55–1.75 s before,
+  0.56–0.83 s after.
+- `ProximiMapView` and `ProximiExploreView` keep the route network and the venue data for the next view
+  on the same SDK. They follow `venueDataChanges()` also after they closed. The first view installs the
+  route network; after the SDK stopped, the next view does it again.
+- A change of the amenity catalogue (`.amenities` in `venueDataChanges()`) updates the screens' amenity
+  icons and lists.
+- Field log: `venue data: <n> features read in <s>` (also geofences and amenities; the time includes
+  the wait for the SDK's earlier calls) and `hosted map: route network <n> paths in <s>`.
+
+Fixed:
+
+- Since 1.22.0 the map library never reported the venue as drawn (`ProximiioMapSession.venueDrawing`),
+  so the field log's `map timing` line had no `drawn`. The cones of the other floors were hidden
+  layers; MapLibre does not load the image source of a hidden layer, and a source that is not loaded
+  keeps every frame from counting as fully rendered. The other floors' cones are now taken off the map.
 
 ### 1.22.2 (2026-10-29)
 

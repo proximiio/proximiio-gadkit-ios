@@ -39,12 +39,11 @@ public struct ProximiExploreView: View {
         }
         .task {
             if let venue {
-                // Back on screen after `onDisappear`.
+                // Back on screen. Follows the changes again if the SDK stopped in between.
                 await venue.data.start()
             } else {
                 venue = await VenueService.hosted(sdk: sdk, settings: settings)
             }
         }
-        .onDisappear { venue?.stop() }
     }
 }
