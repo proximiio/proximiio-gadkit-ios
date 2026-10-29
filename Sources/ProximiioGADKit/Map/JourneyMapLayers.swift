@@ -17,6 +17,9 @@
 //  - every other lift, staircase and escalator that serves the shown floor, with its amenity icon
 //    (`LevelChangerPlace`; Monday "All level changers visible", 2026-10-15)
 //  - the amenity picked in the menu: the red marker with its white icon (`PlaceFraming`)
+//  - the building's cones on the shown floor, each an image of the design's metal gradient
+//    (`VenueCone`, `ConeShading`; PM, Monday "Cone visualization", 2026-10-29), over the floor plan
+//    and under the gallery fills and the venue style's cone outlines
 //
 //  The stop markers are the map library's (`MapStyle.journeyStops`).
 //
@@ -105,6 +108,9 @@ final class JourneyMapLayers {
     private var changers: [LevelChangerPlace] = []
     private var highlight: Highlight?
     private var galleryMarkers: [GalleryMarker] = []
+    private var cones: [VenueCone] = []
+    /// The cones' images, drawn when their floor first shows.
+    private var coneShadings: [String: ConeShading] = [:]
 
     func attach(to session: ProximiioMapSession) {
         self.session = session
@@ -121,7 +127,10 @@ final class JourneyMapLayers {
         self.level = level
         guard let style = session?.canvas?.style else { return }
         apply(on: style)
-        if levelChanged { applyLevelChanger(on: style) }
+        if levelChanged {
+            applyLevelChanger(on: style)
+            applyCones(on: style)
+        }
     }
 
     /// The line from the visitor to the start of the route ahead. An empty array removes it.
@@ -222,6 +231,7 @@ final class JourneyMapLayers {
         apply(on: style)
         applyConnector(on: style)
         applyLevelChanger(on: style)
+        applyCones(on: style)
     }
 
     private func applyLevelChanger(on style: MLNStyle) {
@@ -341,6 +351,62 @@ final class JourneyMapLayers {
                 return feature
             }
             source.shape = MLNShapeCollectionFeature(shapes: features)
+        }
+    }
+
+    /// The venue's cones, at the start and after a change of the venue data.
+    func updateCones(_ cones: [VenueCone]) {
+        guard cones != self.cones else { return }
+        let removed = Set(self.cones.map(\.id)).subtracting(cones.map(\.id))
+        let unchanged = Set(cones.filter { self.cones.contains($0) }.map(\.id))
+        coneShadings = coneShadings.filter { unchanged.contains($0.key) }
+        let style = session?.canvas?.style
+        for id in removed {
+            if let layer = style?.layer(withIdentifier: Self.coneID(id)) { style?.removeLayer(layer) }
+            if let source = style?.source(withIdentifier: Self.coneID(id)) { style?.removeSource(source) }
+        }
+        self.cones = cones
+        if let style { applyCones(on: style) }
+    }
+
+    private static func coneID(_ id: String) -> String { "gad-cone-\(id)" }
+
+    /// Shows the cones of the shown floor and hides the others. A cone's image, source and layer are
+    /// made when its floor first shows; a changed cone gets a new image.
+    private func applyCones(on style: MLNStyle) {
+        guard let canvas = session?.canvas else { return }
+        for cone in cones {
+            let id = Self.coneID(cone.id)
+            let layer = style.layer(withIdentifier: id)
+            guard sameLevel(cone.level) else {
+                layer?.isVisible = false
+                continue
+            }
+            if coneShadings[cone.id] == nil { coneShadings[cone.id] = ConeShading.make(cone) }
+            guard let shading = coneShadings[cone.id] else { continue }
+            let quad = MLNCoordinateQuadMake(
+                CLLocationCoordinate2D(latitude: shading.north, longitude: shading.west),
+                CLLocationCoordinate2D(latitude: shading.south, longitude: shading.west),
+                CLLocationCoordinate2D(latitude: shading.south, longitude: shading.east),
+                CLLocationCoordinate2D(latitude: shading.north, longitude: shading.east)
+            )
+            if let source = style.source(withIdentifier: id) as? MLNImageSource {
+                if source.image !== shading.image {
+                    source.coordinates = quad
+                    source.image = shading.image
+                }
+            } else {
+                style.addSource(MLNImageSource(identifier: id, coordinateQuad: quad, image: shading.image))
+            }
+            if let layer {
+                layer.isVisible = true
+            } else if let source = style.source(withIdentifier: id) {
+                let raster = MLNRasterStyleLayer(identifier: id, source: source)
+                raster.rasterFadeDuration = NSExpression(forConstantValue: 0)
+                // Over the floor plan, under the gallery fills of `apply(on:)`: a cone that is a
+                // gallery keeps the gallery's colour.
+                canvas.addLayer(raster, at: .aboveVenueFills)
+            }
         }
     }
 

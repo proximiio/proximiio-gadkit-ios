@@ -599,6 +599,7 @@ struct VisitView: View {
         let levelChangers = LevelChangerPlace.all(in: features)
         levelChangerPlaces = levelChangers
         mapLayers.updateLevelChangers(levelChangers)
+        mapLayers.updateCones(VenueCone.all(in: features))
         hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
         let geofences = await venue.sdk.geofences()
         controller.artworkAreas = VisitController.artworkAreas(of: geofences)

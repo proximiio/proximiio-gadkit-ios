@@ -278,6 +278,7 @@ struct MuseumMapView: View {
         searchListing = .search(amenities)
         let levelChangers = LevelChangerPlace.all(in: features)
         mapLayers.updateLevelChangers(levelChangers)
+        mapLayers.updateCones(VenueCone.all(in: features))
         session.hiddenFeatureIDs = Set(levelChangers.map(\.id))
     }
 

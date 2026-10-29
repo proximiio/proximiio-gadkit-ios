@@ -416,6 +416,7 @@ struct ExploreMuseumView: View {
                                  categories: categories, levelChangerTypes: Set(levelChangers.map(\.featureType)),
                                  facilities: .facilities(amenities))
         mapLayers.updateLevelChangers(levelChangers)
+        mapLayers.updateCones(VenueCone.all(in: features))
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
         // amenities: the Amenities list and the callout show them (PM, Monday "Explore museum view:
         // default map view", 2026-10-26).

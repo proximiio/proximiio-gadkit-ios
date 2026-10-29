@@ -957,6 +957,19 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.22.0 (2026-10-29)
+
+No change for host apps' code.
+
+Added:
+
+- The journey map, the Explore Museum map and the museum map fill the building's cones (polygon
+  features of type `cone`) with the design's metal gradient: #D4DEE6, #F8FAFC, #E8EEF2, #CBD6DF,
+  #AEBCC9 across the cone, at 32 % opacity, with a white edge inside the outline (Figma "0 - DPT Map
+  Kiosk"; PM, Monday "Cone visualization", 2026-10-29). A map style fills a polygon with one colour
+  only, so the package draws each cone as an image over the floor plan, under the gallery fills; the
+  venue style keeps the cones' grey outline (`proximiio-cones`).
+
 ### 1.21.1 (2026-10-29)
 
 No change for host apps' code.
