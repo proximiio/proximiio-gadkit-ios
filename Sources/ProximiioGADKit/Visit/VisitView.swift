@@ -294,6 +294,7 @@ struct VisitView: View {
                 if DebugLaunch.current.visitList { mode = .list }
                 #endif
                 monitor.start()
+                await placeCameraAtLastPosition()
                 await loadVenueData()
                 await MapStyle.waitForCanvas(of: controller.session)
                 applyStopMarkers()
@@ -914,6 +915,23 @@ struct VisitView: View {
         controller.session.recentre(withHeading: withHeading)
     }
 
+    /// Before the venue's features are on the map: the camera at the SDK's last position, at the start
+    /// zoom, without animation, and the floor of that position. The map then draws the venue once, at
+    /// the right place and floor; an animated move and a floor change after the features arrived drew it
+    /// again (proximiio-ios-sdk measurement, 2026-10-29). A position older than
+    /// `GADSettings.trackingLostAfter` is not used.
+    private func placeCameraAtLastPosition() async {
+        guard let last = await venue.sdk.lastPosition else { return }
+        let age = Date().timeIntervalSince(last.timestamp)
+        guard age < settings.trackingLostAfter else { return }
+        let zoom = settings.startZoom ?? settings.followZoom
+        let centre = CLLocationCoordinate2D(latitude: last.coordinate.latitude, longitude: last.coordinate.longitude)
+        controller.session.camera.setCenter(centre, zoom: zoom, animated: false)
+        if let level = last.floor?.level { controller.session.select(floor: FloorKey(level: level)) }
+        FieldLog.log(String(format: "camera at the last position before the venue · L%@ · %.1f s old",
+                            last.floor.map { "\(Int($0.level))" } ?? "?", age))
+    }
+
     /// Shows the visitor at `GADSettings.startZoom` for `startZoomSeconds`, then follows them at the
     /// follow zoom: when the journey starts, on the first fix and when the position comes back (PM,
     /// Monday "Zoom level at start + navigation", 2026-10-29). Without `startZoom` it follows at once.
@@ -925,7 +943,8 @@ struct VisitView: View {
         FieldLog.log("start zoom (\(reason)) · zoom \(zoom) for \(settings.startZoomSeconds) s")
         // The camera write lets go of the follow; `recentre` takes it again.
         let centre = CLLocationCoordinate2D(latitude: position.coordinate.latitude, longitude: position.coordinate.longitude)
-        controller.session.camera.setCenter(centre, zoom: zoom, animated: true)
+        // Without animation: an animated move delayed the first fully drawn frame.
+        controller.session.camera.setCenter(centre, zoom: zoom, animated: false)
         let seconds = settings.startZoomSeconds
         startZoomFollow = Task { @MainActor in
             try? await Task.sleep(for: .seconds(seconds))

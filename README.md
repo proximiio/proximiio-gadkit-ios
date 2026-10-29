@@ -985,6 +985,19 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.26.1 (2026-10-30)
+
+No change for host apps' code.
+
+Changed:
+
+- The journey map puts its camera at the SDK's last position (`Proximiio.lastPosition`), at the start
+  zoom and without animation, and selects that position's floor, before the venue's features are on the
+  map (proposal of the proximiio-ios-sdk measurement, 2026-10-29). A position older than
+  `GADSettings.trackingLostAfter` is not used. The start zoom's move to the visitor has no animation
+  either. On the simulator, with the visitor on level 1, the drawn map came 0.74–0.98 s after the
+  screen appeared (0.78–0.91 s with 1.26.0): no measurable change there.
+
 ### 1.26.0 (2026-10-29)
 
 No change for host apps' code.
