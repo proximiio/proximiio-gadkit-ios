@@ -512,19 +512,20 @@ gallery. The artwork's `metadata.gallery_id` names the gallery: the gallery geof
 (`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. The route ends
 at the POI. The map fills the gallery's polygon feature (else the geofence's outline) with the floor's
 colour. At the POI it draws a red pill with a white border and the POI's title in white ("G303
-Language"), no icon; the POI's own icon is hidden, and so are the numbered artwork markers
-(PM, Monday "Gallery numbers in gallery navigation", 2026-10-28). The stop
-card names the POI with the icon of its amenity and no stop number. The POI of the gallery the visitor
-is in is not drawn (PM, Monday "Navigation to a gallery", 2026-10-26). The numbered artwork markers
+Language"), no icon, and the numbered artwork markers are hidden (PM, Monday "Gallery numbers in
+gallery navigation", 2026-10-28). The stop card names the POI with the icon of its amenity and no stop
+number. Every other gallery's POI is a white pill with a black outline and the title; the POIs' own
+icons are hidden. The gallery the visitor is in has no pill (PM, Monday "Navigation to a gallery",
+2026-10-26) and no destination fill: the venue's own gallery colour, under the artworks and furniture,
+with the artwork numbers (2026-10-28). A curated tour shows every gallery's pill in the white style. The numbered artwork markers
 also stay hidden while the visitor is outside every gallery, unless the active artwork is outside
 every gallery too. The destination gallery is filled over the venue's artworks, furniture and inner
 walls (2026-10-27).
 
 A gallery is visited when its artworks of the journey are all visited or skipped and at least one is
 visited (the customer, 2026-10-28): the map fills it with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4
-#FDC1A8), over the venue's artworks, furniture and inner walls. At its POI it draws the icon of the
-POI's amenity in the white 30 pt circle with the red border of a visited artwork, with the title
-under it (PM, Monday "Visited gallery visualization", 2026-10-28).
+#FDC1A8), over the venue's artworks, furniture and inner walls. Its POI is a white pill with a red
+outline and the title (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
 
 The first fix inside the gallery geofence routes the leg again from the visitor, to the artwork. A
 leg that starts in the artwork's gallery ends at the artwork. An artwork without `gallery_id`, or
@@ -753,6 +754,7 @@ let configuration = GADConfiguration(
 | `levelsWithoutPositioning` | [0] | Floors without positioning. See "Floors without positioning". |
 | `levelChangerReachedMeters` | 5 m | Distance from the lift or stairs to a floor without positioning at which the lift or stairs view shows. |
 | `levelChangeViewSeconds` | 5 s | How long the lift or stairs view shows before the map shows the floor without positioning. |
+| `rideFloorHoldMeters` | 20 m | After the lift or stairs view of a ride, the map shows the floor the ride ends on until a fix on another floor than the ride's start, or a fix on that floor this far from the lift or stairs. |
 | `floorWithoutPositioningMaximumSeconds` | 1800 s | After this time on a floor without positioning with the same destination, the map follows the visitor again. |
 | `uncertainAccuracyMeters`, `locationQuestionQuietPeriod` | 8 m, 120 s | "Probably at …": an uncertain position near the next stop, and how long an answered prompt stays quiet. |
 | `firstFixWait`, `lateOrderWindow` | 5 s, 60 s | A new personalised journey waits this long for a fix before it is ordered without one, and the first fix within the window orders it again. |
@@ -954,6 +956,31 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.21.0 (2026-10-29)
+
+No change for host apps' code. The items come from the GAD PM's Monday notes of 28 October evening.
+
+Added:
+
+- `GADSettings.rideFloorHoldMeters` (20 m). After the lift or stairs view the map shows the floor the
+  ride ends on and keeps it until a fix on another floor than the ride's start, or a fix on that floor
+  this far from the lift or stairs (Monday "Elevator/Staircase animation"). The PM drew privacy zones
+  around the lifts and stairs, so the dot is hidden during the ride.
+- The Map / List selection slides with the finger to the other part, as on the system's segmented
+  control (Monday "Native elements").
+- The field log names how many Explore Museum galleries are filled on their polygon and how many on
+  their geofence.
+
+Changed:
+
+- Every gallery's POI is a pill with its title: red with a white border for the gallery the leg leads
+  to, white with a red outline for a visited gallery, white with a black outline for the others. A
+  curated tour shows every pill in the white style. Before, only the destination and the visited
+  galleries had a marker, a visited one the amenity icon in a circle (Monday "Gallery numbers in
+  gallery navigation").
+- The gallery the visitor is in has no destination fill: the venue's own gallery colour, under the
+  artworks and furniture, with the artwork numbers (Monday "Navigation to a gallery").
 
 ### 1.20.1 (2026-10-28)
 

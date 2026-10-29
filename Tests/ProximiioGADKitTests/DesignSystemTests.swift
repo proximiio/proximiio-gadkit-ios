@@ -59,6 +59,21 @@ struct MapDiagnosticsTests {
         #expect(snapshot.line == "map state museum: features 968 · dropped 0 · style organization · L1 · zoom 20.0 · camera ready true · missing fonts Guggenheim Sans Bold, Open Sans Bold")
     }
 
+    /// The selection follows the finger and stays inside the control (Monday "Native elements",
+    /// 2026-10-28 evening).
+    @Test func theMapListSelectionSlidesWithTheFinger() {
+        #expect(MapListToggle.selectionOffset(showsList: false, slide: 30, width: 71) == 30)
+        #expect(MapListToggle.selectionOffset(showsList: false, slide: -30, width: 71) == 0)
+        #expect(MapListToggle.selectionOffset(showsList: true, slide: -50, width: 71) == 21)
+        #expect(MapListToggle.selectionOffset(showsList: true, slide: 30, width: 71) == 71)
+        // A tap picks the part under the finger; a slide the part the selection ends over.
+        #expect(MapListToggle.showsList(afterSlide: 2, at: 100, showsList: false, width: 71))
+        #expect(!MapListToggle.showsList(afterSlide: 0, at: 20, showsList: true, width: 71))
+        #expect(MapListToggle.showsList(afterSlide: 40, at: 20, showsList: false, width: 71))
+        #expect(!MapListToggle.showsList(afterSlide: 30, at: 20, showsList: false, width: 71))
+        #expect(!MapListToggle.showsList(afterSlide: -50, at: 120, showsList: true, width: 71))
+    }
+
     /// The map shows the venue when its first venue style, its features and the camera are all
     /// there (user, 2026-10-28).
     @Test func theTimingNamesEachStepAndTheDrawnFrame() {

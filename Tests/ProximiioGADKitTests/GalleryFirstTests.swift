@@ -87,19 +87,20 @@ struct GalleryFirstRoutingTests {
         #expect(visited == ["g101", "g303"])
     }
 
-    /// The destination is a 30 pt pill with the full name and no icon; a visited gallery is its icon in
-    /// a 30 pt circle with its name under it (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
-    @MainActor @Test func theDestinationIsAPillWithTheNameOnly() {
-        let named = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", icon: nil, isDestination: true)
-        let withIcon = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", icon: UIImage(systemName: "square"), isDestination: true)
-        #expect(named.size.width > 80)
-        #expect(named.size.height == 30)
-        #expect(withIcon.size == named.size)
-        let visited = JourneyMapLayers.galleryMarkerImage(name: "G1", icon: UIImage(systemName: "square"), isDestination: false)
-        #expect(visited.size.width == 30)
-        let marker = JourneyMapLayers.GalleryMarker(coordinate: .init(latitude: 0, longitude: 0), level: 3, name: "G303 Language",
-                                                    amenityID: "a", isDestination: true)
-        #expect(marker.imageName(iconGeneration: 1) != marker.imageName(iconGeneration: 2))
+    /// Every gallery is a 30 pt pill with its full name, the same size in each style; each style has
+    /// its own image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+    @MainActor @Test func everyGalleryIsAPillWithItsName() {
+        let destination = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", style: .destination)
+        let visited = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", style: .visited)
+        let standard = JourneyMapLayers.galleryMarkerImage(name: "G303 Language", style: .standard)
+        #expect(destination.size.width > 80)
+        #expect(destination.size.height == 30)
+        #expect(visited.size == destination.size)
+        #expect(standard.size == destination.size)
+        let marker = { (style: JourneyMapLayers.GalleryMarker.Style) in
+            JourneyMapLayers.GalleryMarker(coordinate: .init(latitude: 0, longitude: 0), level: 3, name: "G303 Language", style: style)
+        }
+        #expect(Set([marker(.destination), marker(.visited), marker(.standard)].map(\.imageName)).count == 3)
     }
 
     /// Field test 2026-10-19: test copies of artworks named galleries in another building.

@@ -409,7 +409,10 @@ struct ExploreMuseumView: View {
         let categories = Dictionary(amenities.compactMap { amenity in amenity.title.map { (amenity.id, $0) } },
                                     uniquingKeysWith: { first, _ in first })
         let levelChangers = LevelChangerPlace.all(in: features)
-        catalog = ExploreCatalog(places: places, destinations: Gallery.destinations(geofences: geofences, places: places, features: features),
+        let destinations = Gallery.destinations(geofences: geofences, places: places, features: features)
+        let polygons = destinations.values.filter { $0.polygon != nil }.count
+        FieldLog.log("explore: \(destinations.count) galleries · \(polygons) filled on their polygon, \(destinations.count - polygons) on their geofence · \(Gallery.polygonOutlines(features: features).count) gallery polygons in the venue data")
+        catalog = ExploreCatalog(places: places, destinations: destinations,
                                  categories: categories, levelChangerTypes: Set(levelChangers.map(\.featureType)),
                                  facilities: .facilities(amenities))
         mapLayers.updateLevelChangers(levelChangers)

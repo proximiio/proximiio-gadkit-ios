@@ -57,6 +57,19 @@ struct FloorWithoutPositioningTests {
         #expect(FloorWithoutPositioningGuide.reachedChange(coordinate: Self.north(1), level: 1, markers: toLevel4, settings: .standard) == nil)
     }
 
+    /// After the view the map keeps the ride's end floor while fixes stay on the ride's floor near the
+    /// lift or stairs (PM, Monday "Elevator/Staircase animation", 2026-10-28).
+    @Test func theRideFloorStaysUntilAFixOffTheStartFloor() throws {
+        let toLevel4 = [Self.marker("staircase", from: 1, to: 3), Self.marker("staircase", from: 3, to: 4)]
+        let ride = try #require(FloorWithoutPositioningGuide.reachedRide(coordinate: Self.north(1), level: 1, markers: toLevel4, settings: .standard))
+        let meters = GADSettings.standard.rideFloorHoldMeters
+        #expect(!FloorWithoutPositioningGuide.releasesRideFloor(ride, coordinate: Self.north(10), level: 1, meters: meters))
+        #expect(!FloorWithoutPositioningGuide.releasesRideFloor(ride, coordinate: Self.north(1), level: nil, meters: meters))
+        #expect(FloorWithoutPositioningGuide.releasesRideFloor(ride, coordinate: Self.north(30), level: 1, meters: meters))
+        #expect(FloorWithoutPositioningGuide.releasesRideFloor(ride, coordinate: Self.north(1), level: 4, meters: meters))
+        #expect(FloorWithoutPositioningGuide.releasesRideFloor(ride, coordinate: Self.north(1), level: 3, meters: meters))
+    }
+
     @Test func aFloorWithPositioningIsNoChange() {
         let toLevel4 = [Self.marker("staircase", from: 1, to: 3), Self.marker("staircase", from: 3, to: 4)]
         #expect(FloorWithoutPositioningGuide.reachedChange(coordinate: Self.north(1), level: 1, markers: toLevel4, settings: .standard) == nil)

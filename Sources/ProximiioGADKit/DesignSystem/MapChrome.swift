@@ -143,38 +143,85 @@ struct MapLoadingSpinner: View {
     }
 }
 
-/// "Map | List" toggle: two buttons on glass, in place of the system's segmented control.
+/// "Map | List" toggle on glass, in place of the system's segmented control. One gesture takes taps
+/// and slides; VoiceOver and UI tests see two buttons.
 struct MapListToggle: View {
     @Binding var showsList: Bool
+    /// The finger's travel toward List while it slides the selection, in points.
+    @GestureState(resetTransaction: Transaction(animation: .spring(duration: 0.25))) private var slide: CGFloat = 0
+    @Environment(\.layoutDirection) private var layoutDirection
+
+    /// The width of one part: the control is 150 pt wide with 4 pt of padding.
+    private static let partWidth: CGFloat = (150 - 8) / 2
+    /// A finger that travels less than this is a tap.
+    private static let slideThreshold: CGFloat = 8
 
     /// 150 × 50 pt glass with 16 pt corners; the selected part has a black outline (Figma frame of the
-    /// PM, Monday "Native elements", 2026-10-28).
+    /// PM, Monday "Native elements", 2026-10-28). A finger slides the selection to the other part, as
+    /// on the system's segmented control (Monday "Native elements", 2026-10-28 evening).
     var body: some View {
-        HStack(spacing: 0) {
-            segment("Map", isSelected: !showsList) { showsList = false }
-            segment("List", isSelected: showsList) { showsList = true }
+        let forward: CGFloat = layoutDirection == .rightToLeft ? -1 : 1
+        ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Palette.white.opacity(0.6))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1.5))
+                .frame(width: Self.partWidth)
+                .offset(x: forward * Self.selectionOffset(showsList: showsList, slide: slide, width: Self.partWidth))
+            HStack(spacing: 0) {
+                label("Map")
+                label("List")
+            }
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .updating($slide) { value, state, _ in
+                    if abs(value.translation.width) >= Self.slideThreshold { state = forward * value.translation.width }
+                }
+                .onEnded { value in
+                    // The finger's distance from the Map end: the local x runs left to right.
+                    let position = forward > 0 ? value.location.x : 2 * Self.partWidth - value.location.x
+                    showsList = Self.showsList(afterSlide: forward * value.translation.width, at: position,
+                                               showsList: showsList, width: Self.partWidth)
+                }
+        )
+        .accessibilityRepresentation {
+            HStack(spacing: 0) {
+                accessibleButton("Map", isSelected: !showsList) { showsList = false }
+                accessibleButton("List", isSelected: showsList) { showsList = true }
+            }
         }
         .padding(4)
         .frame(width: 150, height: 50)
         .glassSurface(RoundedRectangle(cornerRadius: 16), strength: .frosted)
+        .animation(.spring(duration: 0.25), value: showsList)
     }
 
-    private func segment(_ title: LocalizedStringKey, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    /// The selection's offset from the Map part toward the List part: the selected part, moved by
+    /// `slide` and kept inside the control. Pure; covered by tests.
+    nonisolated static func selectionOffset(showsList: Bool, slide: CGFloat, width: CGFloat) -> CGFloat {
+        min(max((showsList ? width : 0) + slide, 0), width)
+    }
+
+    /// Whether the control shows List when the finger lifts: a tap picks the part under the finger,
+    /// at `position` from the Map end; a slide picks the part the selection ends over. Pure; covered
+    /// by tests.
+    nonisolated static func showsList(afterSlide slide: CGFloat, at position: CGFloat, showsList: Bool, width: CGFloat) -> Bool {
+        if abs(slide) < slideThreshold { return position > width }
+        return selectionOffset(showsList: showsList, slide: slide, width: width) > width / 2
+    }
+
+    private func label(_ title: LocalizedStringKey) -> some View {
+        Text(title, bundle: .module)
+            .textStyle(.largeBodyRegular)
+            .foregroundStyle(Palette.ink)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func accessibleButton(_ title: LocalizedStringKey, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title, bundle: .module)
-                .textStyle(.largeBodyRegular)
-                .foregroundStyle(Palette.ink)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Palette.white.opacity(0.6))
-                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1.5))
-                    }
-                }
-                .contentShape(Rectangle())
+            Text(title, bundle: .module).frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

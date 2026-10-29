@@ -172,6 +172,15 @@ final class FloorWithoutPositioningGuide {
         return Change(level: end, from: Int(level.rounded()), featureType: marker.featureType, coordinate: marker.coordinate)
     }
 
+    /// Whether the map stops showing the floor `change` ends on after the lift or stairs view: a fix
+    /// on another floor than the ride's start, or on that floor more than `meters` from the lift or
+    /// stairs. A fix without a floor changes nothing. Pure; covered by tests.
+    nonisolated static func releasesRideFloor(_ change: Change, coordinate: MapCoordinate, level: Double?, meters: Double) -> Bool {
+        guard let level else { return false }
+        if !VenueLevel.same(level, Double(change.from)) { return true }
+        return GeoMath.haversineDistance(from: coordinate.proximiio, to: change.coordinate.proximiio) > meters
+    }
+
     /// The lift or stairs on `level` nearest `origin` that also serves `target`, for the way back.
     /// Pure; covered by tests.
     nonisolated static func exitChanger(from origin: ProximiioCoordinate, level: Int, to target: Int, in changers: [LevelChangerPlace]) -> LevelChangerPlace? {

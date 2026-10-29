@@ -106,6 +106,10 @@ public struct GADSettings: Equatable, Sendable {
     public var levelChangerReachedMeters: Double = 5
     /// Seconds of the lift or stairs view before the map shows the floor without positioning.
     public var levelChangeViewSeconds: TimeInterval = 5
+    /// After the lift or stairs view the map shows the floor the ride ends on until a fix on another
+    /// floor than the ride's start, or a fix on that floor this many metres from the lift or stairs
+    /// (PM, Monday "Elevator/Staircase animation", 2026-10-28).
+    public var rideFloorHoldMeters: Double = 20
     /// Seconds after which the map follows the visitor again when the destination on a floor
     /// without positioning did not change.
     public var floorWithoutPositioningMaximumSeconds: TimeInterval = 1800

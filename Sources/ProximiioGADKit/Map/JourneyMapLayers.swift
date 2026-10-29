@@ -6,9 +6,9 @@
 //  `Colors`):
 //
 //  - the destination gallery filled with the level colour; visited galleries with its tint
-//  - the destination gallery's and the visited galleries' markers: the gallery's icon and its name
-//    (PM, Monday "Gallery numbers in gallery navigation" and "Visited gallery visualization",
-//    2026-10-28)
+//  - each gallery's name in a pill at its POI: red for the gallery a leg leads to, white with a red
+//    outline for a visited gallery, white with a black outline for the others (PM, Monday "Gallery
+//    numbers in gallery navigation", 2026-10-28)
 //  - a connector from the visitor to the start of the route ahead, in the route's start colour.
 //    The route ahead starts where the visitor projects onto the route, so a visitor beside the
 //    route has no line from the dot to the route without it.
@@ -61,20 +61,23 @@ final class JourneyMapLayers {
         static func imageName(for icon: GADIcon) -> String { "gad-highlight-\(icon.rawValue)" }
     }
 
-    /// A gallery's marker at its POI: the gallery a leg leads to first (gallery first), or a visited
-    /// gallery.
+    /// A gallery's name at its POI.
     struct GalleryMarker: Equatable {
+        enum Style: String, Equatable {
+            /// The gallery a leg leads to first (gallery first).
+            case destination
+            /// A gallery whose artworks of the journey are done.
+            case visited
+            case standard
+        }
+
         var coordinate: ProximiioCoordinate
         var level: Double
         /// The POI's title, such as "G303 Language".
         var name: String
-        /// The POI's amenity, whose icon the marker shows.
-        var amenityID: String?
-        var isDestination: Bool
+        var style: Style
 
-        func imageName(iconGeneration: Int) -> String {
-            "gad-gallery-\(isDestination ? "destination" : "visited")-\(iconGeneration)-\(amenityID ?? "-")-\(name)"
-        }
+        var imageName: String { "gad-gallery-\(style.rawValue)-\(name)" }
     }
 
     /// `place` with the icon of its amenity kind; `nil` for a place of no `AmenityKind`.
@@ -102,10 +105,6 @@ final class JourneyMapLayers {
     private var changers: [LevelChangerPlace] = []
     private var highlight: Highlight?
     private var galleryMarkers: [GalleryMarker] = []
-    /// The amenity icons of the venue data, by amenity id, for the gallery markers.
-    private var galleryIcons: [String: UIImage] = [:]
-    /// Counts the changes of `galleryIcons`: a changed icon gets a new image name.
-    private var iconGeneration = 0
 
     func attach(to session: ProximiioMapSession) {
         self.session = session
@@ -158,18 +157,10 @@ final class JourneyMapLayers {
         applyLevelChanger(on: style)
     }
 
-    /// The galleries' markers: the gallery a leg leads to first and the visited galleries.
+    /// The galleries' names.
     func updateGalleryMarkers(_ markers: [GalleryMarker]) {
         guard markers != galleryMarkers else { return }
         galleryMarkers = markers
-        guard let style = session?.canvas?.style else { return }
-        applyLevelChanger(on: style)
-    }
-
-    /// The amenity icons of the venue data, by amenity id, at the start and after a change.
-    func updateGalleryIcons(_ icons: [String: UIImage]) {
-        galleryIcons = icons
-        iconGeneration += 1
         guard let style = session?.canvas?.style else { return }
         applyLevelChanger(on: style)
     }
@@ -246,72 +237,47 @@ final class JourneyMapLayers {
             features.append(Self.point(highlight.coordinate, image: highlight.imageName, sort: 2))
         }
         for marker in galleryMarkers where sameLevel(marker.level) {
-            let name = marker.imageName(iconGeneration: iconGeneration)
+            let name = marker.imageName
             if style.image(forName: name) == nil {
-                let icon = marker.amenityID.flatMap { galleryIcons[$0] }
-                session?.canvas?.floors.register(Self.galleryMarkerImage(name: marker.name, icon: icon, isDestination: marker.isDestination), named: name)
+                session?.canvas?.floors.register(Self.galleryMarkerImage(name: marker.name, style: marker.style), named: name)
             }
-            features.append(Self.point(marker.coordinate, image: name, sort: marker.isDestination ? 3 : 0))
+            let sort = switch marker.style {
+            case .destination: 3
+            case .visited: 1
+            case .standard: 0
+            }
+            features.append(Self.point(marker.coordinate, image: name, sort: sort))
         }
         source.shape = MLNShapeCollectionFeature(shapes: features)
     }
 
-    /// A gallery's marker (PM, Monday "Gallery numbers in gallery navigation" and "Visited gallery
-    /// visualization", 2026-10-28). The destination is a red pill with a white border and the whole
-    /// title in white, no icon, its middle on the POI (RPR's second answer and the PM, 2026-10-28). A
-    /// visited gallery is its icon in the white 30 pt circle with the red border of a visited artwork,
-    /// with its title under it; the circle is in the middle of the image, so it sits on the POI.
-    /// Without `icon`, a picture frame.
-    static func galleryMarkerImage(name: String, icon: UIImage?, isDestination: Bool) -> UIImage {
+    /// A gallery's name in a 30 pt pill, its middle on the POI (PM, Monday "Gallery numbers in gallery
+    /// navigation", 2026-10-28): the destination red with a white border and white text, a visited
+    /// gallery white with a red outline, the others white with a black outline.
+    static func galleryMarkerImage(name: String, style: GalleryMarker.Style) -> UIImage {
         let red = UIColor(hex: 0xED3731)
         let ink = UIColor(hex: 0x2B2B2B)
-        if isDestination { return galleryPill(name: name, red: red) }
-        let glyph = icon ?? UIImage(systemName: "photo.artframe")
-        let font = UIFont(name: "GuggenheimSansDisplay-SemiBold", size: 12) ?? .systemFont(ofSize: 12, weight: .semibold)
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        let text = name as NSString
-        let bounds = text.boundingRect(with: CGSize(width: 120, height: 40), options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
-                                       attributes: [.font: font, .paragraphStyle: paragraph], context: nil)
-        let labelSize = CGSize(width: ceil(bounds.width) + 4, height: ceil(bounds.height))
-        let circle: CGFloat = 30, gap: CGFloat = 2
-        let size = CGSize(width: max(circle, labelSize.width), height: circle + 2 * (gap + labelSize.height))
-        return UIGraphicsImageRenderer(size: size).image { _ in
-            let circleRect = CGRect(x: (size.width - circle) / 2, y: gap + labelSize.height, width: circle, height: circle)
-            let disk = UIBezierPath(ovalIn: circleRect.insetBy(dx: 1, dy: 1))
-            UIColor.white.setFill()
-            disk.fill()
-            red.setStroke()
-            disk.lineWidth = 2
-            disk.stroke()
-            glyph?.draw(in: circleRect.insetBy(dx: 7, dy: 7))
-            let labelRect = CGRect(x: (size.width - labelSize.width) / 2, y: circleRect.maxY + gap, width: labelSize.width, height: labelSize.height)
-            // The white halo of the venue style's labels, then the text.
-            text.draw(with: labelRect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
-                      attributes: [.font: font, .paragraphStyle: paragraph, .strokeColor: UIColor.white, .strokeWidth: 6], context: nil)
-            text.draw(with: labelRect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
-                      attributes: [.font: font, .paragraphStyle: paragraph, .foregroundColor: ink], context: nil)
+        let (fill, outline, outlineWidth, text): (UIColor, UIColor, CGFloat, UIColor) = switch style {
+        case .destination: (red, .white, 2, .white)
+        case .visited: (.white, red, 2, ink)
+        case .standard: (.white, ink, 1.5, ink)
         }
-    }
-
-    /// The destination gallery's red pill: 30 pt high, the title in white.
-    private static func galleryPill(name: String, red: UIColor) -> UIImage {
         let font = UIFont(name: "GuggenheimSansDisplay-SemiBold", size: 14) ?? .systemFont(ofSize: 14, weight: .semibold)
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
-        let text = name as NSString
-        let textSize = text.size(withAttributes: attributes)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: text]
+        let title = name as NSString
+        let textSize = title.size(withAttributes: attributes)
         let inset: CGFloat = 12, height: CGFloat = 30
         let textWidth = min(ceil(textSize.width), 220)
         let size = CGSize(width: inset + textWidth + inset + 2, height: height)
         return UIGraphicsImageRenderer(size: size).image { _ in
             let pill = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), cornerRadius: height / 2 - 1)
-            red.setFill()
+            fill.setFill()
             pill.fill()
-            UIColor.white.setStroke()
-            pill.lineWidth = 2
+            outline.setStroke()
+            pill.lineWidth = outlineWidth
             pill.stroke()
-            text.draw(with: CGRect(x: inset + 1, y: (height - ceil(textSize.height)) / 2, width: textWidth, height: ceil(textSize.height)),
-                      options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], attributes: attributes, context: nil)
+            title.draw(with: CGRect(x: inset + 1, y: (height - ceil(textSize.height)) / 2, width: textWidth, height: ceil(textSize.height)),
+                       options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], attributes: attributes, context: nil)
         }
     }
 

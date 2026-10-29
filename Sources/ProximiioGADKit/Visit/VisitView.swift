@@ -63,6 +63,8 @@ struct VisitView: View {
     /// The POI of the gallery the visitor is in, which the map does not draw (PM, Monday "Navigation
     /// to a gallery", 2026-10-26).
     @State private var visitorGalleryPlaceID: String?
+    /// The ride whose end floor the map shows after the lift or stairs view (`holdFloor(of:)`).
+    @State private var rideFloor: FloorWithoutPositioningGuide.Change?
     /// The lift or stairs view of a ride to a floor with positioning (PM, Monday "Elevator/Staircase
     /// animation", 2026-10-28: at every ride).
     @State private var ride: FloorWithoutPositioningGuide.Change?
@@ -438,7 +440,10 @@ struct VisitView: View {
             .onChange(of: controller.session.position == nil) { _, hasNoPosition in
                 if !hasNoPosition { recentre(reason: "first position") }
             }
-            .followsVisitorFloor(controller.session, venue: venue, isPaused: floorGuide.isActive)
+            .followsVisitorFloor(controller.session, venue: venue, isPaused: floorGuide.isActive || rideFloor != nil)
+            .onChange(of: ride) { shown, now in
+                if now == nil, let shown { holdFloor(of: shown) }
+            }
             .onReceive(controller.session.$guidance) { _ in
                 Task { @MainActor in
                     refreshConnector()
@@ -464,6 +469,7 @@ struct VisitView: View {
                     controller.checkCloserArtwork()
                     controller.checkWrongFloor(isFloorGuideActive: floorGuide.isActive)
                     updateVisitorGallery(controller.session.position)
+                    releaseRideFloor(controller.session.position)
                     if let fix = controller.session.position { floorGuide.positionReceived(at: fix.timestamp) }
                 }
             }
@@ -582,7 +588,6 @@ struct VisitView: View {
         let scale = UIScreen.main.scale
         amenityIcons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
                                   uniquingKeysWith: { first, _ in first })
-        mapLayers.updateGalleryIcons(amenityIcons)
         controller.artworkRemoteIDs = Dictionary(
             places.compactMap { place in place.remoteID.map { (place.id, $0) } },
             uniquingKeysWith: { first, _ in first }
@@ -629,14 +634,12 @@ struct VisitView: View {
         FieldLog.log("gallery first: \(gallery.map { "route ends at \($0.gallery.name)" } ?? "route ends at the artwork")")
     }
 
-    /// The features the map does not draw: the artworks and level changers (`hiddenFeatureIDs`), the
-    /// POIs of the gallery the leg ends at and of the visited galleries (their markers take their
-    /// place) and the POI of the gallery the visitor is in.
+    /// The features the map does not draw: the artworks and level changers (`hiddenFeatureIDs`) and
+    /// the galleries' POIs, whose names `galleryMarkers` draws.
     private func applyHiddenFeatures() {
         var hidden = hiddenFeatureIDs
+        hidden.formUnion(galleryDestinations.map(\.placeID))
         if let gallery = controller.galleryAhead { hidden.insert(gallery.placeID) }
-        if let visitorGalleryPlaceID { hidden.insert(visitorGalleryPlaceID) }
-        hidden.formUnion(visitedGalleryPOIs.map(\.placeID))
         if controller.session.hiddenFeatureIDs != hidden { controller.session.hiddenFeatureIDs = hidden }
     }
 
@@ -658,23 +661,19 @@ struct VisitView: View {
         })
     }
 
-    /// The POIs of the visited galleries, other than the gallery the leg ends at and the gallery the
-    /// visitor is in.
-    private var visitedGalleryPOIs: [GalleryDestination] {
-        let visited = galleries.filter { visitedGalleryIDs.contains($0.id) }
-        guard !visited.isEmpty else { return [] }
-        return galleryDestinations.filter { destination in
-            destination.placeID != controller.galleryAhead?.placeID && destination.placeID != visitorGalleryPlaceID
-                && visited.contains { $0.id == destination.shown.id || $0.contains(destination.entry, level: destination.gallery.level) }
+    /// Each gallery's name at its POI, but not the gallery the visitor is in (PM, Monday "Navigation
+    /// to a gallery", 2026-10-26). In a personalised journey the gallery the leg ends at is the
+    /// destination and a visited gallery is visited; a curated tour shows every name in the standard
+    /// style (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
+    private var galleryMarkers: [JourneyMapLayers.GalleryMarker] {
+        let visited = kind.guidesToGalleryFirst ? galleries.filter { visitedGalleryIDs.contains($0.id) } : []
+        let ahead = kind.guidesToGalleryFirst ? controller.galleryAhead?.placeID : nil
+        return galleryDestinations.filter { $0.placeID != visitorGalleryPlaceID }.map { destination in
+            let isVisited = visited.contains { $0.id == destination.shown.id || $0.contains(destination.entry, level: destination.gallery.level) }
+            let style: JourneyMapLayers.GalleryMarker.Style = destination.placeID == ahead ? .destination : isVisited ? .visited : .standard
+            return JourneyMapLayers.GalleryMarker(coordinate: destination.entry, level: destination.gallery.level,
+                                                  name: destination.gallery.name, style: style)
         }
-    }
-
-    /// The marker of a gallery at its POI, with the icon of the POI's amenity.
-    private func galleryMarker(_ destination: GalleryDestination, isDestination: Bool) -> JourneyMapLayers.GalleryMarker {
-        JourneyMapLayers.GalleryMarker(
-            coordinate: destination.entry, level: destination.gallery.level, name: destination.gallery.name,
-            amenityID: places.first { $0.id == destination.placeID }?.amenityID, isDestination: isDestination
-        )
     }
 
     /// The numbered stop markers. With gallery first they are hidden while the leg ends at a
@@ -738,6 +737,27 @@ struct VisitView: View {
         }
     }
 
+    /// After the lift or stairs view the map shows the floor the ride ends on, and keeps it while the
+    /// visitor's fixes are still on the ride's floor near the lift or stairs (PM, Monday
+    /// "Elevator/Staircase animation", 2026-10-28). The lifts and stairs are privacy zones: during
+    /// the ride the dot is hidden.
+    private func holdFloor(of change: FloorWithoutPositioningGuide.Change) {
+        rideFloor = change
+        controller.session.select(floor: FloorKey(level: Double(change.level)))
+        FieldLog.log("ride: map shows L\(change.level) until a fix off L\(change.from) or \(Int(settings.rideFloorHoldMeters)) m from the \(change.featureType)")
+    }
+
+    /// Follows the visitor's floor again after `holdFloor(of:)` on a fix that ends it.
+    private func releaseRideFloor(_ position: VenuePosition?) {
+        guard let change = rideFloor, let position,
+              FloorWithoutPositioningGuide.releasesRideFloor(change, coordinate: position.coordinate, level: position.floor?.level,
+                                                             meters: settings.rideFloorHoldMeters)
+        else { return }
+        rideFloor = nil
+        FieldLog.log("ride: map follows the visitor again, fix on L\(position.floor.map { "\(Int($0.level))" } ?? "?")")
+        controller.session.followMyFloor()
+    }
+
     /// Reports `stopNearby` once per stop.
     private func checkStopNearby(position: VenuePosition?, guidance: RouteGuidance?) {
         if let stop = stopNearby.update(position: position, stop: controller.navigator.activeStop, guidance: guidance) {
@@ -750,17 +770,22 @@ struct VisitView: View {
         let active = controller.navigator.activeStop
         let destination = active.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries) }
         let visited = visitedGalleryIDs
+        // The gallery the visitor is in has no destination fill: the venue's own gallery colour, under
+        // the artworks and furniture, with the artwork numbers (PM, Monday "Navigation to a gallery",
+        // 2026-10-28).
+        let visitorGallery = galleryDestinations.first { $0.placeID == visitorGalleryPlaceID }?.shown.id
         // Gallery first: the outline of the gallery geofence the leg ends at, in place of the
         // outline that holds the artwork.
         let galleryAhead = controller.galleryAhead
         var fills = galleries.compactMap { gallery -> JourneyMapLayers.GalleryFill? in
-            if gallery.id == destination?.id, galleryAhead == nil { return .init(gallery: gallery, isDestination: true) }
+            if gallery.id == destination?.id, galleryAhead == nil {
+                return gallery.id == visitorGallery ? nil : .init(gallery: gallery, isDestination: true)
+            }
             return visited.contains(gallery.id) ? .init(gallery: gallery, isDestination: false) : nil
         }
         if let galleryAhead { fills.append(.init(gallery: galleryAhead.shown, isDestination: true)) }
         mapLayers.update(fills: fills, level: controller.session.selectedFloor.level)
-        mapLayers.updateGalleryMarkers(visitedGalleryPOIs.map { galleryMarker($0, isDestination: false) }
-            + (galleryAhead.map { [galleryMarker($0, isDestination: true)] } ?? []))
+        mapLayers.updateGalleryMarkers(galleryMarkers)
         applyHiddenFeatures()
     }
 
