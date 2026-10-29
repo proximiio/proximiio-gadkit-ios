@@ -48,10 +48,12 @@ struct ConeShading {
     static let edgeOpacity: CGFloat = 0.18
     /// The visible width of the white edge inside the outline: half the design's 3.2 px line.
     static let edgeMeters: Double = 0.34
-    /// The outline of the design: 1.28 pt, #95A6B5 at 48 % opacity.
+    /// The outline of the design: #95A6B5 at 48 % opacity, a hairline. The kiosk's 1.28 px on its
+    /// 2160 px screen is about 0.2 m; the map draws it 0.3 pt wide at zoom 16, 0.6 pt at 19 and
+    /// 1.2 pt at 21 (the user's comparison of 2026-10-29: 1.28 pt was far too strong).
     static let outlineColor: UInt32 = 0x95A6B5
     static let outlineOpacity: Double = 0.48
-    static let outlineWidth: Double = 1.28
+    static let outlineWidths: [Double: Double] = [16: 0.3, 19: 0.6, 21: 1.2]
 
     /// Draws `cone` at `pixelsPerMeter`, at most `maxPixels` on the longer side. `nil` for a cone
     /// without an area.

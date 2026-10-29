@@ -957,6 +957,16 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.22.2 (2026-10-29)
+
+No change for host apps' code.
+
+Changed:
+
+- The cones' outline is a hairline, as in the Figma kiosk: 0.3 pt at zoom 16, 0.6 pt at 19 and 1.2 pt
+  at 21 (1.22.1: 1.28 pt at every zoom, far stronger than the design; the user's comparison of
+  2026-10-29).
+
 ### 1.22.1 (2026-10-29)
 
 No change for host apps' code.

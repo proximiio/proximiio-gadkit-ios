@@ -381,7 +381,10 @@ final class JourneyMapLayers {
         guard let outline = style.layer(withIdentifier: Self.coneOutlineLayer) as? MLNLineStyleLayer else { return }
         outline.lineColor = NSExpression(forConstantValue: UIColor(hex: ConeShading.outlineColor))
         outline.lineOpacity = NSExpression(forConstantValue: ConeShading.outlineOpacity)
-        outline.lineWidth = NSExpression(forConstantValue: ConeShading.outlineWidth)
+        outline.lineWidth = NSExpression(
+            format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)",
+            ConeShading.outlineWidths as NSDictionary
+        )
     }
 
     /// Shows the cones of the shown floor and hides the others. A cone's image, source and layer are
