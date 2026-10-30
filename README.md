@@ -1011,6 +1011,19 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.31.1 (2026-10-30)
+
+No change for host apps' code.
+
+Fixed:
+
+- A visitor who reaches an artwork while already in the next artwork's gallery got the leg to the next
+  artwork routed again at the first position after the exit. That leg already ends at the next artwork, so it
+  is kept. The same happened in 1.29.0 and 1.30.x after every move to an artwork in the visitor's gallery.
+- A visitor who reaches an artwork outside the next artwork's gallery sees the leg to that gallery, as gallery
+  first draws it. After the exit, inside the gallery, the leg is routed to the artwork (field log:
+  `gallery first: in … · leg to …` right after `artwork left`). This is unchanged.
+
 ### 1.31.0 (2026-10-30)
 
 No change for host apps' code. `proximiio-map-ios-binary` 6.0.0-beta.60 (SDK 6.0.0-beta.68 unchanged). A

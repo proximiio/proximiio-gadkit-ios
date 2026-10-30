@@ -372,6 +372,13 @@ final class VisitController: ObservableObject {
                 self.navigator.drawsNextLegWhileReached = true
                 guard await self.navigator.markReached(stopID: id) else { return }
                 self.reachedStopID = id
+                // A next leg from inside the next artwork's gallery ends at the artwork. Without the mark,
+                // `checkGalleryFirst` routed that leg again at the first fix after the exit.
+                if let next = self.navigator.upcomingStop, let gallery = self.galleryRouting.gallery(of: next.coordinate),
+                   let position = self.session.position,
+                   gallery.gallery.contains(position.coordinate.proximiio, level: position.floor?.level) {
+                    self.galleryRouting.markReached(next.coordinate)
+                }
                 FieldLog.log("artwork reached: \(id) · route to \(self.navigator.upcomingStop?.title ?? "-")")
                 self.persist(self.navigator.journey)
             }
