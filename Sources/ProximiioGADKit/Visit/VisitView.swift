@@ -1128,99 +1128,105 @@ struct VisitView: View {
             .layoutPriority(1)
             Spacer()
             if !showsList {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 5) {
-                        GlassSquareButton(action: {
-                            floorGuide.leave()
-                            controller.session.followMyFloor()
-                            recentre(reason: "Centre on me")
-                            emit(.recentred)
-                        }) {
-                            GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)
+                // The buttons and the stop card keep their height; the amenity list takes the height
+                // that is left and scrolls (owner, iPhone SE, 2026-10-30: the card's title was cut to one
+                // line while the list was open).
+                VStack(spacing: 12) {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 5) {
+                            GlassSquareButton(action: {
+                                floorGuide.leave()
+                                controller.session.followMyFloor()
+                                recentre(reason: "Centre on me")
+                                emit(.recentred)
+                            }) {
+                                GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)
+                            }
+                            .accessibilityLabel(Text("Centre on me", bundle: .localized))
+                            AccessibleRoutesButton(isOn: $accessibleRoutes) { emit(.accessibleRoutesChanged($0)) }
+                            // The shown floor, a label and no button (PM, Monday "Current level button",
+                            // 2026-10-28).
+                            Text(GuidanceText.floorLabel(controller.session.selectedFloor.level))
+                                .textStyle(.largeBodyBold)
+                                .foregroundStyle(Palette.ink)
+                                .frame(width: 50, height: 50)
+                                .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .localized))
+                                .accessibilityIdentifier("visitFloor")
                         }
-                        .accessibilityLabel(Text("Centre on me", bundle: .localized))
-                        AccessibleRoutesButton(isOn: $accessibleRoutes) { emit(.accessibleRoutesChanged($0)) }
-                        // The shown floor, a label and no button (PM, Monday "Current level button",
-                        // 2026-10-28).
-                        Text(GuidanceText.floorLabel(controller.session.selectedFloor.level))
-                            .textStyle(.largeBodyBold)
-                            .foregroundStyle(Palette.ink)
-                            .frame(width: 50, height: 50)
-                            .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .localized))
-                            .accessibilityIdentifier("visitFloor")
+                    }
+                    if let place = selectedAmenity {
+                        // During a journey "Add a stop" starts the detour at once (PM, Monday "Add stop
+                        // confirmation", 2026-10-26: no second confirmation), and the map goes back to
+                        // the visitor (Monday "Adding amenity -> focus back on my location", 2026-10-27).
+                        PlaceInfoCard(
+                            title: place.title,
+                            subtitle: place.cardSubtitle,
+                            primary: hasStops ? "Add a stop" : "Go here",
+                            onPrimary: {
+                                selectedAmenity = nil
+                                if !hasStops {
+                                    Task { await route(to: place) }
+                                } else {
+                                    Task { await controller.detour(to: place) }
+                                    emit(.detourStarted(place))
+                                    // The host app's pause control shows the journey paused, and its
+                                    // resume is "Resume your Journey" (Nagarro, 2026-10-30).
+                                    detourPausesJourney = true
+                                    setPaused(true)
+                                    emit(.journeyPaused)
+                                    controller.session.followMyFloor()
+                                    recentre(reason: "stop added")
+                                }
+                            },
+                            onClose: { selectedAmenity = nil }
+                        )
+                    } else if let place = routedAmenity {
+                        PlaceInfoCard(
+                            title: place.title,
+                            subtitle: amenityRouteError ?? place.cardSubtitle,
+                            primary: "Close",
+                            onPrimary: endAmenityRoute
+                        )
+                    } else if showsOffRouteCard {
+                        // PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-26.
+                        PlaceInfoCard(
+                            title: String(localized: "Looks like you’ve left your route", bundle: .localized),
+                            subtitle: offRouteText,
+                            primary: "Dismiss",
+                            onPrimary: { controller.dismissOffRoute() }
+                        )
+                    } else if hasStops {
+                        VisitCard(
+                            navigator: controller.navigator,
+                            session: controller.session,
+                            galleries: galleries,
+                            galleryAhead: controller.galleryAhead?.gallery,
+                            galleryIcon: controller.galleryAhead
+                                .flatMap { ahead in places.first { $0.id == ahead.placeID }?.amenityID }
+                                .flatMap { amenityIcons[$0] },
+                            places: places,
+                            isOnFloorWithoutPositioning: floorGuide.isActive,
+                            returningToLevel: returningToLevel,
+                            pausedText: controller.isPaused ? nextStopText ?? "" : nil,
+                            onResumeFromPause: {
+                                // A detour added during the pause keeps the journey paused.
+                                setPaused(detourPausesJourney)
+                                Task { await controller.resumeFromPause() }
+                                emit(.journeyResumed)
+                            },
+                            onResume: {
+                                detourPausesJourney = false
+                                setPaused(false)
+                                resumeJourney()
+                                emit(.journeyResumed)
+                            }
+                        )
                     }
                 }
-                if let place = selectedAmenity {
-                    // During a journey "Add a stop" starts the detour at once (PM, Monday "Add stop
-                    // confirmation", 2026-10-26: no second confirmation), and the map goes back to
-                    // the visitor (Monday "Adding amenity -> focus back on my location", 2026-10-27).
-                    PlaceInfoCard(
-                        title: place.title,
-                        subtitle: place.cardSubtitle,
-                        primary: hasStops ? "Add a stop" : "Go here",
-                        onPrimary: {
-                            selectedAmenity = nil
-                            if !hasStops {
-                                Task { await route(to: place) }
-                            } else {
-                                Task { await controller.detour(to: place) }
-                                emit(.detourStarted(place))
-                                // The host app's pause control shows the journey paused, and its
-                                // resume is "Resume your Journey" (Nagarro, 2026-10-30).
-                                detourPausesJourney = true
-                                setPaused(true)
-                                emit(.journeyPaused)
-                                controller.session.followMyFloor()
-                                recentre(reason: "stop added")
-                            }
-                        },
-                        onClose: { selectedAmenity = nil }
-                    )
-                } else if let place = routedAmenity {
-                    PlaceInfoCard(
-                        title: place.title,
-                        subtitle: amenityRouteError ?? place.cardSubtitle,
-                        primary: "Close",
-                        onPrimary: endAmenityRoute
-                    )
-                } else if showsOffRouteCard {
-                    // PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-26.
-                    PlaceInfoCard(
-                        title: String(localized: "Looks like you’ve left your route", bundle: .localized),
-                        subtitle: offRouteText,
-                        primary: "Dismiss",
-                        onPrimary: { controller.dismissOffRoute() }
-                    )
-                } else if hasStops {
-                    VisitCard(
-                        navigator: controller.navigator,
-                        session: controller.session,
-                        galleries: galleries,
-                        galleryAhead: controller.galleryAhead?.gallery,
-                        galleryIcon: controller.galleryAhead
-                            .flatMap { ahead in places.first { $0.id == ahead.placeID }?.amenityID }
-                            .flatMap { amenityIcons[$0] },
-                        places: places,
-                        isOnFloorWithoutPositioning: floorGuide.isActive,
-                        returningToLevel: returningToLevel,
-                        pausedText: controller.isPaused ? nextStopText ?? "" : nil,
-                        onResumeFromPause: {
-                            // A detour added during the pause keeps the journey paused.
-                            setPaused(detourPausesJourney)
-                            Task { await controller.resumeFromPause() }
-                            emit(.journeyResumed)
-                        },
-                        onResume: {
-                            detourPausesJourney = false
-                            setPaused(false)
-                            resumeJourney()
-                            emit(.journeyResumed)
-                        }
-                    )
-                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal, 21)

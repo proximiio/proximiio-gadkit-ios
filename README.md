@@ -1011,6 +1011,17 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.31.2 (2026-10-30)
+
+No change for host apps' code.
+
+Fixed (owner, iPhone SE, 2026-10-30):
+
+- On a small screen the open amenity list made the stop card lower: a title on two lines, such as "Take the
+  stairs to level 2", was cut to one line. The buttons and the stop card now keep their height, on the journey
+  map and on the museum map. The amenity list takes the height that is left and scrolls.
+- UI test `AddStopUITests.testTheAmenityListLeavesTheStopCardsHeight` (iPhone SE simulator).
+
 ### 1.31.1 (2026-10-30)
 
 No change for host apps' code.

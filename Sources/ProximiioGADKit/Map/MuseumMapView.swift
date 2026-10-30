@@ -182,51 +182,56 @@ struct MuseumMapView: View {
             // A long amenity list takes the free height before the spacer; it scrolls past that.
             .layoutPriority(1)
             Spacer()
-            HStack(alignment: .bottom) {
-                Spacer()
-                VStack(spacing: 5) {
-                    GlassSquareButton(action: { floorGuide.leave(); session.followMyFloor(); session.recentre() }) {
-                        GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)
+            // The buttons and the cards keep their height; the amenity list takes the height that is
+            // left and scrolls (owner, iPhone SE, 2026-10-30).
+            VStack(spacing: 10) {
+                HStack(alignment: .bottom) {
+                    Spacer()
+                    VStack(spacing: 5) {
+                        GlassSquareButton(action: { floorGuide.leave(); session.followMyFloor(); session.recentre() }) {
+                            GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)
+                        }
+                        .disabled(session.position == nil)
+                        .accessibilityLabel(Text("Centre on me", bundle: .localized))
+                        AccessibleRoutesButton(isOn: $accessibleRoutes)
+                        floorButton
                     }
-                    .disabled(session.position == nil)
-                    .accessibilityLabel(Text("Centre on me", bundle: .localized))
-                    AccessibleRoutesButton(isOn: $accessibleRoutes)
-                    floorButton
+                }
+                if let destination {
+                    StopInfoCard(
+                        caption: "NEXT STOP",
+                        title: destination.title,
+                        instruction: routeError ?? instruction,
+                        remaining: remainingText
+                    ) {
+                        destinationIcon(for: destination)
+                    } trailing: {
+                        Button(action: endRoute) {
+                            Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
+                                .frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel(Text("End route", bundle: .localized))
+                    } badges: {
+                        EmptyView()
+                    }
+                    if session.guidance?.isOffRoute == true && session.guidance?.hasArrived == false && !floorGuide.isActive {
+                        Button(String(localized: "New route from here", bundle: .localized)) { Task { await route(to: destination) } }
+                            .buttonStyle(.small)
+                    }
+                } else if let place = selectedPlace {
+                    PlaceInfoCard(
+                        title: place.title,
+                        subtitle: placeSubtitle(place),
+                        primary: "Go here",
+                        onPrimary: {
+                            selectedPlace = nil
+                            Task { await route(to: place) }
+                        },
+                        onClose: { selectedPlace = nil }
+                    )
                 }
             }
-            if let destination {
-                StopInfoCard(
-                    caption: "NEXT STOP",
-                    title: destination.title,
-                    instruction: routeError ?? instruction,
-                    remaining: remainingText
-                ) {
-                    destinationIcon(for: destination)
-                } trailing: {
-                    Button(action: endRoute) {
-                        Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel(Text("End route", bundle: .localized))
-                } badges: {
-                    EmptyView()
-                }
-                if session.guidance?.isOffRoute == true && session.guidance?.hasArrived == false && !floorGuide.isActive {
-                    Button(String(localized: "New route from here", bundle: .localized)) { Task { await route(to: destination) } }
-                        .buttonStyle(.small)
-                }
-            } else if let place = selectedPlace {
-                PlaceInfoCard(
-                    title: place.title,
-                    subtitle: placeSubtitle(place),
-                    primary: "Go here",
-                    onPrimary: {
-                        selectedPlace = nil
-                        Task { await route(to: place) }
-                    },
-                    onClose: { selectedPlace = nil }
-                )
-            }
+            .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
