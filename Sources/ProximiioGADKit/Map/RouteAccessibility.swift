@@ -102,8 +102,8 @@ struct AccessibleRoutesButton: View {
         // On, and while pressed: a black outline, no colour (RPR, Monday "Accessible routing" and
         // "Buttons to have black border when pressed", 2026-10-28).
         .buttonStyle(SquareGlassButtonStyle(isSelected: isOn))
-        .accessibilityLabel(Text("Accessible routes", bundle: .module))
-        .accessibilityValue(isOn ? Text("On", bundle: .module) : Text("Off", bundle: .module))
+        .accessibilityLabel(Text("Accessible routes", bundle: .localized))
+        .accessibilityValue(isOn ? Text("On", bundle: .localized) : Text("Off", bundle: .localized))
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

@@ -45,7 +45,7 @@ final class VisitLiveActivity {
         } else {
             do {
                 activityID = try Activity.request(
-                    attributes: VisitActivityAttributes(journeyTitle: String(localized: "Your journey", bundle: .module)),
+                    attributes: VisitActivityAttributes(journeyTitle: String(localized: "Your journey", bundle: .localized)),
                     content: content
                 ).id
             } catch {
@@ -83,18 +83,18 @@ final class VisitLiveActivity {
         let numbers = VisitPlan.numbers(for: journey)
         let total = numbers.count
         let progress = activeStopID.flatMap { numbers[$0] }
-            .map { String(localized: "Stop \($0) of \(total)", bundle: .module) } ?? String(localized: "\(total) stops", bundle: .module)
+            .map { String(localized: "Stop \($0) of \(total)", bundle: .localized) } ?? String(localized: "\(total) stops", bundle: .localized)
         switch card {
         case .starting:
-            return .init(title: String(localized: "Your journey", bundle: .module), progress: progress, instruction: "", level: "", isFinished: false)
+            return .init(title: String(localized: "Your journey", bundle: .localized), progress: progress, instruction: "", level: "", isFinished: false)
         case .walking(let stop):
             return .init(title: stop, progress: progress, instruction: instruction ?? "", level: "", isFinished: false)
         case .nextStopOnOtherLevel(let stop, let level):
             return .init(title: stop, progress: progress, instruction: instruction ?? "", level: "L\(level)", isFinished: false)
         case .atStop(let stop):
-            return .init(title: stop, progress: progress, instruction: String(localized: "You have arrived", bundle: .module), level: "", isFinished: false)
+            return .init(title: stop, progress: progress, instruction: String(localized: "You have arrived", bundle: .localized), level: "", isFinished: false)
         case .finished:
-            return .init(title: String(localized: "Journey complete", bundle: .module), progress: String(localized: "\(total) stops", bundle: .module), instruction: "", level: "", isFinished: true)
+            return .init(title: String(localized: "Journey complete", bundle: .localized), progress: String(localized: "\(total) stops", bundle: .localized), instruction: "", level: "", isFinished: true)
         }
     }
 }

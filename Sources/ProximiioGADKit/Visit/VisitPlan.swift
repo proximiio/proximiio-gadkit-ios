@@ -212,7 +212,7 @@ struct VisitMeta: Codable, Equatable, Sendable {
     }
 
     static func standard(stopCount: Int, kind: JourneyKind = .personalised) -> VisitMeta {
-        VisitMeta(title: String(localized: "Your journey", bundle: .module), summary: String(localized: "\(stopCount) stops", bundle: .module), kind: kind)
+        VisitMeta(title: String(localized: "Your journey", bundle: .localized), summary: String(localized: "\(stopCount) stops", bundle: .localized), kind: kind)
     }
 }
 

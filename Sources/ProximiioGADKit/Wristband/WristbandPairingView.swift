@@ -45,16 +45,16 @@ import SwiftUI
 
     private var intro: some View {
         PairingScreen(symbol: "qrcode.viewfinder", titleLight: "Connect", titleBold: "your wristband") {
-            Text("Your wristband tracks where you are in the galleries. Pair it now, or later when your journey begins.", bundle: .module)
+            Text("Your wristband tracks where you are in the galleries. Pair it now, or later when your journey begins.", bundle: .localized)
         } actions: {
-            Button(String(localized: "Scan QR code", bundle: .module), action: pairing.startScanning).buttonStyle(.primary)
-            Button(String(localized: "Skip for now", bundle: .module), action: onFinish).buttonStyle(.textAction)
+            Button(String(localized: "Scan QR code", bundle: .localized), action: pairing.startScanning).buttonStyle(.primary)
+            Button(String(localized: "Skip for now", bundle: .localized), action: onFinish).buttonStyle(.textAction)
         }
     }
 
     private var looking: some View {
         PairingScreen(symbol: "dot.radiowaves.left.and.right", titleLight: "Looking for", titleBold: "your wristband", isPulsing: true) {
-            Text("This usually takes a few seconds.", bundle: .module)
+            Text("This usually takes a few seconds.", bundle: .localized)
         } actions: {
             EmptyView()
         }
@@ -62,10 +62,10 @@ import SwiftUI
 
     private func connected(_ label: String) -> some View {
         PairingScreen(symbol: "checkmark", titleLight: "Wristband", titleBold: "connected!") {
-            Text("Keep it on your wrist - the galleries will pick it up as you walk through.", bundle: .module)
+            Text("Keep it on your wrist - the galleries will pick it up as you walk through.", bundle: .localized)
             WristbandStatusCard(label: label, status: "Paired")
         } actions: {
-            Button(String(localized: "Continue", bundle: .module), action: onFinish).buttonStyle(.primary)
+            Button(String(localized: "Continue", bundle: .localized), action: onFinish).buttonStyle(.primary)
         }
     }
 
@@ -76,28 +76,28 @@ import SwiftUI
         return PairingScreen(symbol: "exclamationmark", titleLight: "We couldn’t connect", titleBold: "your wristband") {
             Text(message)
             if isRepeated {
-                Text("Please find a host that can help pair it for you.", bundle: .module)
+                Text("Please find a host that can help pair it for you.", bundle: .localized)
             }
         } actions: {
             if !isRepeated {
-                Button(String(localized: "Try again", bundle: .module)) { Task { await pairing.retry() } }.buttonStyle(.primary)
+                Button(String(localized: "Try again", bundle: .localized)) { Task { await pairing.retry() } }.buttonStyle(.primary)
             }
-            Button(String(localized: "Back to Hub", bundle: .module), action: onFinish).buttonStyle(.textAction)
+            Button(String(localized: "Back to Hub", bundle: .localized), action: onFinish).buttonStyle(.textAction)
         }
     }
 
     private var cameraDenied: some View {
         PairingScreen(symbol: "exclamationmark", titleLight: "Camera", titleBold: "permission denied") {
-            Text("Allow camera access in Settings to scan your wristband, or enter its code.", bundle: .module)
+            Text("Allow camera access in Settings to scan your wristband, or enter its code.", bundle: .localized)
         } actions: {
-            Button(String(localized: "Go to Settings", bundle: .module)) {
+            Button(String(localized: "Go to Settings", bundle: .localized)) {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
             .buttonStyle(.primary)
-            Button(String(localized: "Enter code manually", bundle: .module), action: pairing.enterCodeManually).buttonStyle(.textAction)
-            Button(String(localized: "Back to Hub", bundle: .module), action: onFinish).buttonStyle(.textAction)
+            Button(String(localized: "Enter code manually", bundle: .localized), action: pairing.enterCodeManually).buttonStyle(.textAction)
+            Button(String(localized: "Back to Hub", bundle: .localized), action: onFinish).buttonStyle(.textAction)
         }
     }
 }
@@ -123,8 +123,8 @@ private struct PairingScreen<Content: View, Actions: View>: View {
                 IconRing(symbol: symbol, isPulsing: isPulsing)
                 VStack(spacing: 20) {
                     VStack(spacing: 0) {
-                        Text(titleLight, bundle: .module).font(GADFonts.custom("GuggenheimSansDisplay-Regular", size: 32, relativeTo: .largeTitle))
-                        Text(titleBold, bundle: .module).font(GADFonts.custom("GuggenheimSansDisplay-Bold", size: 32, relativeTo: .largeTitle))
+                        Text(titleLight, bundle: .localized).font(GADFonts.custom("GuggenheimSansDisplay-Regular", size: 32, relativeTo: .largeTitle))
+                        Text(titleBold, bundle: .localized).font(GADFonts.custom("GuggenheimSansDisplay-Bold", size: 32, relativeTo: .largeTitle))
                     }
                     VStack(spacing: 16) { content }
                         .textStyle(.bodySmallRegular)
@@ -187,9 +187,9 @@ private struct WristbandStatusCard: View {
 
     var body: some View {
         HStack {
-            Text("Wristband \(label)", bundle: .module).textStyle(.bodySmallBold)
+            Text("Wristband \(label)", bundle: .localized).textStyle(.bodySmallBold)
             Spacer()
-            Text(status, bundle: .module).textStyle(.bodySmallRegular)
+            Text(status, bundle: .localized).textStyle(.bodySmallRegular)
         }
         .padding(20)
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1.5))
@@ -211,9 +211,9 @@ struct WristbandCodeEntryView: View {
         ZStack {
             AuroraBackground()
             VStack(alignment: .leading, spacing: 16) {
-                Text("Enter your wristband code", bundle: .module).textStyle(.h1Bold)
-                Text("The code is printed on the wristband.", bundle: .module).textStyle(.bodySmallRegular)
-                TextField(String(localized: "Wristband code", bundle: .module), text: $code)
+                Text("Enter your wristband code", bundle: .localized).textStyle(.h1Bold)
+                Text("The code is printed on the wristband.", bundle: .localized).textStyle(.bodySmallRegular)
+                TextField(String(localized: "Wristband code", bundle: .localized), text: $code)
                     .textStyle(.bodyMedium)
                     .keyboardType(.asciiCapable)
                     .textInputAutocapitalization(.characters)
@@ -229,10 +229,10 @@ struct WristbandCodeEntryView: View {
                     Text(message).textStyle(.bodyExtraSmall).foregroundStyle(Palette.errorLabel)
                 }
                 Spacer()
-                Button(String(localized: "Connect", bundle: .module)) { Task { await pairing.submit(code: code) } }
+                Button(String(localized: "Connect", bundle: .localized)) { Task { await pairing.submit(code: code) } }
                     .buttonStyle(.primary)
                     .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button(String(localized: "Cancel", bundle: .module), action: pairing.cancelScanning)
+                Button(String(localized: "Cancel", bundle: .localized), action: pairing.cancelScanning)
                     .buttonStyle(.textAction)
                     .frame(maxWidth: .infinity)
             }

@@ -29,16 +29,16 @@ struct MuseumMapScreen: View {
     /// The back button and the title, "Explore" bold and "Museum" regular.
     private var header: some View {
         ZStack {
-            (Text("Explore", bundle: .module).font(TextStyle.largeBodyBold.font)
+            (Text("Explore", bundle: .localized).font(TextStyle.largeBodyBold.font)
                 + Text(verbatim: " ")
-                + Text("Museum", bundle: .module).font(TextStyle.largeBodyRegular.font))
+                + Text("Museum", bundle: .localized).font(TextStyle.largeBodyRegular.font))
                 .accessibilityAddTraits(.isHeader)
             HStack {
                 Button(action: onBack) {
                     Image(systemName: "chevron.backward").font(.system(size: 14, weight: .medium))
                 }
                 .buttonStyle(.iconGlass)
-                .accessibilityLabel(Text("Back", bundle: .module))
+                .accessibilityLabel(Text("Back", bundle: .localized))
                 Spacer()
             }
         }

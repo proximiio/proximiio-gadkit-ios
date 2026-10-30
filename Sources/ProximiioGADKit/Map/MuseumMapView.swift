@@ -166,14 +166,14 @@ struct MuseumMapView: View {
                     GlassSquareButton(isSelected: isShowingAmenities, action: { withAnimation { isShowingAmenities.toggle() } }) {
                         GADIcon.search.image.resizable().scaledToFit().frame(width: 24, height: 24)
                     }
-                    .accessibilityLabel(Text("Search", bundle: .module))
+                    .accessibilityLabel(Text("Search", bundle: .localized))
                     if isShowingAmenities {
                         AmenityChipList(shortcuts: availableAmenities, selected: selectedAmenity) { kind in
                             selectedAmenity = kind
                             isShowingAmenities = false
                             routeToNearest(kind)
                         }
-                        Button(String(localized: "Search the museum", bundle: .module)) { isSearching = true }
+                        Button(String(localized: "Search the museum", bundle: .localized)) { isSearching = true }
                             .buttonStyle(.small)
                             .transition(.opacity)
                     }
@@ -189,7 +189,7 @@ struct MuseumMapView: View {
                         GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)
                     }
                     .disabled(session.position == nil)
-                    .accessibilityLabel(Text("Centre on me", bundle: .module))
+                    .accessibilityLabel(Text("Centre on me", bundle: .localized))
                     AccessibleRoutesButton(isOn: $accessibleRoutes)
                     floorButton
                 }
@@ -207,12 +207,12 @@ struct MuseumMapView: View {
                         Image(systemName: "xmark").font(.system(size: 14, weight: .semibold))
                             .frame(width: 44, height: 44)
                     }
-                    .accessibilityLabel(Text("End route", bundle: .module))
+                    .accessibilityLabel(Text("End route", bundle: .localized))
                 } badges: {
                     EmptyView()
                 }
                 if session.guidance?.isOffRoute == true && session.guidance?.hasArrived == false && !floorGuide.isActive {
-                    Button(String(localized: "New route from here", bundle: .module)) { Task { await route(to: destination) } }
+                    Button(String(localized: "New route from here", bundle: .localized)) { Task { await route(to: destination) } }
                         .buttonStyle(.small)
                 }
             } else if let place = selectedPlace {
@@ -238,7 +238,7 @@ struct MuseumMapView: View {
     /// Floor button ("L1", Bold 18). Lists the venue's floors; picking one pins the map to it.
     private var floorButton: some View {
         Menu {
-            Button(String(localized: "Follow my floor", bundle: .module)) {
+            Button(String(localized: "Follow my floor", bundle: .localized)) {
                 floorGuide.leave()
                 session.followMyFloor()
             }
@@ -253,13 +253,13 @@ struct MuseumMapView: View {
                 .frame(width: 50, height: 50)
                 .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
         }
-        .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(session.selectedFloor.level))", bundle: .module))
+        .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(session.selectedFloor.level))", bundle: .localized))
     }
 
     /// The route's next step. On a floor without positioning the guidance follows fixes from
     /// another floor, so the card says that the position is not shown.
     private var instruction: String? {
-        if floorGuide.isActive { return String(localized: "Your position is not shown on this level.", bundle: .module) }
+        if floorGuide.isActive { return String(localized: "Your position is not shown on this level.", bundle: .localized) }
         return session.guidance.map { GuidanceText.instruction(for: $0, markers: session.routeRenderer?.geometry?.markers ?? []) }
     }
 
@@ -315,7 +315,7 @@ struct MuseumMapView: View {
     private func route(to place: VenuePlace) async {
         destination = place
         guard let here = session.position else {
-            routeError = String(localized: "Waiting for your position.", bundle: .module)
+            routeError = String(localized: "Waiting for your position.", bundle: .localized)
             session.clearRoute()
             return
         }
@@ -339,9 +339,9 @@ struct MuseumMapView: View {
             #endif
             session.clearRoute()
             if case WayfindingRoutingError.noRoute(.noAccessibleRoute) = error {
-                routeError = String(localized: "No route from here with your accessibility settings.", bundle: .module)
+                routeError = String(localized: "No route from here with your accessibility settings.", bundle: .localized)
             } else {
-                routeError = String(localized: "No route from here.", bundle: .module)
+                routeError = String(localized: "No route from here.", bundle: .localized)
             }
         }
     }
@@ -374,11 +374,11 @@ private struct PlaceDetailSheet: View {
                     .padding(.bottom, 20)
                 }
                 Text(place.title).textStyle(.h1Bold)
-                Text(String(localized: "Level \(Int(place.level.rounded()))", bundle: .module)).textStyle(.caption).textCase(.uppercase)
+                Text(String(localized: "Level \(Int(place.level.rounded()))", bundle: .localized)).textStyle(.caption).textCase(.uppercase)
                 if let details = place.details {
                     Text(details).textStyle(.bodySmallRegular).padding(.top, 10)
                 }
-                Button(String(localized: "Guide Me", bundle: .module), action: onGuide).buttonStyle(.primary).padding(.top, 30)
+                Button(String(localized: "Guide Me", bundle: .localized), action: onGuide).buttonStyle(.primary).padding(.top, 30)
             }
             .foregroundStyle(Palette.ink)
             .padding(30)

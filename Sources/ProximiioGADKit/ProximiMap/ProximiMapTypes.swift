@@ -195,8 +195,9 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// `nil`.
     case destinationUnavailable(poiID: String, reason: ProximiDestination.Failure)
     /// "Add a stop" on an amenity: the journey waits while the visitor goes there, until "Resume
-    /// your Journey" (`journeyResumed`). Sent after `detourStarted`. A detour to the host app's
-    /// `destination` sends none.
+    /// your Journey" (`journeyResumed`) or the host app's `isPaused` `false`. Sent after
+    /// `detourStarted`; `ProximiMapView` sets `isPaused` to `true` before it. A detour to the host
+    /// app's `destination` sends none.
     case journeyPaused
     /// "Resume your Journey": after a detour, or on the card of a journey the host app paused
     /// (`ProximiMapView`'s `isPaused`, which the view then sets back to `false`).
@@ -243,11 +244,11 @@ public enum ProximiMapError: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .notStarted, .startFailed:
-            String(localized: "I couldn’t get things started. Check your connection and let’s try again.", bundle: .module)
+            String(localized: "I couldn’t get things started. Check your connection and let’s try again.", bundle: .localized)
         case .wristband(let message):
             message
         case .noKnownArtworks:
-            String(localized: "None of these artworks is on the museum map.", bundle: .module)
+            String(localized: "None of these artworks is on the museum map.", bundle: .localized)
         }
     }
 }

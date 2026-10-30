@@ -25,12 +25,12 @@ struct WristbandScannerView: View {
             if hasCameraAccess, DataScannerViewController.isSupported {
                 QRScanner(onScan: onScan).ignoresSafeArea()
             } else if !DataScannerViewController.isSupported {
-                Text("Scanning is not available on this device.", bundle: .module)
+                Text("Scanning is not available on this device.", bundle: .localized)
                     .textStyle(.bodyMedium)
                     .foregroundStyle(Palette.white)
             }
             VStack(spacing: 24) {
-                Text("Hold the QR code on the back of your wristband inside the frame", bundle: .module)
+                Text("Hold the QR code on the back of your wristband inside the frame", bundle: .localized)
                     .textStyle(.bodyMedium)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Palette.white)
@@ -41,10 +41,10 @@ struct WristbandScannerView: View {
                     .stroke(Palette.white.opacity(0.6), lineWidth: 1)
                     .frame(width: 260, height: 260)
                 Spacer()
-                Button(String(localized: "Enter code manually", bundle: .module), action: onEnterManually)
+                Button(String(localized: "Enter code manually", bundle: .localized), action: onEnterManually)
                     .buttonStyle(.textAction)
                     .foregroundStyle(Palette.white)
-                Button(String(localized: "Cancel", bundle: .module), action: onCancel)
+                Button(String(localized: "Cancel", bundle: .localized), action: onCancel)
                     .buttonStyle(.primary)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)

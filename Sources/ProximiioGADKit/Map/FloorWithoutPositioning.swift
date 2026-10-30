@@ -246,7 +246,7 @@ struct FloorChangeView: View {
                     .textStyle(.h1Bold)
                     .multilineTextAlignment(.center)
                 if showsNoPositionNote {
-                    Text("Your position is not shown on this level.", bundle: .module)
+                    Text("Your position is not shown on this level.", bundle: .localized)
                         .textStyle(.bodySmallRegular)
                         .multilineTextAlignment(.center)
                 }

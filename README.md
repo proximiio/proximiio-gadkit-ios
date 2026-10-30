@@ -68,6 +68,21 @@ The package ships English and Arabic strings. The host app also declares English
 (`CFBundleLocalizations`, or Known Regions in the project), so the language setting of the app applies
 to the package screens too.
 
+The package views show Arabic when the language is Arabic, else English. The language is:
+
+- the language of the `\.locale` the host app gives `ProximiMapView`, `ProximiExploreView` or the
+  screens of `.proximiMap(_:)`, when it is not the language the app started in;
+- else the first of the app's `AppleLanguages` (iOS Settings, or an app that sets it itself).
+
+A change applies at once, also to an open map: the package's texts, the layout direction of its views
+(right to left in Arabic) and the map labels. The host app needs no restart for the package views.
+
+```swift
+// A host app that switches its language with the SwiftUI environment:
+ProximiMapView(sdk: sdk, journey: $journey)
+    .environment(\.locale, Locale(identifier: language))   // "ar" or "en"
+```
+
 ### Fonts
 
 The package registers Guggenheim Sans Display for its screens. The host app lists no fonts.
@@ -382,11 +397,17 @@ isPaused = true
   no `offRoute`, `backOnRoute` or `positionUncertain`. The stop card
   shows "Journey paused", the next stop and "Resume your Journey".
 - On resume the leg is drawn again from the visitor. With `.progress` a personalised journey is
-  ordered again from the visitor first, as after a detour. A detour keeps its leg through a pause.
+  ordered again from the visitor first, as after a detour.
 - "Resume your Journey" on the card sets `isPaused` back to `false` and reports `journeyResumed`.
-- "Add a stop" on an amenity reports `journeyPaused` after `detourStarted`: the journey waits while
-  the visitor goes there. "Resume your Journey" on the detour's card reports `journeyResumed`.
-  `isPaused` does not change.
+- "Add a stop" on an amenity sets `isPaused` to `true` and reports `journeyPaused` after
+  `detourStarted`: the journey waits while the visitor goes there. The card shows the amenity and
+  "Resume your Journey", not "Journey paused".
+- After "Add a stop", the host app's `false` ends the detour as "Resume your Journey" on the detour's
+  card does. That button sets `isPaused` to `false` and reports `journeyResumed`. When the detour ends
+  otherwise, the view sets `isPaused` to `false`.
+- "Add a stop" while the host app has paused the journey: the card shows "Journey paused". Its resume,
+  on the card or by the host app, shows the detour's card, and the view sets `isPaused` to `true`
+  again until the detour ends.
 - A change of `isPaused` by the host app, and a detour to the host app's `destination`, report no
   event.
 
@@ -693,7 +714,7 @@ follow.
   its description (else a gallery's category) and its level; a line leads from the card to the place,
   drawn as a black dot in a ring with its title. The line follows the place when the visitor moves the
   map. With a gallery's card open, the other galleries are lighter. An amenity gets the same black dot.
-- The map labels follow `AppleLanguages` at once when the app changes it while it runs.
+- The texts and map labels follow a change of the app language at once (see [Languages](#languages)).
 - The design's About the Building and Collections tabs are not in the package: their content is not in
   the venue data.
 
@@ -725,7 +746,7 @@ position, search and routes.
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
 | `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Add a stop" on an amenity's card during a journey, or the host app's `destination`; the detour reached (`completed`) or left. |
 | `destinationUnavailable(poiID:reason:)` | `ProximiMapView` does not route to the host app's `destination`: `.unknownPlace`, `.noRoute` or `.noPosition`. `poiID` is the id the host app gave. The view sets the binding back to `nil`. |
-| `journeyPaused` | "Add a stop" on an amenity's card during a journey, after `detourStarted`: the journey waits for "Resume your Journey". |
+| `journeyPaused` | "Add a stop" on an amenity's card during a journey, after `detourStarted`: the journey waits for "Resume your Journey" or the host app's `isPaused` `false`. `isPaused` is `true` before it. |
 | `journeyResumed` | "Resume your Journey": after a detour, or on the card of a journey the host app paused (`ProximiMapView`'s `isPaused`). |
 | `offRoute(duration:)`, `backOnRoute` | The visitor has been off the route for `offRouteSeconds`; the visitor is on the route again. |
 | `journeyFinished` | Every stop is visited or skipped. Journey Complete shows with `ProximiMap` and with `ProximiMapView.Options.journeyComplete`. |
@@ -984,6 +1005,43 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.28.0 (2026-10-30)
+
+No change for host apps' code. `ProximiMapView` now writes `isPaused` on "Add a stop".
+
+Changed (Nagarro, 2026-10-30: after their play button the card still offered "Resume your Journey"):
+
+- "Add a stop" sets `isPaused` to `true` before `journeyPaused`. The card shows the amenity and "Resume your
+  Journey", not "Journey paused". The host app's `false` ends the detour as "Resume your Journey" does, and
+  the card shows the next stop. "Resume your Journey" on the detour's card, and a detour that ends otherwise,
+  set `isPaused` back to `false`. Before, a host app that set `isPaused` to `true` on `journeyPaused` got
+  "Journey paused", and its `false` left the detour's card with "Resume your Journey".
+- "Add a stop" while the host app has paused the journey: resuming the pause shows the detour's card, and
+  `isPaused` is `true` again until the detour ends.
+
+Changed (Nagarro, 2026-10-30: the language changed wrongly while the app ran):
+
+- The package's texts follow a change of the app language at once, also on an open map. Before, only the
+  map labels did; the texts changed at the next launch.
+- The language is the one of the `\.locale` the host app gives a package view, when it is not the language
+  the app started in, else the first of `AppleLanguages`. Before, the package read only `AppleLanguages`.
+- The package views' layout direction follows the language: right to left in Arabic.
+- Field log: `app language <ar|en> (host locale <id>)` or `(AppleLanguages)` on each change.
+
+Changed: the journey map screen is laid out as the Figma frame 10889:108085 (iPhone 17 Pro, 402 × 874 pt). Each
+value was measured on the simulator against the frame and is within 1 pt of it (owner, 2026-10-30: as close to
+the design as possible).
+
+- The map card starts 3 pt below the status bar (8 pt before). The bottom bar is 11.5 pt under the card (10 pt
+  before), 93.5 pt high (93 pt), and ends 21 pt into the bottom safe area (14 pt). The card is 691 pt high on the
+  iPhone 17 Pro (681 pt before).
+- The card has the design's shadow outside it (blur 50, y −3, 15 % black), and its 1 pt white stroke is outside
+  the card (inside before).
+- The controls in the card are 21 pt from its sides (20 pt before). The stop card is 23 pt above the card's bottom
+  edge (20 pt) and 12 pt under the compass, accessible routes and floor buttons (10 pt).
+- The stop card's instruction line is 18.5 pt high, as in the design; the card is 105.5 pt high (101 pt before).
+- The Map / List control keeps the style of the PM's 2026-10-28 frame (Monday "Native elements").
 
 ### 1.27.1 (2026-10-30)
 

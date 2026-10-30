@@ -38,7 +38,7 @@ struct VisitPlanPicker: View {
                         }
                         Spacer()
                         if let index = picked.firstIndex(of: place.id) {
-                            Text("\(index + 1)", bundle: .module)
+                            Text("\(index + 1)", bundle: .localized)
                                 .textStyle(.bodySmallBold)
                                 .frame(width: 28, height: 28)
                                 .background(Palette.ink, in: Circle())
@@ -49,12 +49,12 @@ struct VisitPlanPicker: View {
                 }
             }
             .searchable(text: $query)
-            .navigationTitle(Text("Plan your visit", bundle: .module))
+            .navigationTitle(Text("Plan your visit", bundle: .localized))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button(String(localized: "Cancel", bundle: .module), action: onCancel) }
+                ToolbarItem(placement: .cancellationAction) { Button(String(localized: "Cancel", bundle: .localized), action: onCancel) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "Start", bundle: .module)) { onStart(picked) }.disabled(picked.isEmpty)
+                    Button(String(localized: "Start", bundle: .localized)) { onStart(picked) }.disabled(picked.isEmpty)
                 }
             }
         }

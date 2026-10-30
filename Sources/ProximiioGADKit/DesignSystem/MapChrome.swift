@@ -72,7 +72,20 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
                 .padding(.top, 9)
                 .accessibilityHidden(true)
         }
-        .overlay(shape.strokeBorder(Palette.white, lineWidth: 1))
+        // A 1 pt white stroke outside the card, as in the design.
+        .overlay(shape.inset(by: -0.5).stroke(Palette.white, lineWidth: 1))
+        // The design's shadow (blur 50, y −3, 15 % black), only outside the card: Figma draws no
+        // shadow behind a translucent layer.
+        .background {
+            shape.fill(.black)
+                .shadow(color: .black.opacity(0.15), radius: 25, y: -3)
+                .mask {
+                    Rectangle().padding(-80)
+                        .overlay(shape.blendMode(.destinationOut))
+                        .compositingGroup()
+                }
+                .allowsHitTesting(false)
+        }
         .padding(.horizontal, 10)
     }
 
@@ -214,7 +227,7 @@ struct MapListToggle: View {
     }
 
     private func label(_ title: LocalizedStringKey) -> some View {
-        Text(title, bundle: .module)
+        Text(title, bundle: .localized)
             .textStyle(.largeBodyRegular)
             .foregroundStyle(Palette.ink)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -222,7 +235,7 @@ struct MapListToggle: View {
 
     private func accessibleButton(_ title: LocalizedStringKey, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title, bundle: .module).frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text(title, bundle: .localized).frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -349,7 +362,7 @@ struct StopInfoCard<Icon: View, Trailing: View, Badges: View>: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 4) {
-                    Text(caption, bundle: .module).textStyle(.caption).textCase(.uppercase)
+                    Text(caption, bundle: .localized).textStyle(.caption).textCase(.uppercase)
                     Spacer(minLength: 4)
                     badges
                 }
@@ -361,6 +374,8 @@ struct StopInfoCard<Icon: View, Trailing: View, Badges: View>: View {
                         if let remaining { Text(remaining).textStyle(.bodyExtraSmall) }
                         if instruction == nil && remaining == nil { Text(verbatim: " ").textStyle(.bodyExtraSmall).hidden() }
                     }
+                    // The line is 18.5 pt high in the design (Figma 10889:108085).
+                    .frame(minHeight: 18.5)
                 }
             }
             // The card has a fixed width in the design (339 of 402 pt); it never hugs the text.
@@ -392,9 +407,9 @@ struct PlaceInfoCard: View {
                 if !subtitle.isEmpty { Text(subtitle).textStyle(.bodySmallRegular) }
             }
             HStack(spacing: 10) {
-                Button(action: onPrimary) { Text(primary, bundle: .module) }.buttonStyle(CardGhostButtonStyle())
+                Button(action: onPrimary) { Text(primary, bundle: .localized) }.buttonStyle(CardGhostButtonStyle())
                 if let onClose {
-                    Button(String(localized: "Close", bundle: .module), action: onClose).buttonStyle(CardGhostButtonStyle())
+                    Button(String(localized: "Close", bundle: .localized), action: onClose).buttonStyle(CardGhostButtonStyle())
                 }
             }
         }
@@ -429,7 +444,7 @@ struct BottomGlassBar<Leading: View, Trailing: View>: View {
             trailing
         }
         .padding(.horizontal, 20)
-        .frame(height: 93)
+        .frame(height: 93.5)
         .glassSurface(Capsule(), shadow: false)
         .padding(.horizontal, 10)
     }

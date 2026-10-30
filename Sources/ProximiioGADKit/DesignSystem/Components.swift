@@ -19,7 +19,7 @@ struct StopNumberBadge: View {
     var emphasis: Emphasis = .normal
 
     var body: some View {
-        Text("\(number)", bundle: .module)
+        Text("\(number)", bundle: .localized)
             .textStyle(.bodyMedium)
             .foregroundStyle(emphasis == .filled ? Palette.white : Palette.ink)
             .frame(width: 34, height: 34)

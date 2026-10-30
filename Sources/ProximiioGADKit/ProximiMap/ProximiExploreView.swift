@@ -37,6 +37,7 @@ public struct ProximiExploreView: View {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .appLanguage()
         .task {
             if let venue {
                 // Back on screen. Follows the changes again if the SDK stopped in between.

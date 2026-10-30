@@ -24,14 +24,14 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .womensRestroom: String(localized: "Women’s restroom", bundle: .module)
-        case .mensRestroom: String(localized: "Men’s restroom", bundle: .module)
-        case .cafe: String(localized: "Café", bundle: .module)
-        case .helpDesk: String(localized: "Help Desk", bundle: .module)
-        case .prayerRoom: String(localized: "Prayer Room", bundle: .module)
-        case .stairs: String(localized: "Stairs", bundle: .module)
-        case .elevator: String(localized: "Elevator", bundle: .module)
-        case .museumShop: String(localized: "Museum Shop", bundle: .module)
+        case .womensRestroom: String(localized: "Women’s restroom", bundle: .localized)
+        case .mensRestroom: String(localized: "Men’s restroom", bundle: .localized)
+        case .cafe: String(localized: "Café", bundle: .localized)
+        case .helpDesk: String(localized: "Help Desk", bundle: .localized)
+        case .prayerRoom: String(localized: "Prayer Room", bundle: .localized)
+        case .stairs: String(localized: "Stairs", bundle: .localized)
+        case .elevator: String(localized: "Elevator", bundle: .localized)
+        case .museumShop: String(localized: "Museum Shop", bundle: .localized)
         }
     }
 
@@ -118,9 +118,9 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
 extension VenuePlace {
     /// "Amenity · Level 1" for an amenity, "Level 1" for other places.
     var cardSubtitle: String {
-        let level = String(localized: "Level \(Int(level.rounded()))", bundle: .module)
+        let level = String(localized: "Level \(Int(level.rounded()))", bundle: .localized)
         return AmenityKind.allCases.contains(where: { $0.matches(self) })
-            ? String(localized: "Amenity", bundle: .module) + " · " + level
+            ? String(localized: "Amenity", bundle: .localized) + " · " + level
             : level
     }
 }

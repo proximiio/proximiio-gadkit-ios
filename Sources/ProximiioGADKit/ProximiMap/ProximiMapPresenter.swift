@@ -28,9 +28,11 @@ struct ProximiMapPresenter: ViewModifier {
                 coverContent(cover)
                     .routeAccessibility(map.routeAccessibility)
                     .onVisitEvent { map.handle($0) }
+                    .appLanguage()
             }
             .sheet(item: $map.sheet, onDismiss: map.sheetDismissed) { sheet in
                 sheetContent(sheet)
+                    .appLanguage()
             }
     }
 
@@ -130,8 +132,9 @@ private struct JourneyReadyFlow: View {
 #if DEBUG
 /// `-hostedMap`: `ProximiMapView` on the app's SDK with the default options, as Nagarro's app uses
 /// it. This view is the host app: it skips a stop the visitor swiped, "Visited" marks the first
-/// pending stop visited, "Remove" removes the last stop, and "Host pause" / "Host resume" set
-/// `isPaused`. The lines at the top count the stop states of its journey, list the navigators it got
+/// pending stop visited, "Remove" removes the last stop, "Host pause" / "Host resume" set
+/// `isPaused`, "Locale ar" / "Locale en" set the view's `\.locale` and "Apple ar" / "Apple en" the
+/// app's `AppleLanguages`. The lines at the top count the stop states of its journey, list the navigators it got
 /// from `onNavigator` and the events of the last one, and show `isPaused` and the view's last events,
 /// for UI tests.
 private struct HostedMapCheck: View {
@@ -147,6 +150,9 @@ private struct HostedMapCheck: View {
     @State private var isPaused = false
     /// The names of the view's events, oldest first.
     @State private var viewEvents: [String] = []
+    /// The `\.locale` this host app gives the view ("Locale ar" / "Locale en"), or `nil` for its own.
+    @State private var hostLocale: Locale?
+    @Environment(\.locale) private var locale
 
     var body: some View {
         ProximiMapView(
@@ -171,6 +177,21 @@ private struct HostedMapCheck: View {
                 }
             }
         )
+        // As a host app's own view: its `\.locale`, and no package view around it.
+        .environment(\.locale, hostLocale ?? locale)
+        .environment(\.appliesAppLanguage, false)
+        .overlay(alignment: .bottom) {
+            // A host app that switches its language with `\.locale`, and one that sets
+            // `AppleLanguages`.
+            HStack {
+                Button("Locale ar") { hostLocale = Locale(identifier: "ar") }
+                Button("Locale en") { hostLocale = Locale(identifier: "en") }
+                Button("Apple ar") { UserDefaults.standard.set(["ar"], forKey: "AppleLanguages") }
+                Button("Apple en") { UserDefaults.standard.set(["en"], forKey: "AppleLanguages") }
+            }
+            .font(.caption2)
+            .environment(\.layoutDirection, .leftToRight)
+        }
         .overlay(alignment: .top) {
             VStack {
                 HStack {

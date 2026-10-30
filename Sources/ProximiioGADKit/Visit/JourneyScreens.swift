@@ -33,7 +33,7 @@ struct JourneyReadyView: View {
                 Spacer()
                 VStack(spacing: 15) {
                     // Figma 02.10A, and "CURATED" on the curated tour's start frame.
-                    Text(meta.kind == .curated ? "CURATED" : "YOUR PERSONALISED JOURNEY", bundle: .module).textStyle(.caption)
+                    Text(meta.kind == .curated ? "CURATED" : "YOUR PERSONALISED JOURNEY", bundle: .localized).textStyle(.caption)
                     Text(meta.title).font(GADFonts.custom("GuggenheimSansDisplay-SemiBold", size: 32, relativeTo: .largeTitle))
                     if let summary = meta.summary {
                         Text(summary).textStyle(.bodySmallRegular)
@@ -44,14 +44,14 @@ struct JourneyReadyView: View {
                 Spacer()
                 VStack(spacing: 28) {
                     if isAtMuseum {
-                        Button(String(localized: "Start the Journey", bundle: .module), action: onStart).buttonStyle(.primary)
+                        Button(String(localized: "Start the Journey", bundle: .localized), action: onStart).buttonStyle(.primary)
                     } else {
                         VStack(spacing: 10) {
-                            Button(String(localized: "Go to Museum", bundle: .module), action: onStart).buttonStyle(.primary)
-                            Text("It will be ready when you arrive at GAD", bundle: .module).textStyle(.bodyExtraSmall)
+                            Button(String(localized: "Go to Museum", bundle: .localized), action: onStart).buttonStyle(.primary)
+                            Text("It will be ready when you arrive at GAD", bundle: .localized).textStyle(.bodyExtraSmall)
                         }
                     }
-                    Button(String(localized: "Back to Hub", bundle: .module), action: onBack).buttonStyle(.textAction)
+                    Button(String(localized: "Back to Hub", bundle: .localized), action: onBack).buttonStyle(.textAction)
                 }
                 .frame(width: 322)
                 .padding(.bottom, 20)
@@ -90,19 +90,19 @@ struct ManageJourneySheet: View {
             Text(meta.title).textStyle(.h1Bold)
             if let summary = meta.summary { Text(summary).textStyle(.bodySmallRegular) }
             VStack(spacing: 12) {
-                Button(String(localized: "Edit stops", bundle: .module), action: onEdit).buttonStyle(.primary)
-                Button(String(localized: "Craft a new journey", bundle: .module), action: onCraftNew).buttonStyle(.primary)
+                Button(String(localized: "Edit stops", bundle: .localized), action: onEdit).buttonStyle(.primary)
+                Button(String(localized: "Craft a new journey", bundle: .localized), action: onCraftNew).buttonStyle(.primary)
                 if isConfirmingDelete {
-                    Button(String(localized: "Delete this journey", bundle: .module), role: .destructive, action: onDelete)
+                    Button(String(localized: "Delete this journey", bundle: .localized), role: .destructive, action: onDelete)
                         .buttonStyle(.primary)
                         .foregroundStyle(Palette.activeRed)
                 } else {
-                    Button(String(localized: "Delete journey", bundle: .module)) { withAnimation { isConfirmingDelete = true } }
+                    Button(String(localized: "Delete journey", bundle: .localized)) { withAnimation { isConfirmingDelete = true } }
                         .buttonStyle(.textAction)
                 }
             }
             .padding(.top, 20)
-            Button(String(localized: "Close", bundle: .module), action: onClose).buttonStyle(.textAction)
+            Button(String(localized: "Close", bundle: .localized), action: onClose).buttonStyle(.textAction)
         }
         .overlaySheetStyle()
     }
@@ -117,12 +117,12 @@ struct ExitConfirmationSheet: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Text("Leave the tour here", bundle: .module).textStyle(.h1Bold)
-            Text("You've visited \(visited) of \(total) stops. Your journey is saved.", bundle: .module)
+            Text("Leave the tour here", bundle: .localized).textStyle(.h1Bold)
+            Text("You've visited \(visited) of \(total) stops. Your journey is saved.", bundle: .localized)
                 .textStyle(.bodySmallRegular)
                 .padding(.bottom, 20)
-            Button(String(localized: "Leave the tour", bundle: .module), action: onLeave).buttonStyle(.primary)
-            Button(String(localized: "Carry on", bundle: .module), action: onCarryOn).buttonStyle(.textAction)
+            Button(String(localized: "Leave the tour", bundle: .localized), action: onLeave).buttonStyle(.primary)
+            Button(String(localized: "Carry on", bundle: .localized), action: onCarryOn).buttonStyle(.textAction)
         }
         .overlaySheetStyle()
     }
@@ -141,18 +141,18 @@ struct JourneyCompleteView: View {
             AuroraBackground(variant: .mint)
             VStack(spacing: 0) {
                 HStack {
-                    Text("Journey Complete", bundle: .module).textStyle(.bodyBold)
+                    Text("Journey Complete", bundle: .localized).textStyle(.bodyBold)
                     Spacer()
                     GlassSquareButton(action: onClose) {
                         Image(systemName: "xmark").font(.system(size: 18, weight: .regular))
                     }
-                    .accessibilityLabel(Text("Close", bundle: .module))
+                    .accessibilityLabel(Text("Close", bundle: .localized))
                 }
                 .padding(.horizontal, 30)
                 .padding(.top, 12)
                 VStack(spacing: 20) {
-                    Text("You've walked your route", bundle: .module).textStyle(.cardTitle)
-                    Text("Sculptural works exploring negative space and mass - six pieces, unfolding through the room.", bundle: .module)
+                    Text("You've walked your route", bundle: .localized).textStyle(.cardTitle)
+                    Text("Sculptural works exploring negative space and mass - six pieces, unfolding through the room.", bundle: .localized)
                         .textStyle(.bodyMedium)
                 }
                 .multilineTextAlignment(.center)
@@ -164,7 +164,7 @@ struct JourneyCompleteView: View {
                         Image(systemName: "map").font(.system(size: 18, weight: .medium))
                     }
                     .buttonStyle(RoundGlassButtonStyle())
-                    .accessibilityLabel(Text("Museum map", bundle: .module))
+                    .accessibilityLabel(Text("Museum map", bundle: .localized))
                 } trailing: {
                     EmptyView()
                 }
@@ -180,7 +180,7 @@ struct JourneyCompleteView: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
                 .foregroundStyle(Palette.ink)
-                .accessibilityLabel(Text("Back", bundle: .module))
+                .accessibilityLabel(Text("Back", bundle: .localized))
                 .padding(16)
             }
         }

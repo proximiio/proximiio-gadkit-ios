@@ -105,7 +105,7 @@ extension WristbandConnecting {
         let isTyped = step == .manualEntry
         if isTyped { enteredCode = label }
         guard !label.isEmpty else {
-            invalidCodeMessage = String(localized: "Enter the code printed on the wristband.", bundle: .module)
+            invalidCodeMessage = String(localized: "Enter the code printed on the wristband.", bundle: .localized)
             return
         }
         invalidCodeMessage = nil

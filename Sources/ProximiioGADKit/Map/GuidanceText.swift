@@ -17,19 +17,19 @@ enum GuidanceText {
     /// The instruction line, e.g. "Turn left in 50 m". `markers`: the route's level changes
     /// (`RouteGeometry.markers`), which give the floor a ride ends on (`rideEnd`).
     static func instruction(for guidance: RouteGuidance, markers: [RouteGeometry.Marker] = []) -> String {
-        if guidance.hasArrived { return String(localized: "You have arrived", bundle: .module) }
-        if guidance.isOffRoute { return String(localized: "You have left the route", bundle: .module) }
+        if guidance.hasArrived { return String(localized: "You have arrived", bundle: .localized) }
+        if guidance.isOffRoute { return String(localized: "You have left the route", bundle: .localized) }
         let metres = Int(guidance.distanceToManoeuvreMeters.rounded())
         switch guidance.manoeuvre?.kind {
-        case .turnLeft, .turnSharpLeft: return String(localized: "Turn left in \(metres) m", bundle: .module)
-        case .turnSlightLeft: return String(localized: "Bear left in \(metres) m", bundle: .module)
-        case .turnRight, .turnSharpRight: return String(localized: "Turn right in \(metres) m", bundle: .module)
-        case .turnSlightRight: return String(localized: "Bear right in \(metres) m", bundle: .module)
+        case .turnLeft, .turnSharpLeft: return String(localized: "Turn left in \(metres) m", bundle: .localized)
+        case .turnSlightLeft: return String(localized: "Bear left in \(metres) m", bundle: .localized)
+        case .turnRight, .turnSharpRight: return String(localized: "Turn right in \(metres) m", bundle: .localized)
+        case .turnSlightRight: return String(localized: "Bear right in \(metres) m", bundle: .localized)
         case .levelChange(let change):
             let level = rideEnd(featureType: change.featureType, coordinate: change.coordinate, from: change.fromLevel, to: change.toLevel, markers: markers)
             return rideText(featureType: change.featureType, level: level)
-        case .arrive: return String(localized: "Arrive in \(metres) m", bundle: .module)
-        default: return String(localized: "Head straight for \(metres) m", bundle: .module)
+        case .arrive: return String(localized: "Arrive in \(metres) m", bundle: .localized)
+        default: return String(localized: "Head straight for \(metres) m", bundle: .localized)
         }
     }
 
@@ -39,7 +39,7 @@ enum GuidanceText {
     /// route: "Go to level 4". Pure; covered by tests.
     static func levelChangeTitle(markers: [RouteGeometry.Marker], visitorLevel: Double?, stopLevel: Int) -> String {
         guard let change = levelChange(markers: markers, visitorLevel: visitorLevel) else {
-            return String(localized: "Go to level \(stopLevel)", bundle: .module)
+            return String(localized: "Go to level \(stopLevel)", bundle: .localized)
         }
         let pending = markers.filter { !$0.isCompleted }
         let level = rideEnd(featureType: change.featureType, coordinate: change.coordinate, from: change.from.level, to: change.to.level, markers: pending)
@@ -58,7 +58,7 @@ enum GuidanceText {
 
     /// "Take the stairs to level 4".
     static func rideText(featureType: String, level: Int) -> String {
-        String(localized: "Take the \(levelChanger(featureType)) to level \(level)", bundle: .module)
+        String(localized: "Take the \(levelChanger(featureType)) to level \(level)", bundle: .localized)
     }
 
     /// The floor a ride in one staircase or lift ends on. The SDK router splits a ride into one
@@ -85,15 +85,15 @@ enum GuidanceText {
     /// Remaining distance and time, e.g. "70 m · <1 min".
     static func remaining(metres: Double) -> String {
         let distance = Int(metres.rounded())
-        return "\(String(localized: "\(distance) m", bundle: .module)) · \(walkingTime(metres: metres))"
+        return "\(String(localized: "\(distance) m", bundle: .localized)) · \(walkingTime(metres: metres))"
     }
 
     /// "<1 min" below one minute, otherwise whole minutes rounded up.
     static func walkingTime(metres: Double) -> String {
         let seconds = max(0, metres) / walkingSpeed
-        if seconds < 60 { return String(localized: "<1 min", bundle: .module) }
+        if seconds < 60 { return String(localized: "<1 min", bundle: .localized) }
         let minutes = Int((seconds / 60).rounded(.up))
-        return String(localized: "\(minutes) min", bundle: .module)
+        return String(localized: "\(minutes) min", bundle: .localized)
     }
 
     /// SF Symbol for the next manoeuvre.
@@ -113,10 +113,10 @@ enum GuidanceText {
     /// Visitor-facing name of a level changer feature type.
     static func levelChanger(_ featureType: String) -> String {
         switch featureType {
-        case "elevator": String(localized: "lift", bundle: .module)
-        case "escalator": String(localized: "escalator", bundle: .module)
-        case "staircase": String(localized: "stairs", bundle: .module)
-        case "ramp": String(localized: "ramp", bundle: .module)
+        case "elevator": String(localized: "lift", bundle: .localized)
+        case "escalator": String(localized: "escalator", bundle: .localized)
+        case "staircase": String(localized: "stairs", bundle: .localized)
+        case "ramp": String(localized: "ramp", bundle: .localized)
         default: featureType
         }
     }

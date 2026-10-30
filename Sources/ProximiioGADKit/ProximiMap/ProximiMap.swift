@@ -310,7 +310,7 @@ public final class ProximiMap {
         let journey = VisitPlan.journey(poiIDs: ids, places: places, galleries: galleries)
         let meta = VisitMeta(
             title: plan.title,
-            summary: plan.summary ?? String(localized: "\(journey.stops.count) stops", bundle: .module),
+            summary: plan.summary ?? String(localized: "\(journey.stops.count) stops", bundle: .localized),
             kind: plan.kind
         )
         store(journey, meta: meta)

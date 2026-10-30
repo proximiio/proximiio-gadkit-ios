@@ -15,11 +15,11 @@ struct LowConfidencePrompt: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Text("PROBABLY AT", bundle: .module).textStyle(.caption)
+            Text("PROBABLY AT", bundle: .localized).textStyle(.caption)
             Text(stop).textStyle(.h1Bold)
-            Text("Your position is uncertain here.", bundle: .module).textStyle(.bodySmallRegular).padding(.bottom, 20)
-            Button(String(localized: "That's right", bundle: .module), action: onConfirm).buttonStyle(.primary)
-            Button(String(localized: "Not here", bundle: .module), action: onNotHere).buttonStyle(.textAction)
+            Text("Your position is uncertain here.", bundle: .localized).textStyle(.bodySmallRegular).padding(.bottom, 20)
+            Button(String(localized: "That's right", bundle: .localized), action: onConfirm).buttonStyle(.primary)
+            Button(String(localized: "Not here", bundle: .localized), action: onNotHere).buttonStyle(.textAction)
         }
         .overlaySheetStyle()
     }

@@ -99,7 +99,10 @@ public struct ProximiMapView: View {
     ///     Journey". `false` resumes it: the leg is drawn again from the visitor, and a personalised
     ///     journey with `Options.progress` is ordered again from the visitor first. "Resume your
     ///     Journey" on the card sets it back to `false` and reports `ProximiMapEvent.journeyResumed`.
-    ///     A change of the host app reports no event.
+    ///     A change of the host app reports no event. "Add a stop" sets it to `true` before
+    ///     `ProximiMapEvent.journeyPaused`, and the card shows the amenity with "Resume your
+    ///     Journey". The host app's `false` then ends the detour as "Resume your Journey" does. The
+    ///     view sets it back to `false` when the detour ends otherwise.
     ///   - options: What the view does beyond drawing the journey. None by default. The view reads
     ///     them when it opens.
     ///   - settings: Times and distances of the screen. The view reads them when it opens.
@@ -186,6 +189,7 @@ public struct ProximiMapView: View {
                 HostedMapLoading(options: options, onClose: onClose)
             }
         }
+        .appLanguage()
         .task {
             model.onEvent = onEvent
             await model.start(sdk: sdk, settings: settings, options: options, journey: $journey)
@@ -333,13 +337,13 @@ private struct HostedMapLoading: View {
                                 Image(systemName: "chevron.backward").font(.system(size: 18, weight: .medium))
                             }
                             .buttonStyle(RoundGlassButtonStyle())
-                            .accessibilityLabel(Text("Back", bundle: .module))
+                            .accessibilityLabel(Text("Back", bundle: .localized))
                         } trailing: {
                             EmptyView()
                         }
                     }
                 }
-                .padding(.bottom, max(geometry.safeAreaInsets.bottom - 14, 4))
+                .padding(.bottom, max(geometry.safeAreaInsets.bottom - 21, 4))
                 .foregroundStyle(Palette.ink)
             }
             // Without `.background` the stack is as wide as the spinner, and the reader puts it at

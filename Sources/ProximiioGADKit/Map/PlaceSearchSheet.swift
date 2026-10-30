@@ -61,8 +61,8 @@ struct PlaceSearchSheet: View {
                     }
                 }
             }
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("Search the museum", bundle: .module))
-            .navigationTitle(Text("Search", bundle: .module))
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("Search the museum", bundle: .localized))
+            .navigationTitle(Text("Search", bundle: .localized))
             .navigationBarTitleDisplayMode(.inline)
         }
     }

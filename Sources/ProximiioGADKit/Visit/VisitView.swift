@@ -100,9 +100,14 @@ struct VisitView: View {
     private let destination: Binding<ProximiDestination?>
     /// The destination the view routes to.
     @State private var routedDestination: RoutedDestination?
-    /// The host app's pause (`ProximiMapView`'s `isPaused`). "Resume your Journey" on the card of a
-    /// paused journey sets it back to `false`.
+    /// The host app's pause (`ProximiMapView`'s `isPaused`). The view sets it to `true` on "Add a
+    /// stop" and back to `false` on "Resume your Journey" and when the detour ends.
     private let isPaused: Binding<Bool>
+    /// `isPaused` is `true` because of "Add a stop": the host app's `false` resumes the journey as
+    /// "Resume your Journey" does.
+    @State private var detourPausesJourney = false
+    /// The value the view wrote to `isPaused` last. The `onChange` that follows is not the host app's.
+    @State private var pausedWrite: Bool?
     /// The places are loaded and the journey started: a destination can be routed to.
     @State private var isReady = false
     /// `venue.settings` when the view was created.
@@ -189,13 +194,15 @@ struct VisitView: View {
                 if options.contains(.liveActivity) && hasStops {
                     VisitLiveActivityDriver(navigator: controller.navigator, session: controller.session, liveActivity: liveActivity)
                 }
-                VStack(spacing: 10) {
+                VStack(spacing: 11.5) {
                     mapCard
                     bottomBar
                 }
-                // The map ignores the safe area; the card starts below the status bar as in the design.
-                .padding(.top, geometry.safeAreaInsets.top + 8)
-                .padding(.bottom, max(geometry.safeAreaInsets.bottom - 14, 4))
+                // The map ignores the safe area. As in the Figma frame 10889:108085: the card starts
+                // 3 pt below the status bar, the bar 11.5 pt under the card ends 21 pt into the
+                // bottom inset.
+                .padding(.top, geometry.safeAreaInsets.top + 3)
+                .padding(.bottom, max(geometry.safeAreaInsets.bottom - 21, 4))
                 StartingSpinner(navigator: controller.navigator, session: controller.session, timeout: settings.mapLoadingTimeout, hasStops: hasStops)
                 if case .changing(let change) = floorGuide.phase {
                     FloorChangeView(change: change)
@@ -238,7 +245,7 @@ struct VisitView: View {
                         Image(systemName: "chevron.backward").font(.system(size: 18, weight: .medium))
                     }
                     .buttonStyle(RoundGlassButtonStyle())
-                    .accessibilityLabel(Text("Back", bundle: .module))
+                    .accessibilityLabel(Text("Back", bundle: .localized))
                 }
             } trailing: {
                 if hasStops {
@@ -246,7 +253,7 @@ struct VisitView: View {
                         Image(systemName: showsList ? "map" : "list.bullet").font(.system(size: 18, weight: .medium))
                     }
                     .buttonStyle(RoundGlassButtonStyle())
-                    .accessibilityLabel(showsList ? Text("Map", bundle: .module) : Text("List", bundle: .module))
+                    .accessibilityLabel(showsList ? Text("Map", bundle: .localized) : Text("List", bundle: .localized))
                 }
             }
         }
@@ -285,6 +292,11 @@ struct VisitView: View {
                     if case .detourEnded(let stop, _) = event, routedDestination?.placeID == (stop.poiID ?? stop.id) {
                         clearDestination()
                     }
+                    // A second "Add a stop" ends the first detour and starts another.
+                    if case .detourEnded = event, detourPausesJourney, controller.navigator.detourStop == nil {
+                        detourPausesJourney = false
+                        setPaused(controller.isPaused)
+                    }
                 }
             }
             .task {
@@ -316,10 +328,15 @@ struct VisitView: View {
             }
             .onChange(of: destination.wrappedValue) { _, destination in destinationChanged(destination) }
             .onChange(of: isPaused.wrappedValue) { _, paused in
+                if pausedWrite == paused {
+                    pausedWrite = nil
+                    return
+                }
+                pausedWrite = nil
                 if paused {
                     controller.pause()
                 } else {
-                    Task { await controller.resumeFromPause() }
+                    Task { await resumeAfterHostPause() }
                 }
             }
             .task {
@@ -907,6 +924,41 @@ struct VisitView: View {
         refreshLevelChanger()
     }
 
+    /// Writes `isPaused` for the host app. The view does not act on it as the host app's change.
+    private func setPaused(_ paused: Bool) {
+        guard isPaused.wrappedValue != paused else { return }
+        pausedWrite = paused
+        isPaused.wrappedValue = paused
+    }
+
+    /// The host app set `isPaused` to `false`. After "Add a stop" this is "Resume your Journey": the
+    /// detour ends and the journey goes on (Nagarro, 2026-10-30: after their play button the card
+    /// still offered "Resume your Journey"). The host app's change reports no event.
+    private func resumeAfterHostPause() async {
+        FieldLog.log("host app resumed the journey · detour \(controller.navigator.detourStop?.id ?? "-")")
+        let wasPaused = controller.isPaused
+        await controller.resumeFromPause()
+        guard detourPausesJourney else { return }
+        if wasPaused {
+            // "Add a stop" during the host app's pause: the detour's card shows now, and the journey
+            // waits for it.
+            setPaused(true)
+            return
+        }
+        detourPausesJourney = false
+        if controller.navigator.detourStop != nil { resumeJourney() }
+    }
+
+    /// "Resume your Journey" after a detour. On a floor without positioning the map goes back to
+    /// the visitor's floor first.
+    private func resumeJourney() {
+        if case .onFloor = floorGuide.phase {
+            returnOrigin = floorDestination?.coordinate
+            floorGuide.returnFromFloor()
+        }
+        Task { await controller.resumeJourney() }
+    }
+
     /// `recentre` with a field-log line naming the caller. Ends a pending `showVisitorThenFollow`.
     private func recentre(withHeading: Bool? = nil, reason: String) {
         startZoomFollow?.cancel()
@@ -1035,9 +1087,10 @@ struct VisitView: View {
     }
 
     /// Controls inside the map card: toggle and search at the top, compass and floor at the
-    /// trailing edge, the stop card at the bottom.
+    /// trailing edge, the stop card at the bottom. As in the Figma frame 10889:108085: 21 pt from the
+    /// card's sides, the stop card 23 pt above its bottom edge and 12 pt under the buttons.
     private var cardOverlay: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             HStack(alignment: .top) {
                 if hasStops {
                     MapListToggle(showsList: Binding(get: { mode == .list }, set: { mode = $0 ? .list : .map }))
@@ -1049,7 +1102,7 @@ struct VisitView: View {
                     GlassSquareButton(isSelected: isShowingAmenities, action: { withAnimation { isShowingAmenities.toggle() } }) {
                         GADIcon.search.image.resizable().scaledToFit().frame(width: 24, height: 24)
                     }
-                    .accessibilityLabel(Text("Search", bundle: .module))
+                    .accessibilityLabel(Text("Search", bundle: .localized))
                     if isShowingAmenities {
                         AmenityChipList(shortcuts: searchShortcuts) { shortcut in
                             isShowingAmenities = false
@@ -1077,7 +1130,7 @@ struct VisitView: View {
                         }) {
                             GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)
                         }
-                        .accessibilityLabel(Text("Centre on me", bundle: .module))
+                        .accessibilityLabel(Text("Centre on me", bundle: .localized))
                         AccessibleRoutesButton(isOn: $accessibleRoutes) { emit(.accessibleRoutesChanged($0)) }
                         // The shown floor, a label and no button (PM, Monday "Current level button",
                         // 2026-10-28).
@@ -1087,7 +1140,7 @@ struct VisitView: View {
                             .frame(width: 50, height: 50)
                             .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
                             .accessibilityElement(children: .ignore)
-                            .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .module))
+                            .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(controller.session.selectedFloor.level))", bundle: .localized))
                             .accessibilityIdentifier("visitFloor")
                     }
                 }
@@ -1106,6 +1159,10 @@ struct VisitView: View {
                             } else {
                                 Task { await controller.detour(to: place) }
                                 emit(.detourStarted(place))
+                                // The host app's pause control shows the journey paused, and its
+                                // resume is "Resume your Journey" (Nagarro, 2026-10-30).
+                                detourPausesJourney = true
+                                setPaused(true)
                                 emit(.journeyPaused)
                                 controller.session.followMyFloor()
                                 recentre(reason: "stop added")
@@ -1123,7 +1180,7 @@ struct VisitView: View {
                 } else if showsOffRouteCard {
                     // PM, Monday "Personalized tour: off-route and re-route behaviour", 2026-10-26.
                     PlaceInfoCard(
-                        title: String(localized: "Looks like you’ve left your route", bundle: .module),
+                        title: String(localized: "Looks like you’ve left your route", bundle: .localized),
                         subtitle: offRouteText,
                         primary: "Dismiss",
                         onPrimary: { controller.dismissOffRoute() }
@@ -1142,24 +1199,23 @@ struct VisitView: View {
                         returningToLevel: returningToLevel,
                         pausedText: controller.isPaused ? nextStopText ?? "" : nil,
                         onResumeFromPause: {
-                            if isPaused.wrappedValue { isPaused.wrappedValue = false }
+                            // A detour added during the pause keeps the journey paused.
+                            setPaused(detourPausesJourney)
                             Task { await controller.resumeFromPause() }
                             emit(.journeyResumed)
                         },
                         onResume: {
-                            if case .onFloor = floorGuide.phase {
-                                returnOrigin = floorDestination?.coordinate
-                                floorGuide.returnFromFloor()
-                            }
-                            Task { await controller.resumeJourney() }
+                            detourPausesJourney = false
+                            setPaused(false)
+                            resumeJourney()
                             emit(.journeyResumed)
                         }
                     )
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.horizontal, 21)
+        .padding(.bottom, 23)
         .animation(.easeInOut(duration: 0.2), value: isShowingAmenities)
         .animation(.easeInOut(duration: 0.2), value: showsOffRouteCard)
     }
@@ -1170,7 +1226,7 @@ struct VisitView: View {
         if let routed = routedDestination, routed.placeID != place.id { clearDestination() }
         routedAmenity = place
         guard let here = controller.session.position else {
-            amenityRouteError = String(localized: "Waiting for your position.", bundle: .module)
+            amenityRouteError = String(localized: "Waiting for your position.", bundle: .localized)
             controller.session.clearRoute()
             return
         }
@@ -1189,9 +1245,9 @@ struct VisitView: View {
             FieldLog.log("route to \(place.title) failed: \(error)")
             controller.session.clearRoute()
             if case WayfindingRoutingError.noRoute(.noAccessibleRoute) = error {
-                amenityRouteError = String(localized: "No route from here with your accessibility settings.", bundle: .module)
+                amenityRouteError = String(localized: "No route from here with your accessibility settings.", bundle: .localized)
             } else {
-                amenityRouteError = String(localized: "No route from here.", bundle: .module)
+                amenityRouteError = String(localized: "No route from here.", bundle: .localized)
             }
         }
     }
@@ -1289,11 +1345,11 @@ struct VisitView: View {
     /// "Your next stop is Gallery 103." The gallery the leg ends at, else the next stop.
     private var nextStopText: String? {
         guard let next = controller.galleryAhead?.gallery.name ?? controller.navigator.activeStop?.title else { return nil }
-        return String(localized: "Your next stop is \(next).", bundle: .module)
+        return String(localized: "Your next stop is \(next).", bundle: .localized)
     }
 
     private var offRouteText: String {
-        nextStopText ?? String(localized: "Head back to your route.", bundle: .module)
+        nextStopText ?? String(localized: "Head back to your route.", bundle: .localized)
     }
 
     /// Shows the nearest place of `kind` on a card. "Add a stop" adds it as a journey detour (PM
@@ -1356,7 +1412,7 @@ private struct VisitCard: View {
     var body: some View {
         if let pausedText {
             PlaceInfoCard(
-                title: String(localized: "Journey paused", bundle: .module),
+                title: String(localized: "Journey paused", bundle: .localized),
                 subtitle: pausedText,
                 primary: "Resume your Journey",
                 onPrimary: onResumeFromPause
@@ -1366,7 +1422,7 @@ private struct VisitCard: View {
             PlaceInfoCard(
                 title: detour.title,
                 subtitle: places.first { $0.id == detour.id }?.cardSubtitle
-                    ?? detour.floor.map { String(localized: "Level \(Int($0.level.rounded()))", bundle: .module) } ?? "",
+                    ?? detour.floor.map { String(localized: "Level \(Int($0.level.rounded()))", bundle: .localized) } ?? "",
                 primary: "Resume your Journey",
                 onPrimary: onResume
             )
@@ -1381,7 +1437,7 @@ private struct VisitCard: View {
                 icon
             } trailing: {
                 if case .nextStopOnOtherLevel(_, let level) = state {
-                    OutlineBadge(text: "L\(level)").accessibilityLabel(Text("Level \(level)", bundle: .module))
+                    OutlineBadge(text: "L\(level)").accessibilityLabel(Text("Level \(level)", bundle: .localized))
                 }
             } badges: {
                 if let artwork = namedArtwork { ArtworkBadges(place: artwork) }
@@ -1423,11 +1479,11 @@ private struct VisitCard: View {
     private var title: String {
         if isOnFloorWithoutPositioning, let stop = navigator.activeStop { return galleryAhead?.name ?? stop.title }
         return switch state {
-        case .starting: String(localized: "Your journey", bundle: .module)
+        case .starting: String(localized: "Your journey", bundle: .localized)
         case .walking(let stop): galleryAhead?.name ?? stop
         case .atStop(let stop): stop
         case .nextStopOnOtherLevel(_, let level): levelChangeTitle(stopLevel: level)
-        case .finished: String(localized: "You've walked your route", bundle: .module)
+        case .finished: String(localized: "You've walked your route", bundle: .localized)
         }
     }
 
@@ -1448,13 +1504,13 @@ private struct VisitCard: View {
         // The navigator keeps a stop that no route with the visitor's accessibility needs reaches,
         // with no route line. In a personalised journey the visitor can skip it in the list.
         if let returningToLevel {
-            return String(localized: "Head to Level \(returningToLevel) by lift or stairs", bundle: .module)
+            return String(localized: "Head to Level \(returningToLevel) by lift or stairs", bundle: .localized)
         }
         if isOnFloorWithoutPositioning {
-            return String(localized: "Your position is not shown on this level.", bundle: .module)
+            return String(localized: "Your position is not shown on this level.", bundle: .localized)
         }
         if let stop = navigator.activeStop, case .noAccessibleRoute = navigator.noRouteReasons[stop.id] {
-            return String(localized: "No route to this stop with your accessibility settings.", bundle: .module)
+            return String(localized: "No route to this stop with your accessibility settings.", bundle: .localized)
         }
         switch state {
         case .walking:
@@ -1507,7 +1563,7 @@ private struct VisitCard: View {
         switch state {
         case .walking, .atStop, .nextStopOnOtherLevel:
             if let stopNumber, showsStopNumber {
-                Text("\(stopNumber)", bundle: .module).textStyle(.bodyMedium)
+                Text("\(stopNumber)", bundle: .localized).textStyle(.bodyMedium)
             } else if galleryAhead != nil {
                 if let galleryIcon {
                     Image(uiImage: galleryIcon).resizable().scaledToFit().frame(width: 20, height: 20)
@@ -1545,13 +1601,13 @@ private struct SkipConfirmation: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Text("Skip this artwork?", bundle: .module).textStyle(.h1Bold)
+            Text("Skip this artwork?", bundle: .localized).textStyle(.h1Bold)
             Text(stop.title).textStyle(.largeBodyRegular)
-            Text("It will be removed from your route. Artworks you have visited stay saved.", bundle: .module)
+            Text("It will be removed from your route. Artworks you have visited stay saved.", bundle: .localized)
                 .textStyle(.bodySmallRegular)
                 .padding(.bottom, 20)
-            Button(String(localized: "Skip artwork", bundle: .module), action: onSkip).buttonStyle(.primary)
-            Button(String(localized: "Keep it", bundle: .module), action: onKeep).buttonStyle(.textAction)
+            Button(String(localized: "Skip artwork", bundle: .localized), action: onSkip).buttonStyle(.primary)
+            Button(String(localized: "Keep it", bundle: .localized), action: onKeep).buttonStyle(.textAction)
         }
         // Less space under "Keep it" (PM, Monday "Skip artwork popup too large", 2026-10-28).
         .overlaySheetStyle(bottomPadding: 12)
@@ -1563,7 +1619,7 @@ private struct ReroutingCard: View {
     var body: some View {
         VStack(spacing: 14) {
             ProgressView().controlSize(.large)
-            Text("Rerouting you…", bundle: .module).textStyle(.bodyMedium)
+            Text("Rerouting you…", bundle: .localized).textStyle(.bodyMedium)
         }
         .foregroundStyle(Palette.ink)
         .padding(.horizontal, 36)

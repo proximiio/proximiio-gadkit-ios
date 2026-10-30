@@ -96,7 +96,7 @@ private struct StopList: View {
                     }
                 }
                 if allowsSkip {
-                    Text("Swipe left to skip an artwork", bundle: .module)
+                    Text("Swipe left to skip an artwork", bundle: .localized)
                         .textStyle(.bodyExtraSmall)
                         .foregroundStyle(Palette.ink)
                         .padding(.top, 10)
@@ -117,7 +117,7 @@ private struct StopList: View {
         if let gallery = Gallery.containing(stop.coordinate.proximiio, level: stop.floor?.level, in: galleries) {
             return gallery.name
         }
-        return stop.floor.map { String(localized: "Level \(Int($0.level.rounded()))", bundle: .module) }
+        return stop.floor.map { String(localized: "Level \(Int($0.level.rounded()))", bundle: .localized) }
     }
 
     /// A stop as a frosted card (Figma journey list): number badge, title, floor.
@@ -135,7 +135,7 @@ private struct StopList: View {
                 if let artist = place?.artist {
                     Text(artist).textStyle(.bodySmallRegular)
                 } else if let level = stop.floor?.level {
-                    Text(String(localized: "Level \(Int(level.rounded()))", bundle: .module)).textStyle(.bodySmallRegular)
+                    Text(String(localized: "Level \(Int(level.rounded()))", bundle: .localized)).textStyle(.bodySmallRegular)
                 }
             }
             Spacer(minLength: 0)
@@ -146,7 +146,7 @@ private struct StopList: View {
         .padding(.vertical, 18)
         .glassSurface(RoundedRectangle(cornerRadius: 12), strength: .frosted)
         .accessibilityAddTraits(isActive ? .isSelected : [])
-        .accessibilityValue(isVisited ? Text("Visited", bundle: .module) : Text("", bundle: .module))
+        .accessibilityValue(isVisited ? Text("Visited", bundle: .localized) : Text("", bundle: .localized))
     }
 }
 
@@ -158,10 +158,10 @@ struct ArtworkBadges: View {
     var body: some View {
         HStack(spacing: 4) {
             if place.hasAR {
-                OutlineBadge(text: "AR").accessibilityLabel(Text("AR view", bundle: .module))
+                OutlineBadge(text: "AR").accessibilityLabel(Text("AR view", bundle: .localized))
             }
             if place.hasAudio {
-                OutlineBadge(systemImage: "music.note").accessibilityLabel(Text("Audio", bundle: .module))
+                OutlineBadge(systemImage: "music.note").accessibilityLabel(Text("Audio", bundle: .localized))
             }
         }
     }
@@ -226,7 +226,7 @@ private struct SwipeToSkipRow<Content: View>: View {
             withAnimation(.snappy(duration: 0.25)) { dragX = 0 }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityAction(named: Text("Skip", bundle: .module)) { if isEnabled { onSkip() } }
+        .accessibilityAction(named: Text("Skip", bundle: .localized)) { if isEnabled { onSkip() } }
         // For UI tests; VoiceOver does not read identifiers.
         .accessibilityIdentifier(isRevealed ? "journeyStopRow.skipShown" : "journeyStopRow")
     }

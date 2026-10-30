@@ -141,8 +141,8 @@ struct ExploreCatalog: Equatable, Sendable {
         legendGalleries = entries.filter(isGallery)
         let titles = Set(entries.map { $0.title.lowercased() })
         // A lift or staircase entry ranks as the amenity named after its feature type.
-        let changers = [("elevator", String(localized: "Elevator", bundle: .module)),
-                        ("staircase", String(localized: "Stairs", bundle: .module))]
+        let changers = [("elevator", String(localized: "Elevator", bundle: .localized)),
+                        ("staircase", String(localized: "Stairs", bundle: .localized))]
             .filter { levelChangerTypes.contains($0.0) && !titles.contains($0.1.lowercased()) }
             .compactMap { type, title in facilities.rank(ofTitle: type).map { (ExploreLegendEntry(amenityID: "level-changer-\(type)", title: title), $0) } }
         let ranked = entries.filter { !isGallery($0) }.compactMap { entry in facilities.rank(of: entry.amenityID).map { (entry, $0) } }

@@ -51,9 +51,9 @@ final class GeofenceNotifier {
         let body: String
         switch event {
         case .entered(let entered):
-            (geofence, direction, body) = (entered, "entered", String(localized: "You entered this area.", bundle: .module))
+            (geofence, direction, body) = (entered, "entered", String(localized: "You entered this area.", bundle: .localized))
         case .exited(let exited, _):
-            (geofence, direction, body) = (exited, "exited", String(localized: "You left this area.", bundle: .module))
+            (geofence, direction, body) = (exited, "exited", String(localized: "You left this area.", bundle: .localized))
         default:
             return nil
         }

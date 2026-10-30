@@ -24,10 +24,10 @@ struct BeforeYouGoSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("BEFORE YOU GO", bundle: .module).textStyle(.caption)
-            Text("Take your time leaving - here's what's next", bundle: .module).textStyle(.h1Bold)
+            Text("BEFORE YOU GO", bundle: .localized).textStyle(.caption)
+            Text("Take your time leaving - here's what's next", bundle: .localized).textStyle(.h1Bold)
             if suggestions.isEmpty {
-                Text("Thank you for visiting Guggenheim Abu Dhabi.", bundle: .module).textStyle(.bodySmallRegular)
+                Text("Thank you for visiting Guggenheim Abu Dhabi.", bundle: .localized).textStyle(.bodySmallRegular)
             }
             ForEach(suggestions) { place in
                 Button { onPick(place) } label: {

@@ -32,9 +32,9 @@ enum ExploreTab: CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .spaces: String(localized: "Spaces", bundle: .module)
-        case .highlights: String(localized: "Highlights", bundle: .module)
-        case .amenities: String(localized: "Amenities", bundle: .module)
+        case .spaces: String(localized: "Spaces", bundle: .localized)
+        case .highlights: String(localized: "Highlights", bundle: .localized)
+        case .amenities: String(localized: "Amenities", bundle: .localized)
         }
     }
 }
@@ -120,7 +120,7 @@ struct ExploreMuseumView: View {
     private var header: some View {
         HStack(alignment: .top) {
             // Regular 24 as in the Figma frame 12129:102006 (PM, Monday "Font size and style", 2026-10-26).
-            Text(String(localized: "Level \(Int(level.rounded()))", bundle: .module))
+            Text(String(localized: "Level \(Int(level.rounded()))", bundle: .localized))
                 .textStyle(.h1Regular)
                 .padding(.top, 8)
                 .accessibilityIdentifier("exploreLevel")
@@ -151,7 +151,7 @@ struct ExploreMuseumView: View {
                         Text(GuidanceText.floorLabel(candidate))
                             .textStyle(isShown ? .bodyBold : .bodyRegular)
                     }
-                    .accessibilityLabel(Text("Level \(Int(candidate))", bundle: .module))
+                    .accessibilityLabel(Text("Level \(Int(candidate))", bundle: .localized))
                     .accessibilityAddTraits(isShown ? .isSelected : [])
                 }
                 Button {
@@ -162,7 +162,7 @@ struct ExploreMuseumView: View {
                         .frame(width: 50, height: 18)
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel(Text("Close", bundle: .module))
+                .accessibilityLabel(Text("Close", bundle: .localized))
             } else {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { isShowingLevels = true }
@@ -177,7 +177,7 @@ struct ExploreMuseumView: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(level))", bundle: .module))
+                .accessibilityLabel(Text("Floor \(GuidanceText.floorLabel(level))", bundle: .localized))
             }
         }
         .buttonStyle(.plain)
@@ -200,7 +200,7 @@ struct ExploreMuseumView: View {
             GlassSquareButton(isSelected: panel == .legend, action: { toggle(.legend) }) {
                 Image(systemName: "list.bullet").font(.system(size: 18, weight: .medium))
             }
-            .accessibilityLabel(Text("Map legend", bundle: .module))
+            .accessibilityLabel(Text("Map legend", bundle: .localized))
             HStack(spacing: 0) {
                 ForEach(ExploreTab.allCases) { item in
                     tabButton(item)
@@ -300,7 +300,7 @@ struct ExploreMuseumView: View {
     private func title(of panel: ExplorePanel) -> String {
         switch panel {
         case .list(let tab): tab.title
-        case .legend: String(localized: "Map legend", bundle: .module)
+        case .legend: String(localized: "Map legend", bundle: .localized)
         }
     }
 
@@ -309,12 +309,12 @@ struct ExploreMuseumView: View {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             let groups = ExploreCatalog.byLevel(items(for: tab))
                             if groups.isEmpty {
-                                Text(String(localized: "Nothing here yet.", bundle: .module))
+                                Text(String(localized: "Nothing here yet.", bundle: .localized))
                                     .textStyle(.bodySmallRegular)
                                     .padding(.top, 20)
                             }
                             ForEach(groups) { group in
-                                Text(String(localized: "Level \(Int(group.level))", bundle: .module))
+                                Text(String(localized: "Level \(Int(group.level))", bundle: .localized))
                                     .textStyle(.caption)
                                     .textCase(.uppercase)
                                     .tracking(1.5)
@@ -337,8 +337,8 @@ struct ExploreMuseumView: View {
     /// their map icons.
     private var legend: some View {
         HStack(alignment: .top, spacing: 20) {
-            legendColumn(String(localized: "Facilities", bundle: .module), catalog.legendFacilities)
-            legendColumn(String(localized: "Galleries", bundle: .module), catalog.legendGalleries)
+            legendColumn(String(localized: "Facilities", bundle: .localized), catalog.legendFacilities)
+            legendColumn(String(localized: "Galleries", bundle: .localized), catalog.legendGalleries)
         }
         .padding(.horizontal, 24)
         .padding(.top, 16)
@@ -373,11 +373,11 @@ struct ExploreMuseumView: View {
     /// "8 spaces · 4 levels", "6 works", "12 amenities · 5 levels".
     private func summary(_ tab: ExploreTab) -> String {
         let items = items(for: tab)
-        let levels = String(localized: "\(Set(items.map { $0.level.rounded() }).count) levels", bundle: .module)
+        let levels = String(localized: "\(Set(items.map { $0.level.rounded() }).count) levels", bundle: .localized)
         switch tab {
-        case .spaces: return String(localized: "\(items.count) spaces", bundle: .module) + " · " + levels
-        case .highlights: return String(localized: "\(items.count) works", bundle: .module)
-        case .amenities: return String(localized: "\(items.count) amenities", bundle: .module) + " · " + levels
+        case .spaces: return String(localized: "\(items.count) spaces", bundle: .localized) + " · " + levels
+        case .highlights: return String(localized: "\(items.count) works", bundle: .localized)
+        case .amenities: return String(localized: "\(items.count) amenities", bundle: .localized) + " · " + levels
         }
     }
 
@@ -608,7 +608,7 @@ private struct ExploreCard: View {
                     .font(.system(size: 12, weight: .semibold))
                     .frame(width: 36, height: 36)
             }
-            .accessibilityLabel(Text("Close", bundle: .module))
+            .accessibilityLabel(Text("Close", bundle: .localized))
         }
         .foregroundStyle(Palette.ink)
         .glassSurface(RoundedRectangle(cornerRadius: 16), strength: .frosted)
