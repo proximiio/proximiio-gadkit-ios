@@ -364,6 +364,8 @@ struct VisitView: View {
                         }
                     case .entered(let geofence) where geofence.isArtwork:
                         controller.artworkGeofenceEntered(remoteID: geofence.remoteId)
+                    case .exited(let geofence, _) where geofence.isArtwork:
+                        controller.artworkGeofenceExited(remoteID: geofence.remoteId)
                     default: break
                     }
                 }

@@ -15,8 +15,11 @@
 //  2026-10-19). Since SDK 6.0.0-beta.63 the SDK also exits a geofence only
 //  `ProximiioConfiguration.geofenceExitDelay` after the position left it (`ProximiMap`:
 //  `GADSettings.geofenceExitDelay`, 5 s; the SDK default is 3 s), so an artwork counts as inside up
-//  to that long after the visitor left it. The journey moves to the next
-//  artwork `GADSettings.artworkAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
+//  to that long after the visitor left it. The journey moves to the next stop when the visitor
+//  leaves the artwork's geofence (`GADSettings.advancesOnArtworkExit`; Nagarro, 2026-10-30): on the
+//  SDK's exit event (`artworkGeofenceExited`), after `geofenceExitDelay` outside it without one, or
+//  at once when the visitor is in another open artwork's geofence. Without the setting it moves on
+//  `GADSettings.artworkAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
 //  the visitor walks past without entering its geofence stays unvisited until it is skipped.
 //  Out of order: a visitor inside the geofence of another open artwork for
 //  `GADSettings.outOfOrderDwell` (0 s while testing) marks it visited, and the stops still ahead are
@@ -166,6 +169,11 @@ final class VisitController {
     private var journeyEdit: Task<Void, Never>?
     /// Stops whose move to the next artwork is scheduled.
     private var scheduledDone: Set<String> = []
+    /// With `GADSettings.advancesOnArtworkExit`: the active artwork whose geofence the visitor
+    /// entered. The journey moves on when they leave it.
+    private var arrivedStopID: String?
+    /// The first fix outside the geofence of `arrivedStopID`, for a leave without an exit event.
+    private var outsideArrivedSince: Date?
     /// Time inside the geofence of each open artwork that is not the active stop.
     private var outOfOrderDwell = GeofenceDwell()
     /// Out-of-order artworks being marked visited.
@@ -285,7 +293,7 @@ final class VisitController {
         refreshGalleryAhead()
         switch event {
         case .stopReached(let stop) where stop.kind != .detour:
-            scheduleDone(stop.id)
+            scheduleDone(stop.id, after: settings.artworkAdvanceDelay)
         case .detourEnded(_, completed: true):
             tasks.append(Task { [weak self] in
                 await self?.serially { [weak self] in
@@ -308,13 +316,37 @@ final class VisitController {
         }
     }
 
-    /// The visitor entered an artwork geofence. The active artwork moves on after
-    /// `GADSettings.artworkAdvanceDelay`. The geofence of any other artwork is ignored, and every artwork
-    /// geofence is ignored during a detour.
+    /// The visitor entered an artwork geofence. With `GADSettings.advancesOnArtworkExit` the active
+    /// artwork moves on when the visitor leaves it, else after `GADSettings.artworkAdvanceDelay`. The
+    /// geofence of any other artwork is ignored, and every artwork geofence is ignored during a detour.
     func artworkGeofenceEntered(remoteID: String?) {
         guard managesProgress, !isPaused, navigator.detourStop == nil, let id = Self.activeStopID(forRemoteID: remoteID, in: navigator.journey, remoteIDs: artworkRemoteIDs) else { return }
-        FieldLog.log("artwork geofence arrival: \(id) remote \(remoteID ?? "-")")
-        scheduleDone(id)
+        guard settings.advancesOnArtworkExit else {
+            FieldLog.log("artwork geofence arrival: \(id) remote \(remoteID ?? "-")")
+            return scheduleDone(id, after: settings.artworkAdvanceDelay)
+        }
+        outsideArrivedSince = nil
+        guard arrivedStopID != id else { return }
+        arrivedStopID = id
+        FieldLog.log("artwork geofence arrival: \(id) remote \(remoteID ?? "-") · next stop at the exit")
+    }
+
+    /// The SDK reports that the visitor left an artwork geofence. Leaving the active artwork they
+    /// arrived at moves the journey to the next stop (`GADSettings.advancesOnArtworkExit`).
+    func artworkGeofenceExited(remoteID: String?) {
+        guard managesProgress, !isPaused, let arrived = arrivedStopID, let remoteID,
+              artworkRemoteIDs[stop(arrived)?.poiID ?? arrived] == remoteID else { return }
+        leaveArrivedArtwork(reason: "exit event")
+    }
+
+    /// The visitor left the active artwork they arrived at: the journey moves to the next stop.
+    private func leaveArrivedArtwork(reason: String) {
+        guard let id = arrivedStopID else { return }
+        arrivedStopID = nil
+        outsideArrivedSince = nil
+        guard navigator.activeStop?.id == id else { return }
+        FieldLog.log("artwork left (\(reason)): \(id) · next stop")
+        scheduleDone(id, after: 0)
     }
 
     /// Checks the fix against the geofences of the open artworks on the visitor's floor, and
@@ -335,6 +367,7 @@ final class VisitController {
         let level = position.floor?.level
         let activeID = navigator.activeStop?.id
         var inside: Set<String> = []
+        var isInsideActive = false
         for stop in navigator.journey.stops
         where stop.kind != .detour && (stop.state == .pending || stop.state == .active || stop.state == .reached) {
             guard let remoteID = artworkRemoteIDs[stop.poiID ?? stop.id],
@@ -343,9 +376,29 @@ final class VisitController {
             if !VenueLevel.matches(stop.floor?.level, level) { continue }
             guard areas.contains(where: { enteredGeofenceIDs.contains($0.id) || $0.contains(point) }) else { continue }
             if stop.id == activeID {
+                isInsideActive = true
                 artworkGeofenceEntered(remoteID: remoteID)
             } else if countsOutOfOrder {
                 inside.insert(stop.id)
+            }
+        }
+        if let arrived = arrivedStopID {
+            if arrived != activeID {
+                // Skipped, reordered or visited otherwise.
+                arrivedStopID = nil
+                outsideArrivedSince = nil
+            } else if !inside.isEmpty {
+                // In another open artwork: the visitor has moved on. That artwork counts from the
+                // next fix, after the journey moved on.
+                leaveArrivedArtwork(reason: "in another artwork")
+                inside = []
+            } else if !isInsideActive {
+                // No exit event: the SDK did not count the visitor inside, or the event was missed.
+                let since = outsideArrivedSince ?? .now
+                outsideArrivedSince = since
+                if Date.now.timeIntervalSince(since) >= settings.geofenceExitDelay {
+                    leaveArrivedArtwork(reason: "outside for \(settings.geofenceExitDelay) s")
+                }
             }
         }
         for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: settings.outOfOrderDwell) {
@@ -619,11 +672,10 @@ final class VisitController {
         return stop.id
     }
 
-    /// Marks `stopID` visited after `GADSettings.artworkAdvanceDelay` if it is still the active stop. The leg to
-    /// the next artwork is drawn.
-    private func scheduleDone(_ stopID: String) {
+    /// Marks `stopID` visited after `delay` seconds if it is still the active stop. The leg to the
+    /// next artwork is drawn.
+    private func scheduleDone(_ stopID: String, after delay: TimeInterval) {
         guard scheduledDone.insert(stopID).inserted else { return }
-        let delay = settings.artworkAdvanceDelay
         tasks.append(Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
             await self?.serially { [weak self] in

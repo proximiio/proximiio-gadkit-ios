@@ -167,8 +167,9 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// changes the journey; that change starts the screen again without it. With `.progress` the
     /// stop is skipped.
     case stopPlaceDeleted(ProximiStop)
-    /// `GADSettings.artworkAdvanceDelay` after the visitor reached the artwork of the active stop:
-    /// the stop is done and the route leads to the next stop.
+    /// The visitor left the geofence of the active stop's artwork (`GADSettings.advancesOnArtworkExit`),
+    /// or `GADSettings.artworkAdvanceDelay` after they reached it without that setting: the stop is
+    /// done and the route leads to the next stop.
     case artworkReached(ProximiStop)
     /// The visitor stayed at an artwork further down the journey. It counts as visited. A
     /// personalised journey orders the stops ahead again.

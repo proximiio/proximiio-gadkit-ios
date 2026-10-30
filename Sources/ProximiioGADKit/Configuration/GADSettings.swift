@@ -19,7 +19,13 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Arrival
 
-    /// Seconds between the arrival at an artwork (its geofence) and the route to the next stop.
+    /// `true`: the journey moves to the next stop when the visitor leaves the geofence of the active
+    /// artwork: on the SDK's exit event, or after `geofenceExitDelay` outside it without one (Nagarro,
+    /// 2026-10-30: the next stop comes from the exit event). `false`: `artworkAdvanceDelay` after the
+    /// visitor entered it.
+    public var advancesOnArtworkExit = true
+    /// With `advancesOnArtworkExit` `false`: seconds between the arrival at an artwork (its geofence)
+    /// and the route to the next stop.
     public var artworkAdvanceDelay: TimeInterval = 2
     /// Seconds inside the geofence of an artwork that is not the next stop before it counts as
     /// visited out of order. A longer time keeps a visitor who crosses it on the way from marking it.
