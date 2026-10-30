@@ -14,6 +14,7 @@
 //    -hubPage welcome|craft               open the Hub on that page
 //    -openMap                             open the museum map after launch
 //    -visitList                           with -visit: open the journey in List mode
+//    -visitSearch                         with -visit: open the journey with the amenity list open
 //    -visitKind personalised|curated      with -visit: the kind of journey, default personalised
 //    -visitAutoAdvance                    with -visit: advance 5 m after leaving a stop
 //    -hostedMap                           with -visit: open the visit in ProximiMapView on the app's SDK;
@@ -45,6 +46,7 @@ import Foundation
     public var visitStops: [String] = []
     public var visitAutoAdvance = false
     public var visitList = false
+    public var visitSearch = false
     /// `-hostedMap`: `ProximiMap` opens the visit in `ProximiMapView` instead of its journey screen.
     public var hostedMap = false
     /// `-hostedPrepare`: `ProximiMapView.prepare(sdk:)` before the hosted view opens.
@@ -82,6 +84,7 @@ import Foundation
         )
         visitAutoAdvance = arguments.contains("-visitAutoAdvance")
         visitList = arguments.contains("-visitList")
+        visitSearch = arguments.contains("-visitSearch")
         hostedMap = arguments.contains("-hostedMap")
         hostedPrepare = arguments.contains("-hostedPrepare")
         hostedDestination = value(after: "-hostedDestination")

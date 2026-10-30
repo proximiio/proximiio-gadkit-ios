@@ -304,6 +304,7 @@ struct VisitView: View {
                 onNavigator?(controller.navigator)
                 #if DEBUG
                 if DebugLaunch.current.visitList { mode = .list }
+                if DebugLaunch.current.visitSearch { isShowingAmenities = true }
                 #endif
                 monitor.start()
                 await placeCameraAtLastPosition()
@@ -1093,11 +1094,14 @@ struct VisitView: View {
     /// card's sides, the stop card 23 pt above its bottom edge and 12 pt under the buttons.
     private var cardOverlay: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .top) {
+            // A stack, not a row: the amenity list under search may reach under the toggle's column,
+            // so its width does not add to the toggle's. In a row the two were wider than a 375 pt
+            // screen and pushed the card off it (PM, iPhone X and SE, 2026-10-30).
+            ZStack(alignment: .topTrailing) {
                 if hasStops {
                     MapListToggle(showsList: Binding(get: { mode == .list }, set: { mode = $0 ? .list : .map }))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Spacer()
                 // In List mode the design hides search.
                 if !showsList {
                 VStack(alignment: .trailing, spacing: 10) {
@@ -1114,6 +1118,7 @@ struct VisitView: View {
                 }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
             // 32 pt below the card's top edge, 17 pt below the drag handle (Figma 10889:108085;
             // Nagarro, 2026-10-30: the controls sat too close to the handle).
             .padding(.top, 32)

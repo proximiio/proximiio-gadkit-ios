@@ -19,8 +19,14 @@ import SwiftUI
     case hub = "BackgroundHub"
     case map = "BackgroundMap"
 
+    /// Fills the space it gets and no more: a filled image that is taller than the screen (an
+    /// iPhone SE's screen is wider than the image) made the stacks around it taller than the
+    /// screen, and the bottom bar went off it (PM, iPhone SE, 2026-10-30).
     public var view: some View {
-        Image(rawValue, bundle: .module).resizable().scaledToFill().ignoresSafeArea()
+        Color.clear
+            .overlay { Image(rawValue, bundle: .module).resizable().scaledToFill() }
+            .clipped()
+            .ignoresSafeArea()
     }
 }
 

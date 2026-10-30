@@ -1009,6 +1009,22 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.30.1 (2026-10-30)
+
+No change for host apps' code.
+
+Fixed (PM, iPhone X and iPhone SE, 2026-10-30):
+
+- On a 375 pt wide screen the amenity list under search pushed the journey map card past the screen's right
+  edge: the Map / List control and the list's column stood in one row, and with the widest chip ("Learning &
+  Engagement") they were wider than the card. The list now reaches under the control's column instead.
+- On a screen wider than the background image's aspect (iPhone SE, 375 × 667 pt), the filled background made
+  the screen taller than the display: the bottom bar and the bottom of the stop card were below it. The
+  background now fills the screen without sizing it. The Hub and Journey Complete use the same background.
+- Checked on an iPhone SE (3rd generation) simulator, iOS 26.3: the search button, the chips and the bottom bar
+  are on the screen (`AddStopUITests.testTheAmenityListStaysOnScreen`).
+- Debug builds: `-visitSearch` opens the journey with the amenity list open.
+
 ### 1.30.0 (2026-10-30)
 
 **Breaking** (only for an app that uses `ProximiMap`; `ProximiMapView` and `ProximiExploreView` are
