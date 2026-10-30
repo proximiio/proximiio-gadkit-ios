@@ -15,9 +15,9 @@
 //  location for a take-over, `locationReadiness()` says so and `LocationAccess` asks
 //  before the bind.
 //
+import Combine
 import CoreLocation
 import Foundation
-import Observation
 import Proximiio
 #if canImport(ProximiioBlueiot)
 import ProximiioBlueiot
@@ -32,21 +32,20 @@ import ProximiioBlueiot
 }
 
 @MainActor
-@Observable
-final class WristbandSession {
+final class WristbandSession: ObservableObject {
     /// The binding client. One per process; `VenueService` attaches its position provider.
     let binding: BlueiotWristbandBinding
 
     /// The latest binding state. `nil` until the first value arrives from `stateChanges()`.
-    private(set) var state: BlueiotBindingState?
+    @Published private(set) var state: BlueiotBindingState?
 
-    @ObservationIgnored private let location = LocationAccess()
+    private let location = LocationAccess()
     /// Called after every state change, for `ProximiMap`.
-    @ObservationIgnored var onStateChange: ((BlueiotBindingState) -> Void)?
+    var onStateChange: ((BlueiotBindingState) -> Void)?
     /// The SDK that gets the relay's privacy signal (`forwardPrivacy(to:)`).
-    @ObservationIgnored private var privacySDK: Proximiio?
+    private var privacySDK: Proximiio?
     /// The value last passed to `setPositioningSourcePrivate(since:)`; `.some(nil)` is "not private".
-    @ObservationIgnored private var forwardedPrivateSince: Date??
+    private var forwardedPrivateSince: Date??
 
     init(configuration backend: GADConfiguration) {
         binding = BlueiotWristbandBinding(configuration: Self.configuration(for: backend))

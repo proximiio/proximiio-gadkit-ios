@@ -9,8 +9,8 @@
 //  bind. The scanned payload or typed code goes to the relay-api unparsed; the relay-api
 //  resolves every label format.
 //
+import Combine
 import Foundation
-import Observation
 import Proximiio
 #if canImport(ProximiioBlueiot)
 import ProximiioBlueiot
@@ -47,8 +47,7 @@ extension WristbandConnecting {
 }
 
 @MainActor
-@Observable
-@_spi(GADApp) public final class WristbandPairing: Identifiable {
+@_spi(GADApp) public final class WristbandPairing: ObservableObject, Identifiable {
     public enum Step: Equatable {
         /// "Connect your wristband" with "Scan QR code" and "Skip for now".
         case intro
@@ -67,12 +66,12 @@ extension WristbandConnecting {
         case cameraDenied
     }
 
-    private(set) var step: Step = .intro
-    private(set) var failedAttempts = 0
+    @Published private(set) var step: Step = .intro
+    @Published private(set) var failedAttempts = 0
     /// Message under the code field: an empty code, or a code the relay-api rejected.
-    private(set) var invalidCodeMessage: String?
+    @Published private(set) var invalidCodeMessage: String?
     /// The last typed code. Fills the field when the entry screen is shown again.
-    private(set) var enteredCode = ""
+    @Published private(set) var enteredCode = ""
 
     private let connector: WristbandConnecting
 

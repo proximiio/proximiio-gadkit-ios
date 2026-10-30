@@ -63,9 +63,19 @@ enum AppLanguage {
     @MainActor static func hostLocaleChanged(_ locale: Locale) {
         let host = hostLanguage(of: locale, launchLanguage: launchLanguage)
         if AppLanguageState.shared.set(host: host) {
-            FieldLog.log("app language \(current) (host locale \(locale.identifier))")
-            MapLanguageFollower.shared.apply()
+            languageChanged(reason: "host locale \(locale.identifier)")
         }
+    }
+
+    /// Posted on the main thread after `current` changed.
+    static let didChange = Notification.Name("ProximiioGADKit.AppLanguage.didChange")
+
+    /// Tells the views and the open maps that `current` changed.
+    @MainActor static func languageChanged(reason: String) {
+        FieldLog.log("app language \(current) (\(reason))")
+        if #available(iOS 17, *) { AppLanguageTracking.shared.changed() }
+        NotificationCenter.default.post(name: didChange, object: nil)
+        MapLanguageFollower.shared.apply()
     }
 
     /// Keeps the labels of `session` in `current` while the session lives.
@@ -80,9 +90,8 @@ extension Bundle {
     static var localized: Bundle { AppLanguage.bundle }
 }
 
-/// The package's language. Reading `language` in a view's body makes the view show again when it
-/// changes.
-@Observable
+/// The package's language, readable from any thread. A change reaches the views through
+/// `AppLanguage.languageChanged(reason:)`.
 final class AppLanguageState: @unchecked Sendable {
     static let shared = AppLanguageState()
 
@@ -92,22 +101,20 @@ final class AppLanguageState: @unchecked Sendable {
         var language: String { host ?? preferred }
     }
 
-    @ObservationIgnored private let storage: OSAllocatedUnfairLock<Storage>
-    @ObservationIgnored private var observer: NSObjectProtocol?
+    private let storage: OSAllocatedUnfairLock<Storage>
+    private var observer: NSObjectProtocol?
 
     private init() {
         storage = OSAllocatedUnfairLock(initialState: Storage(host: nil, preferred: AppLanguage.preferred))
         observer = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: nil) { [weak self] _ in
             guard let self, self.set(preferred: AppLanguage.preferred) else { return }
-            Task { @MainActor in
-                FieldLog.log("app language \(AppLanguage.current) (AppleLanguages)")
-                MapLanguageFollower.shared.apply()
-            }
+            Task { @MainActor in AppLanguage.languageChanged(reason: "AppleLanguages") }
         }
     }
 
+    /// On iOS 17 and later, reading it in a view's body makes the view show again when it changes.
     var language: String {
-        access(keyPath: \.language)
+        if #available(iOS 17, *) { AppLanguageTracking.shared.access() }
         return storage.withLock { $0.language }
     }
 
@@ -129,9 +136,27 @@ final class AppLanguageState: @unchecked Sendable {
             edit(&storage)
             return (before, storage.language)
         }
-        guard before != after else { return false }
+        return before != after
+    }
+}
+
+/// iOS 17 and later: makes every view that read the language show again when it changes.
+@available(iOS 17, *)
+@Observable
+final class AppLanguageTracking: @unchecked Sendable {
+    static let shared = AppLanguageTracking()
+
+    /// Only observed; it holds no value.
+    private var language: Void {
+        access(keyPath: \.language)
+    }
+
+    func access() {
+        _ = language
+    }
+
+    @MainActor func changed() {
         withMutation(keyPath: \.language) {}
-        return true
     }
 }
 
@@ -152,17 +177,31 @@ extension View {
 private struct AppLanguageModifier: ViewModifier {
     @Environment(\.locale) private var locale
     @Environment(\.appliesAppLanguage) private var isApplied
+    /// The language the content shows. A change shows this view again on iOS 16 too.
+    @State private var language = AppLanguage.current
 
     func body(content: Content) -> some View {
         if isApplied {
             content
         } else {
-            let language = AppLanguage.current
-            content
+            rebuiltOnIOS16(content)
                 .environment(\.locale, Locale(languageCode: .init(language), languageRegion: locale.region))
                 .environment(\.layoutDirection, language == "ar" ? .rightToLeft : .leftToRight)
                 .environment(\.appliesAppLanguage, true)
-                .onChange(of: locale, initial: true) { _, locale in AppLanguage.hostLocaleChanged(locale) }
+                .onValueChange(of: locale, initial: true) { _, locale in AppLanguage.hostLocaleChanged(locale) }
+                .onReceive(NotificationCenter.default.publisher(for: AppLanguage.didChange)) { _ in
+                    language = AppLanguage.current
+                }
+        }
+    }
+
+    /// iOS 16 has no Observation, so the views that read the language do not show again by
+    /// themselves: the content is built again in the new language. The open map starts again.
+    @ViewBuilder private func rebuiltOnIOS16(_ content: Content) -> some View {
+        if #available(iOS 17, *) {
+            content
+        } else {
+            content.id(language)
         }
     }
 }

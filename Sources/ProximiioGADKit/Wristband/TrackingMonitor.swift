@@ -16,8 +16,8 @@
 //  `.privacyZone`, however long the band is silent there: the visitor is not lost (Monday "Privacy
 //  zones", 2026-10-19).
 //
+import Combine
 import Foundation
-import Observation
 import Proximiio
 
 /// Whether the wristband delivers positions during a visit.
@@ -45,12 +45,11 @@ public enum TrackingHealth: Equatable, Sendable {
 }
 
 @MainActor
-@Observable
-final class TrackingMonitor {
-    private(set) var health: TrackingHealth = .waiting
-    private(set) var lastCoordinate: ProximiioCoordinate?
-    private(set) var lastLevel: Double?
-    private(set) var lastAccuracy: Double?
+final class TrackingMonitor: ObservableObject {
+    @Published private(set) var health: TrackingHealth = .waiting
+    @Published private(set) var lastCoordinate: ProximiioCoordinate?
+    @Published private(set) var lastLevel: Double?
+    @Published private(set) var lastAccuracy: Double?
 
     private var wasEverAvailable = false
     private var unavailableSince: Date?

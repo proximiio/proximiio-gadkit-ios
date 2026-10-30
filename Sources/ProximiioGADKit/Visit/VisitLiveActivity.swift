@@ -125,6 +125,6 @@ struct VisitLiveActivityDriver: View {
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)
             .onAppear { liveActivity.update(state) }
-            .onChange(of: state) { _, state in liveActivity.update(state) }
+            .onValueChange(of: state) { _, state in liveActivity.update(state) }
     }
 }

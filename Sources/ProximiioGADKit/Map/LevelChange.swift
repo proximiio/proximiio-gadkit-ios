@@ -151,7 +151,7 @@ private struct VisitorFloorModifier: ViewModifier {
                 lift = LiftDetector(dwell: venue.settings.liftRideDwell, exitFixes: venue.settings.liftExitFixes)
                 lifts = LiftArea.all(features: await venue.data.features())
             }
-            .onChange(of: venue.data.version) { _, _ in
+            .onReceive(venue.data.$version.dropFirst()) { _ in
                 Task { lifts = LiftArea.all(features: await venue.data.features()) }
             }
             .onReceive(session.$position) { position in

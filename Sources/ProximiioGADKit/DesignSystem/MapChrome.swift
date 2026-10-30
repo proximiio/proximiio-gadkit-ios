@@ -300,9 +300,9 @@ struct AmenityChipList: View {
         .scrollIndicators(.hidden)
         .scrollBounceBehavior(.basedOnSize)
         // The chips' glass reaches past the list's edges.
-        .scrollClipDisabled()
+        .scrollClipDisabledIfAvailable()
         // The last chip scrolls out of the fade.
-        .contentMargins(.bottom, scrolls ? Self.fadeHeight : 0, for: .scrollContent)
+        .scrollContentBottomMargin(scrolls ? Self.fadeHeight : 0)
         .frame(width: contentSize.width > 0 ? contentSize.width : nil)
         .frame(maxHeight: contentSize.height > 0 ? contentSize.height : nil)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { visibleHeight = $0 }

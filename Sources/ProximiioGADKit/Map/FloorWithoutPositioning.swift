@@ -23,16 +23,15 @@
 //  `FloorChangeView` plays RPR's lift or stairs animation, up or down (Lottie; PM, Monday
 //  "Elevator/Staircase animation", 2026-10-27).
 //
+import Combine
 import Lottie
-import Observation
 import Proximiio
 import ProximiioMap
 import SwiftUI
 import UIKit
 
 @MainActor
-@Observable
-final class FloorWithoutPositioningGuide {
+final class FloorWithoutPositioningGuide: ObservableObject {
     /// The lift or stairs ride to a floor without positioning.
     struct Change: Equatable {
         /// The floor the ride ends on.
@@ -55,19 +54,19 @@ final class FloorWithoutPositioningGuide {
         case returning(Change)
     }
 
-    private(set) var phase: Phase = .idle
+    @Published private(set) var phase: Phase = .idle
     /// Called when the map should show the floor of `Change`.
-    @ObservationIgnored var onEnter: ((Change) -> Void)?
+    var onEnter: ((Change) -> Void)?
     /// Called when the map should follow the visitor again.
-    @ObservationIgnored var onLeave: ((Change) -> Void)?
+    var onLeave: ((Change) -> Void)?
 
-    @ObservationIgnored private let settings: GADSettings
-    @ObservationIgnored private var destinationID: String?
+    private let settings: GADSettings
+    private var destinationID: String?
     /// The destination whose phase ended; it gets no second view.
-    @ObservationIgnored private var finishedDestinationID: String?
-    @ObservationIgnored private var timer: Task<Void, Never>?
+    private var finishedDestinationID: String?
+    private var timer: Task<Void, Never>?
     /// When the way back started: a fix after it ends the phase.
-    @ObservationIgnored private var returningSince: Date?
+    private var returningSince: Date?
 
     init(settings: GADSettings) {
         self.settings = settings

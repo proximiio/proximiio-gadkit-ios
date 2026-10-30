@@ -79,7 +79,7 @@ public struct ProximiMapView: View {
     private let onClose: (() -> Void)?
     private let onNavigator: @MainActor (JourneyNavigator) -> Void
 
-    @State private var model = HostedMapModel()
+    @StateObject private var model = HostedMapModel()
 
     /// - Parameters:
     ///   - sdk: The host app's SDK, started, with the position provider of the wristband session
@@ -194,14 +194,16 @@ public struct ProximiMapView: View {
             model.onEvent = onEvent
             await model.start(sdk: sdk, settings: settings, options: options, journey: $journey)
         }
-        .onChange(of: journey) { _, journey in model.journeyChanged(journey) }
+        .onValueChange(of: journey) { _, journey in model.journeyChanged(journey) }
+        .onReceive(NotificationCenter.default.publisher(for: AppLanguage.didChange)) { _ in
+            if #unavailable(iOS 17) { model.startAgain() }
+        }
     }
 }
 
 /// The state of a `ProximiMapView`: the venue on the host app's SDK and the journey on screen.
 @MainActor
-@Observable
-final class HostedMapModel {
+final class HostedMapModel: ObservableObject {
     struct Loaded {
         let venue: VenueService
         /// The journey the screen starts with.
@@ -213,23 +215,23 @@ final class HostedMapModel {
         let generation: Int
     }
 
-    private(set) var loaded: Loaded?
+    @Published private(set) var loaded: Loaded?
     /// The host app's journey after a change the open screen applies in place.
-    private(set) var incoming: IncomingJourney?
-    @ObservationIgnored var onEvent: ((ProximiMapEvent) -> Void)?
-    @ObservationIgnored private var venue: VenueService?
-    @ObservationIgnored private var options: ProximiMapView.Options = []
-    @ObservationIgnored private var places: [VenuePlace] = []
-    @ObservationIgnored private var galleries: [Gallery] = []
+    @Published private(set) var incoming: IncomingJourney?
+    var onEvent: ((ProximiMapEvent) -> Void)?
+    private var venue: VenueService?
+    private var options: ProximiMapView.Options = []
+    private var places: [VenuePlace] = []
+    private var galleries: [Gallery] = []
     /// The host app's journey on screen, matched to the places.
-    @ObservationIgnored private var hosted: HostedJourney?
+    private var hosted: HostedJourney?
     /// The journey last shown or written. Another value from the host app changes the screen.
-    @ObservationIgnored private var current: ProximiJourney?
+    private var current: ProximiJourney?
     /// The host app's latest journey while the venue loads.
-    @ObservationIgnored private var latest: ProximiJourney?
-    @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var revision = 0
-    @ObservationIgnored private var isStarting = false
+    private var latest: ProximiJourney?
+    private var generation = 0
+    private var revision = 0
+    private var isStarting = false
 
     /// Loads the venue and shows `journey`. Called again when the view is back on screen, it follows
     /// the venue data changes again if the SDK stopped in between.
@@ -269,6 +271,15 @@ final class HostedMapModel {
         incoming = nil
         generation += 1
         loaded = Loaded(venue: venue, journey: matched.journey, kind: journey.kind, options: options, generation: generation)
+    }
+
+    /// Starts the screen again with the journey as it is now: iOS 16 builds the view again after a
+    /// change of the app language (`AppLanguage`), and the screen must not start with the journey
+    /// it opened with.
+    func startAgain() {
+        guard let current, loaded != nil else { return }
+        FieldLog.log("hosted map: start again · app language \(AppLanguage.current)")
+        show(current)
     }
 
     /// The binding changed. The open screen applies a value the view did not write in place; one it

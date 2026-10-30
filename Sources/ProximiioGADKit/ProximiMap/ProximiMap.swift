@@ -12,9 +12,9 @@
 //  the package. The host app scans the wristband's QR code itself and passes the code to
 //  `connectWristband(code:)`.
 //
+import Combine
 import CoreLocation
 import Foundation
-import Observation
 import Proximiio
 import ProximiioMap
 #if canImport(ProximiioBlueiot)
@@ -22,8 +22,7 @@ import ProximiioBlueiot
 #endif
 
 @MainActor
-@Observable
-public final class ProximiMap {
+public final class ProximiMap: ObservableObject {
     /// The screens and sheets `open(_:)` shows.
     public enum Screen: String, Equatable, Sendable, CaseIterable {
         /// The museum map with the gallery legend, search and routes to amenities.
@@ -48,12 +47,12 @@ public final class ProximiMap {
     }
 
     public let configuration: GADConfiguration
-    public private(set) var status: Status = .idle
+    @Published public private(set) var status: Status = .idle
     /// The stored journey, or `nil`. It survives app launches.
-    public private(set) var journey: JourneySummary?
+    @Published public private(set) var journey: JourneySummary?
     /// The accessibility needs for routes, on top of the accessible routes button the visitor can
     /// turn on.
-    public var routeAccessibility: RouteAccessibility = .none
+    @Published public var routeAccessibility: RouteAccessibility = .none
 
     /// `true` once the visitor is at the museum (`ProximiMapEvent.arrivedAtMuseum`).
     public var isAtMuseum: Bool { arrival.isAtMuseum }
@@ -82,29 +81,31 @@ public final class ProximiMap {
         var id: String { rawValue }
     }
 
-    var cover: Cover?
-    var sheet: Sheet?
-    private(set) var venue: VenueService?
-    private(set) var places: [VenuePlace] = []
-    private(set) var galleries: [Gallery] = []
+    @Published var cover: Cover?
+    @Published var sheet: Sheet?
+    @Published private(set) var venue: VenueService?
+    @Published private(set) var places: [VenuePlace] = []
+    @Published private(set) var galleries: [Gallery] = []
     let session: WristbandSession
     let arrival = ArrivalDetector()
 
-    @ObservationIgnored private var coverScreen: Screen?
-    @ObservationIgnored private var sheetScreen: Screen?
+    private var coverScreen: Screen?
+    private var sheetScreen: Screen?
     /// Runs when the cover or sheet on screen has been dismissed: the next one. Presenting while a
     /// presentation is still dismissing can fail and keep its state set with nothing on screen
     /// (Monday "UI gets stuck", 2026-10-15).
-    @ObservationIgnored private var afterDismiss: (() -> Void)?
-    @ObservationIgnored private var continuations: [UUID: AsyncStream<ProximiMapEvent>.Continuation] = [:]
-    @ObservationIgnored private var startTask: Task<Void, Error>?
-    @ObservationIgnored private var sessionTask: Task<Void, Never>?
-    @ObservationIgnored private var tasks: [Task<Void, Never>] = []
-    @ObservationIgnored private let notifier = GeofenceNotifier()
-    @ObservationIgnored private var lastWristband: WristbandStatus?
+    private var afterDismiss: (() -> Void)?
+    private var continuations: [UUID: AsyncStream<ProximiMapEvent>.Continuation] = [:]
+    private var startTask: Task<Void, Error>?
+    private var sessionTask: Task<Void, Never>?
+    private var tasks: [Task<Void, Never>] = []
+    private let notifier = GeofenceNotifier()
+    private var lastWristband: WristbandStatus?
+    /// Forwards the changes of `session` and `arrival`.
+    private var forwarding: Set<AnyCancellable> = []
     #if DEBUG
     /// `-hostedMap`: the journey of the `ProximiMapView` the debug launch opens.
-    var hostedJourney = ProximiJourney(stops: [])
+    @Published var hostedJourney = ProximiJourney(stops: [])
     #endif
 
     public init(configuration: GADConfiguration) {
@@ -116,6 +117,11 @@ public final class ProximiMap {
             self?.emit(.arrivedAtMuseum)
         }
         session.onStateChange = { [weak self] _ in self?.wristbandStateChanged() }
+        // `isAtMuseum`, `isLocationDenied` and `wristband` read these two objects.
+        for nested in [session.objectWillChange, arrival.objectWillChange] {
+            nested.sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
+                .store(in: &forwarding)
+        }
         #if DEBUG
         if DebugLaunch.current.routeAccessibility != .none {
             routeAccessibility = DebugLaunch.current.routeAccessibility
@@ -418,7 +424,7 @@ public final class ProximiMap {
         }
     }
 
-    @ObservationIgnored private var pendingToken: UUID?
+    private var pendingToken: UUID?
 
     // Called by `ProximiMapPresenter`.
 

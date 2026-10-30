@@ -25,10 +25,10 @@ struct VisitView: View {
     @Environment(\.visitEventHandler) private var emit
     @Environment(\.routeAccessibility) private var hostAccessibility
     @AppStorage(RouteAccessibility.accessibleRoutesKey) private var accessibleRoutes = false
-    @State private var controller: VisitController
+    @StateObject private var controller: VisitController
     @State private var mode: VisitMode = .map
     @State private var stopToSkip: JourneyStop?
-    @State private var monitor: TrackingMonitor
+    @StateObject private var monitor: TrackingMonitor
     @State private var places: [VenuePlace] = []
     /// The search shortcuts' choice and order (`in_search`, `search_order`).
     /// The amenity shortcuts of the search, from the amenities' `in_search` and `search_order`.
@@ -86,7 +86,7 @@ struct VisitView: View {
     @State private var leavesAfterDismiss = false
     @State private var stopNearby: StopNearbyDetector
     /// The lift or stairs view and the map of a floor without positioning.
-    @State private var floorGuide: FloorWithoutPositioningGuide
+    @StateObject private var floorGuide: FloorWithoutPositioningGuide
     private let venue: VenueService
     private let kind: JourneyKind
     private let options: ProximiMapView.Options
@@ -153,10 +153,10 @@ struct VisitView: View {
         _mode = State(initialValue: mode)
         let settings = venue.settings
         self.settings = settings
-        _monitor = State(initialValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
+        _monitor = StateObject(wrappedValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
         _stopNearby = State(initialValue: StopNearbyDetector(nearbyMeters: settings.stopNearbyMeters))
         _liveActivity = State(initialValue: VisitLiveActivity(minimumUpdateInterval: settings.liveActivityMinimumInterval))
-        _floorGuide = State(initialValue: FloorWithoutPositioningGuide(settings: settings))
+        _floorGuide = StateObject(wrappedValue: FloorWithoutPositioningGuide(settings: settings))
         let session = MapStyle.session(
             sdk: venue.sdk,
             // The leg keeps its shape until the arrival; the walked part is translucent (PM review
@@ -167,7 +167,7 @@ struct VisitView: View {
         #if DEBUG
         if DebugLaunch.current.visitAutoAdvance { rules.advance = .onDeparture(meters: 5) }
         #endif
-        _controller = State(initialValue: VisitController(
+        _controller = StateObject(wrappedValue: VisitController(
             session: session, journey: journey, rules: rules, keepsOrder: kind.keepsOrder,
             countsOutOfOrder: kind.countsOutOfOrder,
             managesProgress: options.contains(.progress),
@@ -264,9 +264,9 @@ struct VisitView: View {
         content
             .animation(.default, value: mode)
             .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
-            .onChange(of: floorGuide.phase) { _, _ in floorGuidePhaseChanged() }
-            .onChange(of: mode) { _, mode in emit(.modeChanged(mode)) }
-            .onChange(of: accessibility) { _, accessibility in
+            .onValueChange(of: floorGuide.phase) { _, _ in floorGuidePhaseChanged() }
+            .onValueChange(of: mode) { _, mode in emit(.modeChanged(mode)) }
+            .onValueChange(of: accessibility) { _, accessibility in
                 Task { await controller.setAccessibility(accessibility) }
             }
             .task {
@@ -326,8 +326,8 @@ struct VisitView: View {
                 isReady = true
                 destinationChanged(destination.wrappedValue)
             }
-            .onChange(of: destination.wrappedValue) { _, destination in destinationChanged(destination) }
-            .onChange(of: isPaused.wrappedValue) { _, paused in
+            .onValueChange(of: destination.wrappedValue) { _, destination in destinationChanged(destination) }
+            .onValueChange(of: isPaused.wrappedValue) { _, paused in
                 if pausedWrite == paused {
                     pausedWrite = nil
                     return
@@ -370,7 +370,7 @@ struct VisitView: View {
                     }
                 }
             }
-            .onChange(of: amenityOnMap) { _, place in show(amenity: place) }
+            .onValueChange(of: amenityOnMap) { _, place in show(amenity: place) }
             // Field log only. Camera diagnostics for the map library: why the heading-up follow does not start on a
             // device (PM review 2026-10-12).
             .onReceive(controller.session.$cameraMode) { mode in
@@ -413,10 +413,10 @@ struct VisitView: View {
                     evaluateAmbiguity()
                 }
             }
-            .onChange(of: controller.navigator.isFinished) { _, isFinished in
+            .onValueChange(of: controller.navigator.isFinished) { _, isFinished in
                 if isFinished && options.contains(.journeyComplete) { isShowingWrapUp = true }
             }
-            .onChange(of: incoming) { _, incoming in
+            .onValueChange(of: incoming) { _, incoming in
                 guard let incoming else { return }
                 Task { await controller.apply(incoming.journey) }
             }
@@ -462,15 +462,15 @@ struct VisitView: View {
             }
             // No tracking or wristband alerts: the host app handles the wristband states
             // (PM 2026-10-15).
-            .onChange(of: monitor.health) { _, health in
+            .onValueChange(of: monitor.health) { _, health in
                 emit(.trackingChanged(health))
                 applyPositionStyle(for: health)
             }
-            .onChange(of: controller.session.position == nil) { _, hasNoPosition in
+            .onValueChange(of: controller.session.position == nil) { _, hasNoPosition in
                 if !hasNoPosition { showVisitorThenFollow(reason: "first position") }
             }
             .followsVisitorFloor(controller.session, venue: venue, isPaused: floorGuide.isActive || rideFloor != nil)
-            .onChange(of: ride) { shown, now in
+            .onValueChange(of: ride) { shown, now in
                 if now == nil, let shown { holdFloor(of: shown) }
             }
             .onReceive(controller.session.$guidance) { _ in
@@ -506,13 +506,13 @@ struct VisitView: View {
                 checkStopNearby(position: controller.session.position, guidance: guidance)
                 controller.checkLegDeviation(guidance, isFloorGuideActive: floorGuide.isActive)
             }
-            .onChange(of: controller.navigator.activeStop?.id) { _, _ in
+            .onValueChange(of: controller.navigator.activeStop?.id) { _, _ in
                 checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
                 checkArrival()
                 applyStopMarkers()
             }
-            .onChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
-            .onChange(of: venue.data.version) { _, _ in
+            .onValueChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
+            .onReceive(venue.data.$version.dropFirst()) { _ in
                 let routeNetworkChanged = venue.data.changedKinds.contains(.features)
                 Task {
                     await loadVenueData()
@@ -529,7 +529,7 @@ struct VisitView: View {
                     refreshLevelChanger()
                 }
             }
-            .onChange(of: controller.galleryAhead) { _, gallery in galleryAheadChanged(gallery) }
+            .onValueChange(of: controller.galleryAhead) { _, gallery in galleryAheadChanged(gallery) }
             .onReceive(controller.session.$selectedFloor) { _ in
                 Task { @MainActor in
                     refreshMapLayers()

@@ -23,7 +23,7 @@ The host app uses one of two entry points:
 
 ## Requirements
 
-- iOS 17 or later. Swift 6 language mode (`swift-tools-version: 6.0`).
+- iOS 16.4 or later. Swift 6 language mode (`swift-tools-version: 6.0`).
 - SwiftUI host app.
 - Built and tested with Xcode 26.3 and Xcode 27.
 - Read access to this repository. The SDK and Map binary packages are public.
@@ -75,7 +75,9 @@ The package views show Arabic when the language is Arabic, else English. The lan
 - else the first of the app's `AppleLanguages` (iOS Settings, or an app that sets it itself).
 
 A change applies at once, also to an open map: the package's texts, the layout direction of its views
-(right to left in Arabic) and the map labels. The host app needs no restart for the package views.
+(right to left in Arabic) and the map labels. The host app needs no restart for the package views. On
+iOS 16 the open package view is built again in the new language: an open map starts again, at the
+journey's current state.
 
 ```swift
 // A host app that switches its language with the SwiftUI environment:
@@ -100,7 +102,7 @@ import SwiftUI
 @main
 struct MuseumApp: App {
     // One ProximiMap for the life of the app, for example from the DI container.
-    @State private var map = ProximiMap(configuration: GADConfiguration(
+    @StateObject private var map = ProximiMap(configuration: GADConfiguration(
         apiBaseURL: URL(string: "https://api.example.com")!,
         applicationToken: applicationToken,
         relayAPIBaseURL: URL(string: "https://relay-api.example.com")!,
@@ -126,7 +128,7 @@ struct MuseumApp: App {
 }
 
 struct HomeView: View {
-    let map: ProximiMap
+    @ObservedObject var map: ProximiMap
 
     var body: some View {
         Button("Museum map") { map.open(.museumMap) }
@@ -140,8 +142,8 @@ struct HomeView: View {
 
 ## ProximiMap
 
-`ProximiMap` is `@MainActor` and `@Observable`: SwiftUI views that read its properties update with
-them.
+`ProximiMap` is `@MainActor` and an `ObservableObject`. Hold it with `@StateObject`, and pass it to
+the views that read its properties as `@ObservedObject`; they update with them.
 
 | Member | |
 |---|---|
@@ -1006,6 +1008,23 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.30.0 (2026-10-30)
+
+**Breaking** (only for an app that uses `ProximiMap`; `ProximiMapView` and `ProximiExploreView` are
+unchanged):
+- `ProximiMap` is an `ObservableObject`, no longer `@Observable`. Hold it with `@StateObject` instead of
+  `@State`, and pass it as `@ObservedObject` instead of `@Bindable` or a plain property.
+
+Changed:
+
+- The package and its Live Activity target support iOS 16.4 and later, was iOS 17 (owner, 2026-10-30:
+  the PM tests on an iPhone X, whose last iOS is 16.7). The SDK and the map support iOS 15.
+- The package's classes are `ObservableObject`s; Observation needs iOS 17.
+- On iOS 16 a change of the app language builds the open package view again: an open map starts again,
+  at the journey's current state. iOS 17 and later update the texts in place, as in 1.28.0.
+- On iOS 16 the amenity list's chips are clipped at the list's edges, and the bottom space of the
+  scrolling lists is a safe-area inset (`contentMargins` and `scrollClipDisabled` need iOS 17).
 
 ### 1.29.0 (2026-10-30)
 

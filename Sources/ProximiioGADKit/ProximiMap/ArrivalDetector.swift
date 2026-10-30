@@ -11,25 +11,24 @@
 //  authorization, which `VenueService.start` requests. No region monitoring: that needs Always
 //  authorization, which the package does not request.
 //
+import Combine
 import CoreLocation
 import Foundation
-import Observation
 import Proximiio
 
 @MainActor
-@Observable
-final class ArrivalDetector: NSObject, CLLocationManagerDelegate {
+final class ArrivalDetector: NSObject, ObservableObject, CLLocationManagerDelegate {
     /// Distance from a place of the venue that counts as "at the museum", in metres.
     nonisolated static let radius: CLLocationDistance = 400
 
-    private(set) var isAtMuseum = false
+    @Published private(set) var isAtMuseum = false
     /// Location authorization, for "Location is required".
-    private(set) var authorization: CLAuthorizationStatus
+    @Published private(set) var authorization: CLAuthorizationStatus
     /// Called once, when `isAtMuseum` becomes `true`.
-    @ObservationIgnored var onArrival: (() -> Void)?
+    var onArrival: (() -> Void)?
 
-    @ObservationIgnored private let manager = CLLocationManager()
-    @ObservationIgnored private var places: [ProximiioCoordinate] = []
+    private let manager = CLLocationManager()
+    private var places: [ProximiioCoordinate] = []
 
     override init() {
         authorization = manager.authorizationStatus

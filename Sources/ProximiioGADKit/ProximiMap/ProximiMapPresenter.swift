@@ -20,7 +20,7 @@ extension View {
 }
 
 struct ProximiMapPresenter: ViewModifier {
-    @Bindable var map: ProximiMap
+    @ObservedObject var map: ProximiMap
 
     func body(content: Content) -> some View {
         content
@@ -138,7 +138,7 @@ private struct JourneyReadyFlow: View {
 /// from `onNavigator` and the events of the last one, and show `isPaused` and the view's last events,
 /// for UI tests.
 private struct HostedMapCheck: View {
-    @Bindable var map: ProximiMap
+    @ObservedObject var map: ProximiMap
     let sdk: Proximiio
     /// The names of the navigator's events, oldest first.
     @State private var navigatorEvents: [String] = []
@@ -207,13 +207,13 @@ private struct HostedMapCheck: View {
                     Button(isPaused ? "Host resume" : "Host pause") { isPaused.toggle() }.font(.caption2)
                     Button("Close map") { map.cover = nil }.font(.caption2)
                 }
-                Text("navigator \(navigators): \(navigatorEvents.suffix(6).joined(separator: " "))")
+                Text(verbatim: "navigator \(navigators): \(navigatorEvents.suffix(6).joined(separator: " "))")
                     .font(.caption2)
                     .accessibilityIdentifier("hostedNavigatorEvents")
-                Text("destination \(destination?.poiID ?? "none")")
+                Text(verbatim: "destination \(destination?.poiID ?? "none")")
                     .font(.caption2)
                     .accessibilityIdentifier("hostedDestination")
-                Text("paused \(isPaused) · events \(viewEvents.suffix(4).joined(separator: " "))")
+                Text(verbatim: "paused \(isPaused) · events \(viewEvents.suffix(4).joined(separator: " "))")
                     .font(.caption2)
                     .accessibilityIdentifier("hostedPaused")
             }

@@ -20,27 +20,26 @@
 //  6.0.0-beta.47). A running `JourneyNavigator` routes its legs again only on
 //  `routeNetworkChanged()`, which `VisitView` calls on a change of `.features`.
 //
+import Combine
 import Foundation
-import Observation
 import Proximiio
 
 @MainActor
-@Observable
-final class VenueDataRefresh {
+final class VenueDataRefresh: ObservableObject {
     /// Changes when the features, geofences, floors, places or amenities changed.
-    private(set) var version = 0
+    @Published private(set) var version = 0
     /// The kinds of the last change, set before `version` changes.
-    @ObservationIgnored private(set) var changedKinds: Set<VenueDataKind> = []
+    private(set) var changedKinds: Set<VenueDataKind> = []
     /// Runs after `version` changed. Set by `ProximiMap`.
-    @ObservationIgnored var onChange: (() -> Void)?
+    var onChange: (() -> Void)?
 
-    @ObservationIgnored let sdk: Proximiio
+    let sdk: Proximiio
     /// The reads every caller of `features()`, `geofences()` and `amenities()` waits for. `nil`
     /// until the first call, and after a change of the kind.
-    @ObservationIgnored private var featuresRead: Task<[ProximiioFeature], Never>?
-    @ObservationIgnored private var geofencesRead: Task<[ProximiioGeofence], Never>?
-    @ObservationIgnored private var amenitiesRead: Task<[ProximiioAmenity], any Error>?
-    @ObservationIgnored private var follow: Task<Void, Never>?
+    private var featuresRead: Task<[ProximiioFeature], Never>?
+    private var geofencesRead: Task<[ProximiioGeofence], Never>?
+    private var amenitiesRead: Task<[ProximiioAmenity], any Error>?
+    private var follow: Task<Void, Never>?
 
     /// Whether the changes are followed: after `start()`, until `stop()` or until the SDK stopped.
     var isFollowing: Bool { follow != nil }

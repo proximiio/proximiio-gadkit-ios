@@ -37,13 +37,13 @@ struct MuseumMapView: View {
     /// The lifts, staircases and escalators on every floor they serve.
     @State private var mapLayers = JourneyMapLayers()
     /// The lift or stairs view and the map of a floor without positioning.
-    @State private var floorGuide: FloorWithoutPositioningGuide
+    @StateObject private var floorGuide: FloorWithoutPositioningGuide
 
     init(venue: VenueService, initialDestination: VenuePlace? = nil) {
         self.venue = venue
         self.initialDestination = initialDestination
         _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.options(settings: venue.settings)))
-        _floorGuide = State(initialValue: FloorWithoutPositioningGuide(settings: venue.settings))
+        _floorGuide = StateObject(wrappedValue: FloorWithoutPositioningGuide(settings: venue.settings))
     }
 
     @State private var isShowingAmenities = false
@@ -114,7 +114,7 @@ struct MuseumMapView: View {
         // The follow camera keeps the initial venue framing. The first position zooms
         // in to `MapOptions.recentreZoom` on the visitor.
         .followsVisitorFloor(session, venue: venue, isPaused: floorGuide.isActive)
-        .onChange(of: venue.data.version) { _, _ in
+        .onReceive(venue.data.$version.dropFirst()) { _ in
             Task { await loadPlaces() }
         }
         .onReceive(session.$guidance) { _ in
@@ -128,13 +128,13 @@ struct MuseumMapView: View {
         .onReceive(session.$selectedFloor) { floor in
             mapLayers.update(fills: [], level: floor.level)
         }
-        .onChange(of: destination) { _, place in
+        .onValueChange(of: destination) { _, place in
             mapLayers.updateHighlight(JourneyMapLayers.highlight(of: place))
         }
-        .onChange(of: accessibility) {
+        .onValueChange(of: accessibility) { _, _ in
             if let destination { Task { await route(to: destination) } }
         }
-        .onChange(of: session.position == nil) { _, hasNoPosition in
+        .onValueChange(of: session.position == nil) { _, hasNoPosition in
             if !hasNoPosition { session.recentre() }
         }
         .sheet(item: $detailPlace) { place in

@@ -77,47 +77,46 @@
 //  again. `resumeFromPause()` draws the leg again from the visitor; a personalised journey is ordered
 //  again from the visitor first, as after a detour.
 //
+import Combine
 import Foundation
-import Observation
 import Proximiio
 import ProximiioMap
 
 @MainActor
-@Observable
-final class VisitController {
+final class VisitController: ObservableObject {
     let session: ProximiioMapSession
     let navigator: JourneyNavigator
     /// `true` for `GADSettings.offRouteWarningSeconds` after `farFromRoute`, `offRouteTooLong` or a
     /// wrong floor, until the visitor closes the warning, resumes the journey or adds a stop.
-    private(set) var isOffRoute = false
+    @Published private(set) var isOffRoute = false
     /// `pause()` until `resumeFromPause()`.
-    private(set) var isPaused = false
-    @ObservationIgnored private var offRouteWarning: Task<Void, Never>?
+    @Published private(set) var isPaused = false
+    private var offRouteWarning: Task<Void, Never>?
     /// Since when the fixes have been on a floor the route does not take.
-    @ObservationIgnored private var wrongFloorSince: Date?
+    private var wrongFloorSince: Date?
     /// The journey was routed again for the wrong floor the visitor is still on.
-    @ObservationIgnored private var isRoutedForWrongFloor = false
+    private var isRoutedForWrongFloor = false
     /// `true` while the controller routes the journey again: the order after an artwork visited out
     /// of order or a closer artwork, the leg from the visitor, the end of a detour.
-    private(set) var isRerouting = false
-    @ObservationIgnored private var reroutes = 0 {
+    @Published private(set) var isRerouting = false
+    private var reroutes = 0 {
         didSet { isRerouting = reroutes > 0 }
     }
     /// From `farFromRoute` or `offRouteTooLong` until the visitor is back on the route or a new leg
     /// starts. The warning can be closed meanwhile.
-    @ObservationIgnored private var isOffRouteEpisode = false {
+    private var isOffRouteEpisode = false {
         didSet { if !isOffRouteEpisode { isLegOffRouteEpisode = false } }
     }
     /// The episode started off the leg (`checkLegDeviation`); it ends when the visitor is back on it.
-    @ObservationIgnored private var isLegOffRouteEpisode = false
-    @ObservationIgnored private var lastCloserArtworkCheck = Date.distantPast
+    private var isLegOffRouteEpisode = false
+    private var lastCloserArtworkCheck = Date.distantPast
     /// The stop the navigator walks to for a moment while an artwork visited out of order moves
     /// ahead. `VisitView` reports no `nextStop` for it.
-    private(set) var passingStopID: String?
+    @Published private(set) var passingStopID: String?
     /// Called after an artwork stop is marked done: `true` for the active stop, `false` for an
     /// artwork visited out of order. `VisitView` reports `VisitEvent.artworkReached` and
     /// `artworkVisitedOutOfOrder`.
-    @ObservationIgnored var onArtworkDone: ((JourneyStop, _ isActiveStop: Bool) -> Void)?
+    var onArtworkDone: ((JourneyStop, _ isActiveStop: Bool) -> Void)?
     private var tasks: [Task<Void, Never>] = []
     private var isStarted = false
     /// `true` once `navigator.start()` has returned.
@@ -130,7 +129,7 @@ final class VisitController {
     /// The navigator's legs (gallery first).
     private let galleryRouting: GalleryFirstRouting
     /// The gallery the leg to the active artwork ends at, or `nil` when it ends at the artwork.
-    private(set) var galleryAhead: GalleryDestination?
+    @Published private(set) var galleryAhead: GalleryDestination?
 
     /// Times and distances (`GADSettings`): the move to the next artwork after an arrival, the
     /// wait for a fix before ordering, the out-of-order dwell, the detour arrival, the off-route
@@ -196,7 +195,7 @@ final class VisitController {
 
     /// Stores the journey after each change; `nil` after Journey Complete. `ProximiMap` writes
     /// `VisitStore`, `ProximiMapView` the host app's journey.
-    @ObservationIgnored let persist: @MainActor (Journey?) -> Void
+    let persist: @MainActor (Journey?) -> Void
 
     init(
         session: ProximiioMapSession,

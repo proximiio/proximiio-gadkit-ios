@@ -101,7 +101,7 @@ struct ExploreMuseumView: View {
         .animation(.easeInOut(duration: 0.2), value: selected)
         .task { await start() }
         .task { await MapDiagnostics.follow(session, name: "explore") }
-        .onChange(of: venue.data.version) { _, _ in
+        .onReceive(venue.data.$version.dropFirst()) { _ in
             Task { await load() }
         }
         .onReceive(session.$selectedFloor) { floor in
@@ -109,7 +109,7 @@ struct ExploreMuseumView: View {
             level = floor.level
             applyMapLayers()
         }
-        .onChange(of: selected) { _, _ in
+        .onValueChange(of: selected) { _, _ in
             applyMapLayers()
             applyHiddenFeatures()
         }
@@ -277,7 +277,7 @@ struct ExploreMuseumView: View {
                         }
                     }
                     // The last row can scroll above the fade.
-                    .contentMargins(.bottom, Self.listFadeHeight, for: .scrollContent)
+                    .scrollContentBottomMargin(Self.listFadeHeight)
                     // The rows fade out above the tab bar: its glass shows the text under it (PM,
                     // Monday "Explore museum: spaces list fade", 2026-10-28: 30 pt did not hide them).
                     .mask {

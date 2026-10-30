@@ -8,7 +8,7 @@
 import SwiftUI
 
 @_spi(GADApp) public struct WristbandPairingView: View {
-    @Bindable var pairing: WristbandPairing
+    @ObservedObject var pairing: WristbandPairing
     /// "Skip for now", "Back to Hub" and "Continue" all leave the flow.
     let onFinish: () -> Void
 
@@ -198,7 +198,7 @@ private struct WristbandStatusCard: View {
 
 /// "Enter your wristband code". The design references this screen; it is not drawn yet.
 struct WristbandCodeEntryView: View {
-    @Bindable var pairing: WristbandPairing
+    @ObservedObject var pairing: WristbandPairing
     @State private var code: String
     @FocusState private var isFocused: Bool
 

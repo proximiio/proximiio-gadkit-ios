@@ -12,7 +12,7 @@ import PackageDescription
 let package = Package(
     name: "ProximiioGADKit",
     defaultLocalization: "en",
-    platforms: [.iOS(.v17)],
+    platforms: [.iOS("16.4")],
     products: [
         .library(name: "ProximiioGADKit", targets: ["ProximiioGADKit"]),
         // The Live Activity attributes and widget, for the host app's widget extension.

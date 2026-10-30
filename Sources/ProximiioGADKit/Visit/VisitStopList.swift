@@ -219,7 +219,7 @@ private struct SwipeToSkipRow<Content: View>: View {
                 }
         }
         .animation(.snappy(duration: 0.25), value: isRevealed)
-        .onChange(of: isDragging) { _, dragging in
+        .onValueChange(of: isDragging) { _, dragging in
             guard !dragging, axis != .undecided || isSwiping else { return }
             axis = .undecided
             isSwiping = false
