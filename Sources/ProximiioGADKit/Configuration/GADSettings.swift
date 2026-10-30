@@ -21,8 +21,10 @@ public struct GADSettings: Equatable, Sendable {
 
     /// `true`: the journey moves to the next stop when the visitor leaves the geofence of the active
     /// artwork: on the SDK's exit event, or after `geofenceExitDelay` outside it without one (Nagarro,
-    /// 2026-10-30: the next stop comes from the exit event). `false`: `artworkAdvanceDelay` after the
-    /// visitor entered it.
+    /// 2026-10-30: the next stop comes from the exit event). Inside the geofence the artwork is
+    /// reached: the card and the destination marker keep the artwork, and the route shows the leg to
+    /// the next stop (`JourneyNavigator.drawsNextLegWhileReached`; GAD PM and Nagarro, 2026-10-30).
+    /// `false`: `artworkAdvanceDelay` after the visitor entered it.
     public var advancesOnArtworkExit = true
     /// With `advancesOnArtworkExit` `false`: seconds between the arrival at an artwork (its geofence)
     /// and the route to the next stop.
@@ -69,6 +71,11 @@ public struct GADSettings: Equatable, Sendable {
     /// The position dot is drawn on the route while it is within this many metres of it. Display
     /// only; guidance and arrival use the real position.
     public var routeSnapMeters: Double = 0.5
+    /// The walked part of the route moves only while the position is within this many metres of the
+    /// leg; further away it stays where it was (`RouteFollowRules.progressCorridorMeters`). The
+    /// remaining distance and the instructions follow every position. `nil`: the walked part follows
+    /// the position at any distance (PM, Monday "Route marked as walked too far", 2026-10-30).
+    public var progressCorridorMeters: Double? = 3
 
     // MARK: Map
 

@@ -28,6 +28,19 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.startZoomSeconds == 2)
     }
 
+    /// The walked part of the route moves only within 3 m of the leg, on the way to an artwork and to
+    /// an amenity (PM, Monday "Route marked as walked too far", 2026-10-30; map 6.0.0-beta.60).
+    @Test @MainActor func theWalkedPartMovesOnlyNearTheRoute() {
+        var settings = GADSettings.standard
+        #expect(settings.progressCorridorMeters == 3)
+        #expect(VisitController.artworkGuidanceRules(settings).progressCorridorMeters == 3)
+        #expect(VisitController.detourGuidanceRules(settings).progressCorridorMeters == 3)
+        #expect(VisitController.artworkGuidanceRules(settings).arrivalDwellSeconds == .infinity)
+        settings.progressCorridorMeters = nil
+        #expect(VisitController.artworkGuidanceRules(settings).progressCorridorMeters == nil)
+        #expect(VisitController.detourGuidanceRules(settings).progressCorridorMeters == nil)
+    }
+
     /// The heading-up map turns in 1.5 s and ignores changes under 5° (Nagarro, 2026-10-29; map
     /// 6.0.0-beta.58).
     @Test @MainActor func theMapTurnsSlowlyAndIgnoresSmallHeadingChanges() {

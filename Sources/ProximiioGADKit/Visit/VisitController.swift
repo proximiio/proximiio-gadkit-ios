@@ -18,7 +18,11 @@
 //  to that long after the visitor left it. The journey moves to the next stop when the visitor
 //  leaves the artwork's geofence (`GADSettings.advancesOnArtworkExit`; Nagarro, 2026-10-30): on the
 //  SDK's exit event (`artworkGeofenceExited`), after `geofenceExitDelay` outside it without one, or
-//  at once when the visitor is in another open artwork's geofence. Without the setting it moves on
+//  at once when the visitor is in another open artwork's geofence. Until then the artwork is reached
+//  (`JourneyNavigator.markReached(stopID:)`): it stays the active stop with the destination marker,
+//  and the navigator draws the leg to the next stop from the visitor (`drawsNextLegWhileReached`;
+//  GAD PM and Nagarro, 2026-10-30). A reached artwork that the navigator moves past (a detour, a
+//  chosen stop) is reported visited too. Without the setting the journey moves on
 //  `GADSettings.artworkAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
 //  the visitor walks past without entering its geofence stays unvisited until it is skipped.
 //  Out of order: a visitor inside the geofence of another open artwork for
@@ -138,15 +142,28 @@ final class VisitController: ObservableObject {
 
     /// Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance
     /// off; the artwork geofence is the only arrival. Off the leg beyond `GADSettings.offRouteMeters`.
+    /// The walked part of the route moves only within `GADSettings.progressCorridorMeters` of the leg.
     private var artworkGuidanceRules: RouteFollowRules {
-        RouteFollowRules(arrivalDwellSeconds: .infinity, offRouteMeters: settings.offRouteMeters)
+        Self.artworkGuidanceRules(settings)
+    }
+
+    /// `artworkGuidanceRules` for `settings`. Pure; covered by tests.
+    static func artworkGuidanceRules(_ settings: GADSettings) -> RouteFollowRules {
+        var rules = RouteFollowRules(arrivalDwellSeconds: .infinity, offRouteMeters: settings.offRouteMeters)
+        rules.progressCorridorMeters = settings.progressCorridorMeters
+        return rules
     }
 
     /// Guidance on a leg to an amenity detour: arrival within 2.5 × the fix accuracy, between
     /// `amenityArrivalMinimumMeters` and `amenityArrivalMaximumMeters`, for `amenityArrivalDwell`.
     /// The SDK default (at least 3 m, 2 s) missed visitors who walked past a stop with relay fixes.
     private var detourGuidanceRules: RouteFollowRules {
-        RouteFollowRules(
+        Self.detourGuidanceRules(settings)
+    }
+
+    /// `detourGuidanceRules` for `settings`. Pure; covered by tests.
+    static func detourGuidanceRules(_ settings: GADSettings) -> RouteFollowRules {
+        var rules = RouteFollowRules(
             arrival: .fromAccuracy(
                 multiplier: 2.5,
                 minimumMeters: settings.amenityArrivalMinimumMeters,
@@ -155,6 +172,8 @@ final class VisitController: ObservableObject {
             arrivalDwellSeconds: settings.amenityArrivalDwell,
             offRouteMeters: settings.offRouteMeters
         )
+        rules.progressCorridorMeters = settings.progressCorridorMeters
+        return rules
     }
 
     /// `remote_id` of each artwork POI, by POI id. Set once the venue's features are loaded.
@@ -171,6 +190,8 @@ final class VisitController: ObservableObject {
     /// With `GADSettings.advancesOnArtworkExit`: the active artwork whose geofence the visitor
     /// entered. The journey moves on when they leave it.
     private var arrivedStopID: String?
+    /// The artwork the navigator holds reached (`markReached`) and that is not yet reported visited.
+    private var reachedStopID: String?
     /// The first fix outside the geofence of `arrivedStopID`, for a leave without an exit event.
     private var outsideArrivedSince: Date?
     /// Time inside the geofence of each open artwork that is not the active stop.
@@ -218,8 +239,9 @@ final class VisitController: ObservableObject {
         let routing = GalleryFirstRouting(inner: ProximiioJourneyRouting(sdk: session.sdk))
         self.galleryRouting = routing
         self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules,
-                                          guidanceRules: RouteFollowRules(arrivalDwellSeconds: .infinity, offRouteMeters: settings.offRouteMeters),
+                                          guidanceRules: Self.artworkGuidanceRules(settings),
                                           routing: routing)
+        navigator.drawsNextLegWhileReached = settings.advancesOnArtworkExit
         var deviation = navigator.deviationRules
         deviation.leftRouteMeters = settings.offRouteMeters
         deviation.offRouteTooLongSeconds = settings.offRouteSeconds
@@ -291,7 +313,7 @@ final class VisitController: ObservableObject {
     private func handle(_ event: JourneyEvent) {
         refreshGalleryAhead()
         switch event {
-        case .stopReached(let stop) where stop.kind != .detour:
+        case .stopReached(let stop) where stop.kind != .detour && !settings.advancesOnArtworkExit:
             scheduleDone(stop.id, after: settings.artworkAdvanceDelay)
         case .detourEnded(_, completed: true):
             tasks.append(Task { [weak self] in
@@ -308,16 +330,31 @@ final class VisitController: ObservableObject {
             if startsEpisode, reroutesAfterWarning { rerouteFromVisitor() }
         case .returnedToRoute:
             isOffRouteEpisode = false
-        case .legChanged, .rerouted:
+        case .legChanged:
             isOffRouteEpisode = false
+            reportReachedStopDone()
+        case .rerouted:
+            isOffRouteEpisode = false
+        case .journeyFinished:
+            reportReachedStopDone()
         default:
             break
         }
     }
 
+    /// Reports the reached artwork visited once the navigator has moved past it without
+    /// `scheduleDone`: a detour or a chosen stop makes a reached stop done.
+    private func reportReachedStopDone() {
+        guard let id = reachedStopID, let stop = stop(id), stop.state == .done else { return }
+        reachedStopID = nil
+        FieldLog.log("artwork left (the journey moved on): \(id)")
+        onArtworkDone?(stop, true)
+    }
+
     /// The visitor entered an artwork geofence. With `GADSettings.advancesOnArtworkExit` the active
-    /// artwork moves on when the visitor leaves it, else after `GADSettings.artworkAdvanceDelay`. The
-    /// geofence of any other artwork is ignored, and every artwork geofence is ignored during a detour.
+    /// artwork is reached, and moves on when the visitor leaves it; else it moves on after
+    /// `GADSettings.artworkAdvanceDelay`. The geofence of any other artwork is ignored, and every
+    /// artwork geofence is ignored during a detour.
     func artworkGeofenceEntered(remoteID: String?) {
         guard managesProgress, !isPaused, navigator.detourStop == nil, let id = Self.activeStopID(forRemoteID: remoteID, in: navigator.journey, remoteIDs: artworkRemoteIDs) else { return }
         guard settings.advancesOnArtworkExit else {
@@ -328,6 +365,17 @@ final class VisitController: ObservableObject {
         guard arrivedStopID != id else { return }
         arrivedStopID = id
         FieldLog.log("artwork geofence arrival: \(id) remote \(remoteID ?? "-") · next stop at the exit")
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self, self.arrivedStopID == id, self.navigator.activeStop?.id == id else { return }
+                // A detour turns it off (`detour(to:)`).
+                self.navigator.drawsNextLegWhileReached = true
+                guard await self.navigator.markReached(stopID: id) else { return }
+                self.reachedStopID = id
+                FieldLog.log("artwork reached: \(id) · route to \(self.navigator.upcomingStop?.title ?? "-")")
+                self.persist(self.navigator.journey)
+            }
+        })
     }
 
     /// The SDK reports that the visitor left an artwork geofence. Leaving the active artwork they
@@ -365,6 +413,11 @@ final class VisitController: ObservableObject {
         let point = position.coordinate.proximiio
         let level = position.floor?.level
         let activeID = navigator.activeStop?.id
+        if settings.advancesOnArtworkExit, arrivedStopID == nil, navigator.hasArrived {
+            // A journey restored with the artwork reached: it moves on when the visitor is outside.
+            arrivedStopID = activeID
+            reachedStopID = activeID
+        }
         var inside: Set<String> = []
         var isInsideActive = false
         for stop in navigator.journey.stops
@@ -448,7 +501,7 @@ final class VisitController: ObservableObject {
     /// longer the active stop, the stops ahead are ordered again from the visitor and the leg leads
     /// to that artwork. At most every 5 s.
     func checkCloserArtwork() {
-        guard managesProgress, !keepsOrder, isNavigating, !isPaused, isOffRouteEpisode, navigator.detourStop == nil,
+        guard managesProgress, !keepsOrder, isNavigating, !isPaused, isOffRouteEpisode, navigator.detourStop == nil, !navigator.hasArrived,
               let active = navigator.activeStop, Date.now.timeIntervalSince(lastCloserArtworkCheck) >= 5
         else { return }
         lastCloserArtworkCheck = .now
@@ -469,11 +522,11 @@ final class VisitController: ObservableObject {
     /// current destination (`RouteGuidance.isOffRoute`) gets the warning, as for the navigator's
     /// `leftRoute`, also where a later leg of the journey passes (PM, Monday "Personalized tour:
     /// off-route and re-route behaviour", 2026-10-28). Back within two thirds of that distance the
-    /// episode ends. Only with the warning (`.askApp`); not while paused, during a detour or on a
-    /// floor without positioning.
+    /// episode ends. Only with the warning (`.askApp`); not while paused, during a detour, on a
+    /// floor without positioning or at a reached artwork, whose guidance is the leg to the next stop.
     func checkLegDeviation(_ guidance: RouteGuidance?, isFloorGuideActive: Bool) {
         guard deviationPolicy == .askApp, isNavigating, !isPaused, !isFloorGuideActive, navigator.detourStop == nil,
-              let guidance, !guidance.hasArrived
+              !navigator.hasArrived, let guidance, !guidance.hasArrived
         else { return }
         switch Self.legDeviation(isOffRoute: guidance.isOffRoute, meters: guidance.offRouteMeters, threshold: settings.offRouteMeters,
                                  isEpisode: isOffRouteEpisode, isLegEpisode: isLegOffRouteEpisode) {
@@ -611,8 +664,10 @@ final class VisitController: ObservableObject {
         await current.value
     }
 
+    /// No gallery during a detour or at a reached artwork: the card names the stop.
     private func refreshGalleryAhead() {
-        let gallery = navigator.detourStop == nil ? navigator.activeStop.flatMap { galleryRouting.gallery(of: $0.coordinate) } : nil
+        let gallery = navigator.detourStop == nil && !navigator.hasArrived
+            ? navigator.activeStop.flatMap { galleryRouting.gallery(of: $0.coordinate) } : nil
         if gallery != galleryAhead { galleryAhead = gallery }
     }
 
@@ -681,6 +736,8 @@ final class VisitController: ObservableObject {
                 guard let self else { return }
                 self.scheduledDone.remove(stopID)
                 guard !Task.isCancelled, self.navigator.activeStop?.id == stopID else { return }
+                // Reported here, not by `reportReachedStopDone` on the leg change.
+                if self.reachedStopID == stopID { self.reachedStopID = nil }
                 let changed = await self.navigator.markDone(stopID: stopID)
                 self.persist(self.navigator.journey)
                 if changed, let stop = self.stop(stopID) { self.onArtworkDone?(stop, true) }
@@ -805,8 +862,10 @@ final class VisitController: ObservableObject {
         stop.iconName = AmenityKind.allCases.first { $0.matches(place) }?.icon.rawValue
         closeOffRouteWarning()
         // The navigator applies guidance rules to each new leg: the detour leg is reached by
-        // distance, the legs after it by the artwork geofence only.
+        // distance, the legs after it by the artwork geofence only. At the reached amenity the route
+        // waits for "Resume your Journey"; the next artwork's arrival turns the next leg on again.
         navigator.guidanceRules = detourGuidanceRules
+        navigator.drawsNextLegWhileReached = false
         await navigator.detour(to: stop)
         navigator.guidanceRules = artworkGuidanceRules
         return stop.id

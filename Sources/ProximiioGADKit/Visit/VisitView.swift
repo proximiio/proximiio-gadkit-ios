@@ -814,9 +814,11 @@ struct VisitView: View {
         controller.session.followMyFloor()
     }
 
-    /// Reports `stopNearby` once per stop.
+    /// Reports `stopNearby` once per stop. At a reached artwork the guidance is the leg to the next
+    /// stop, so the distance is the straight line.
     private func checkStopNearby(position: VenuePosition?, guidance: RouteGuidance?) {
-        if let stop = stopNearby.update(position: position, stop: controller.navigator.activeStop, guidance: guidance) {
+        let navigator = controller.navigator
+        if let stop = stopNearby.update(position: position, stop: navigator.activeStop, guidance: navigator.hasArrived ? nil : guidance) {
             emit(.stopNearby(stop))
         }
     }
@@ -1519,6 +1521,9 @@ private struct VisitCard: View {
         if let stop = navigator.activeStop, case .noAccessibleRoute = navigator.noRouteReasons[stop.id] {
             return String(localized: "No route to this stop with your accessibility settings.", bundle: .localized)
         }
+        // At a reached artwork the guidance is the leg to the next stop; the card names the artwork
+        // until the visitor leaves it (GAD PM and Nagarro, 2026-10-30).
+        if navigator.hasArrived { return nil }
         switch state {
         case .walking:
             return navigator.guidance.map { GuidanceText.instruction(for: $0, markers: markers) }
@@ -1540,7 +1545,7 @@ private struct VisitCard: View {
     }
 
     private var remaining: String? {
-        if isOnFloorWithoutPositioning { return nil }
+        if isOnFloorWithoutPositioning || navigator.hasArrived { return nil }
         switch state {
         case .walking, .nextStopOnOtherLevel:
             guard let guidance = navigator.guidance, !guidance.isOffRoute, !guidance.hasArrived else { return nil }

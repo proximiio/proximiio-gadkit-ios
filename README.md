@@ -37,7 +37,7 @@ cases come in minor versions; a `switch` with `default` keeps compiling. The [Ch
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.68 and `proximiio-map-ios-binary`
-6.0.0-beta.59 exactly. The host app needs no dependency on them. A host app that also depends on
+6.0.0-beta.60 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -326,7 +326,8 @@ With `.progress` the view also writes:
 - the journey after every change of the order or of a stop state. A personalised journey is ordered
   from the visitor at the start, so the first write can be the new order;
 - `.visited` when the visitor leaves the artwork's geofence (`advancesOnArtworkExit`), or
-  `artworkAdvanceDelay` after the arrival without it. The stop the route leads to is `.pending`;
+  `artworkAdvanceDelay` after the arrival without it. The stop the route leads to is `.pending`, also while
+  the visitor is at it;
 - the stops that match no POI unchanged, after the other stops;
 - nothing at Journey Complete: the journey already holds the last states.
 
@@ -780,7 +781,7 @@ let configuration = GADConfiguration(
 |---|---|---|
 | `trackingLostAfter` | 110 s | Seconds without positioning before `ProximiMapEvent.trackingChanged(.lostPlace)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
 | `trackingStoppedAfter` | 170 s | Seconds without positioning before `ProximiMapEvent.trackingChanged(.stoppedResponding)` (about 3 min). |
-| `advancesOnArtworkExit` | `true` | The route leads to the next stop when the visitor leaves the active artwork's geofence (Nagarro, 2026-10-30). `false`: `artworkAdvanceDelay` after entering it. |
+| `advancesOnArtworkExit` | `true` | The journey moves to the next stop when the visitor leaves the active artwork's geofence (Nagarro, 2026-10-30). Inside it the card and the destination marker keep the artwork, with no instruction, and the route shows the leg to the next stop (GAD PM and Nagarro, 2026-10-30). `false`: `artworkAdvanceDelay` after entering it. |
 | `artworkAdvanceDelay` | 2 s | With `advancesOnArtworkExit` `false`: from the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order (personalised journeys only). |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
@@ -790,6 +791,7 @@ let configuration = GADConfiguration(
 | `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
+| `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `nil`: at any distance. The remaining distance and the instructions follow every position. |
 | `followZoom` | 18.8 | Zoom of "Centre on me", of the first position and of the follow. |
 | `galleryFollowZoom` | 20 | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
 | `startZoom` | 18 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
@@ -1008,6 +1010,33 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.31.0 (2026-10-30)
+
+No change for host apps' code. `proximiio-map-ios-binary` 6.0.0-beta.60 (SDK 6.0.0-beta.68 unchanged). A
+host app that depends on it moves to the same version. The map binary's interface files keep the zip's date, so
+Xcode can keep the module it built from beta.59: an error such as "value of type 'JourneyNavigator' has no member
+'drawsNextLegWhileReached'" goes away after Product > Clean Build Folder.
+
+Changed (GAD PM and Nagarro, 2026-10-30):
+
+- With `advancesOnArtworkExit`, entering the active artwork's geofence marks the stop reached
+  (`JourneyNavigator.markReached(stopID:)`). The card keeps the artwork, without an instruction or a
+  distance, and the artwork's marker stays the destination. The route shows the leg to the next stop from
+  the visitor (`drawsNextLegWhileReached`). At the exit the stop is visited and that leg is the live leg,
+  routed again only when the visitor is off it. `artworkReached` and the stop's `.visited` still come at the
+  exit. At a reached artwork the off-route warning of `.offRoutePrompt` is off, and `stopNearby` measures
+  the straight line to it.
+- A detour or a stop chosen in the list while the visitor is at the artwork makes it visited, with
+  `artworkReached`. At a reached amenity the route waits for "Resume your Journey", as before.
+
+Added (PM, Monday "Route marked as walked too far", 2026-10-30):
+
+- `GADSettings.progressCorridorMeters` (3 m): the walked part of the route moves only while the position is
+  within this distance of the leg (`RouteFollowRules.progressCorridorMeters`). Before, a visitor a few metres
+  beside the path, or cutting a corner, marked the route walked ahead of them. `nil` keeps the old
+  behaviour.
+- Field log: `artwork reached: … · route to …` and `artwork left (the journey moved on): …`.
 
 ### 1.30.1 (2026-10-30)
 
