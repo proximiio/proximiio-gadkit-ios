@@ -1059,7 +1059,9 @@ struct VisitView: View {
                 }
                 }
             }
-            .padding(.top, 22)
+            // 32 pt below the card's top edge, 17 pt below the drag handle (Figma 10889:108085;
+            // Nagarro, 2026-10-30: the controls sat too close to the handle).
+            .padding(.top, 32)
             // A long amenity list takes the free height before the spacer; it scrolls past that.
             .layoutPriority(1)
             Spacer()

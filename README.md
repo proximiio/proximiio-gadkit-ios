@@ -985,6 +985,19 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.27.1 (2026-10-30)
+
+No change for host apps' code.
+
+Changed (Nagarro, 2026-10-30: the controls at the top of the journey map sat too close to the drag
+handle):
+
+- On the journey map the Map / List control and the search button are 32 pt below the card's top edge,
+  as in the Figma frame 10889:108085. They were 22 pt below it, 8 pt under the handle; now 17 pt.
+- The drag handle is drawn as in the design: 60 × 6 pt at 20 % black, a 2 pt white stroke outside it,
+  9 pt below the card's top edge. Before, the white stroke was inside the 6 pt, so only 2 pt of grey
+  showed.
+
 ### 1.27.0 (2026-10-30)
 
 **Breaking:**

@@ -63,11 +63,13 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
         }
         .clipShape(shape)
         .overlay(alignment: .top) {
+            // Figma `Swipe`: 60 × 6 pt at 20 % black, a 2 pt white stroke outside it, 9 pt below the
+            // card's top edge.
             Capsule()
                 .fill(.black.opacity(0.2))
-                .overlay(Capsule().strokeBorder(Palette.white, lineWidth: 2))
                 .frame(width: 60, height: 6)
-                .padding(.top, 8)
+                .background(Capsule().strokeBorder(Palette.white, lineWidth: 2).padding(-2))
+                .padding(.top, 9)
                 .accessibilityHidden(true)
         }
         .overlay(shape.strokeBorder(Palette.white, lineWidth: 1))
