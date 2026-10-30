@@ -37,7 +37,7 @@ cases come in minor versions; a `switch` with `default` keeps compiling. The [Ch
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.68 and `proximiio-map-ios-binary`
-6.0.0-beta.58 exactly. The host app needs no dependency on them. A host app that also depends on
+6.0.0-beta.59 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -984,6 +984,23 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.27.0 (2026-10-30)
+
+**Breaking:**
+- `proximiio-map-ios-binary` 6.0.0-beta.59 (SDK 6.0.0-beta.68 unchanged). A host app that depends on it
+  sets the same version.
+
+Changed:
+
+- The maps ask for no floor-plan tile outside the area and zoom range the venue style names. Map
+  6.0.0-beta.59 reads `proximiio:raster:bounds` (`[west, south, east, north]` in degrees) from the style
+  metadata; `proximiio:raster:minzoom` and `maxzoom` were read before. Before, the Explore Museum map asked
+  on every launch for 3 tiles outside the GAD tiles, which the tile store refused, and MapLibre asked them
+  again after 1, 2 and 4 s; above zoom 20.5 it asked for z22 tiles, which do not exist. The GAD style has
+  bounds [54.393654, 24.535255, 54.40361, 24.543376], min zoom 9 and max zoom 21 since 2026-10-30.
+  Explore Museum drawn 0.82–1.01 s after `open()` (0.92–1.69 s with map 6.0.0-beta.58; simulator, cold
+  launch).
 
 ### 1.26.1 (2026-10-30)
 
