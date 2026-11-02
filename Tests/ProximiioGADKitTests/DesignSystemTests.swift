@@ -82,6 +82,18 @@ struct MapDiagnosticsTests {
         #expect(!MapListToggle.showsList(afterSlide: -50, at: 120, showsList: true, width: 71))
     }
 
+    /// Right to left, Map is the right part and List the left part; the selection stays inside the
+    /// control (PM, Monday "Arabic toggle functions to the wrong direction", 2026-10-30).
+    @Test func rightToLeftTheListSelectionIsOnTheLeft() {
+        #expect(MapListToggle.selectionX(showsList: false, slide: 0, width: 71, isRightToLeft: false) == 0)
+        #expect(MapListToggle.selectionX(showsList: true, slide: 0, width: 71, isRightToLeft: false) == 71)
+        #expect(MapListToggle.selectionX(showsList: false, slide: 0, width: 71, isRightToLeft: true) == 71)
+        #expect(MapListToggle.selectionX(showsList: true, slide: 0, width: 71, isRightToLeft: true) == 0)
+        // A finger 30 pt toward List from Map.
+        #expect(MapListToggle.selectionX(showsList: false, slide: 30, width: 71, isRightToLeft: true) == 41)
+        #expect(MapListToggle.selectionX(showsList: true, slide: 30, width: 71, isRightToLeft: true) == 0)
+    }
+
     /// The map shows the venue when its first venue style, its features and the camera are all
     /// there (user, 2026-10-28).
     @Test func theTimingNamesEachStepAndTheDrawnFrame() {

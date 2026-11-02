@@ -85,8 +85,9 @@ extension View {
     }
 }
 
-/// The accessible routes button of the maps: a wheelchair on glass while it is off; white on a
-/// filled `Palette.position` square while it is on (PM 2026-10-14: an indicator for both states).
+/// The accessible routes button of the maps: the design's ISA wheelchair, 19 × 20 pt, on glass, with
+/// a black outline while it is on (PM 2026-10-14: an indicator for both states; Monday "Accessible
+/// route icon", 2026-11-02).
 struct AccessibleRoutesButton: View {
     @Binding var isOn: Bool
     var onToggle: (Bool) -> Void = { _ in }
@@ -96,8 +97,11 @@ struct AccessibleRoutesButton: View {
             isOn.toggle()
             onToggle(isOn)
         } label: {
-            Image(systemName: "figure.roll")
-                .font(.system(size: 20, weight: .medium))
+            GADIcon.wheelchair.image
+                .resizable()
+                .scaledToFit()
+                .frame(width: 19, height: 20)
+                .foregroundStyle(Palette.ink)
         }
         // On, and while pressed: a black outline, no colour (RPR, Monday "Accessible routing" and
         // "Buttons to have black border when pressed", 2026-10-28).

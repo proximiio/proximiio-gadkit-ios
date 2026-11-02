@@ -81,11 +81,13 @@ struct Gallery: Identifiable, Equatable, Sendable {
     }
 
     /// The galleries a personalised journey leads to first, by `gallery_id` (`GalleryDestination`). A
-    /// gallery without a polygon geofence or a POI is left out. Pure; covered by tests.
+    /// gallery without a POI is left out. Pure; covered by tests.
     ///
     /// Each destination gets the polygon feature (`type` starting with `gallery`) whose
     /// `metadata.gallery_id` is the gallery's id, else the one on the POI's floor that contains the
-    /// POI (`features`).
+    /// POI (`features`). A gallery without a polygon geofence uses its polygon feature with that
+    /// `gallery_id` as the outline too: the GAD data has 13 such galleries, such as "205" (PM, Monday
+    /// "Explore Museum view: gallery highlighting", 2026-10-30).
     static func destinations(geofences: [ProximiioGeofence], places: [VenuePlace], features: [ProximiioFeature] = []) -> [String: GalleryDestination] {
         let pois = Dictionary(
             places.compactMap { place -> (String, VenuePlace)? in
@@ -109,6 +111,14 @@ struct Gallery: Identifiable, Equatable, Sendable {
             )
         }
         let polygons = polygonOutlines(features: features)
+        for polygon in polygons {
+            guard let id = polygon.galleryID, destinations[id] == nil, let poi = pois[id] else { continue }
+            destinations[id] = GalleryDestination(
+                gallery: Gallery(id: id, name: poi.title, level: polygon.outline.level, ring: polygon.outline.ring),
+                entry: poi.coordinate,
+                placeID: poi.id
+            )
+        }
         for (id, destination) in destinations {
             let polygon = polygons.first { $0.galleryID == id }
                 ?? polygons.first { $0.galleryID == nil && $0.outline.contains(destination.entry, level: destination.gallery.level) }

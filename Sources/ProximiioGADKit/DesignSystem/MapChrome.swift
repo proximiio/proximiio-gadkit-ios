@@ -181,16 +181,25 @@ struct MapListToggle: View {
     /// PM, Monday "Native elements", 2026-10-28). A finger slides the selection to the other part, as
     /// on the system's segmented control (Monday "Native elements", 2026-10-28 evening).
     var body: some View {
-        let forward: CGFloat = layoutDirection == .rightToLeft ? -1 : 1
+        let isRightToLeft = layoutDirection == .rightToLeft
+        // Laid out left to right in every language, so the offset and the finger's x mean the same;
+        // right to left, Map is the right part (PM, Monday "Arabic toggle functions to the wrong
+        // direction", 2026-10-30: the selection moved out of the control).
+        let forward: CGFloat = isRightToLeft ? -1 : 1
         ZStack(alignment: .leading) {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Palette.white.opacity(0.6))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.ink, lineWidth: 1.5))
                 .frame(width: Self.partWidth)
-                .offset(x: forward * Self.selectionOffset(showsList: showsList, slide: slide, width: Self.partWidth))
+                .offset(x: Self.selectionX(showsList: showsList, slide: slide, width: Self.partWidth, isRightToLeft: isRightToLeft))
             HStack(spacing: 0) {
-                label("Map")
-                label("List")
+                if isRightToLeft {
+                    label("List")
+                    label("Map")
+                } else {
+                    label("Map")
+                    label("List")
+                }
             }
         }
         .contentShape(Rectangle())
@@ -200,12 +209,13 @@ struct MapListToggle: View {
                     if abs(value.translation.width) >= Self.slideThreshold { state = forward * value.translation.width }
                 }
                 .onEnded { value in
-                    // The finger's distance from the Map end: the local x runs left to right.
+                    // The finger's distance from the Map end.
                     let position = forward > 0 ? value.location.x : 2 * Self.partWidth - value.location.x
                     showsList = Self.showsList(afterSlide: forward * value.translation.width, at: position,
                                                showsList: showsList, width: Self.partWidth)
                 }
         )
+        .environment(\.layoutDirection, .leftToRight)
         .accessibilityRepresentation {
             HStack(spacing: 0) {
                 accessibleButton("Map", isSelected: !showsList) { showsList = false }
@@ -222,6 +232,13 @@ struct MapListToggle: View {
     /// `slide` and kept inside the control. Pure; covered by tests.
     nonisolated static func selectionOffset(showsList: Bool, slide: CGFloat, width: CGFloat) -> CGFloat {
         min(max((showsList ? width : 0) + slide, 0), width)
+    }
+
+    /// The selection's x from the control's left edge: right to left, Map is the right part and List
+    /// the left part. Pure; covered by tests.
+    nonisolated static func selectionX(showsList: Bool, slide: CGFloat, width: CGFloat, isRightToLeft: Bool) -> CGFloat {
+        let offset = selectionOffset(showsList: showsList, slide: slide, width: width)
+        return isRightToLeft ? width - offset : offset
     }
 
     /// Whether the control shows List when the finger lifts: a tap picks the part under the finger,
@@ -319,9 +336,11 @@ struct AmenityChipList: View {
                     LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: Self.fadeHeight)
                 }
             }
-            // Past the edges, so the chips' shadows stay; at the bottom only when nothing fades.
+            // Past the edges, so the chips' shadows stay. A list that scrolls ends at its top edge, so
+            // no chip scrolls up over the search button (PM, Monday "Amenity search when list is long",
+            // 2026-10-30), and fades at the bottom.
             .padding(.horizontal, -24)
-            .padding(.top, -24)
+            .padding(.top, scrolls ? 0 : -24)
             .padding(.bottom, scrolls ? 0 : -24)
         }
         // A white haze behind the list, so the map behind it shows less (RPR, Monday "White blur

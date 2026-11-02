@@ -125,6 +125,9 @@ enum GADIcon: String, CaseIterable {
     case search = "IconSearch"
     case shop = "IconShop"
     case stairs = "IconStairs"
+    /// The accessible routes button: the ISA wheelchair of the design (Figma Path · 1, node
+    /// 16444:202832; PM, Monday "Accessible route icon", 2026-11-02).
+    case wheelchair = "IconWheelchair"
 
     /// The glyph, tinted with the foreground style.
     var image: Image { Image(rawValue, bundle: .module).renderingMode(.template) }
@@ -137,7 +140,7 @@ enum GADIcon: String, CaseIterable {
     /// The white circle variant used as a map marker, or `nil` for icons without one.
     var markerImageName: String? {
         switch self {
-        case .compass, .search: nil
+        case .compass, .search, .wheelchair: nil
         default: rawValue + "Marker"
         }
     }

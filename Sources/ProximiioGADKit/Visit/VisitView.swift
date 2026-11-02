@@ -218,13 +218,20 @@ struct VisitView: View {
         }
     }
 
+    /// The white over the host app's background behind the list: the Figma list frame is white in
+    /// the middle and shows the background's colours at the edges.
+    static let listBackgroundOpacity = 0.6
+
     /// The map in its glass card, with the list, "Rerouting you…" and the controls over it.
     private var mapCard: some View {
         MapGlassFrame(onPullDown: pullDownAction) {
             ProximiioMapView(session: controller.session)
+                // List mode shows the host app's background through the card, not the map (PM, Monday
+                // "List view transparency", 2026-11-02; Figma 03.P.03D). The map stays loaded.
+                .opacity(showsList ? 0 : 1)
             if showsList {
                 VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, onSkip: requestSkip)
-                    .background(Palette.white.opacity(0.92))
+                    .background(Palette.white.opacity(Self.listBackgroundOpacity))
                     .transition(.opacity)
             }
             if showsRerouting {

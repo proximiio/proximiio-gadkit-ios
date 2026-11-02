@@ -79,16 +79,18 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Map
 
-    /// Zoom of "Centre on me", of the first position and of the follow (PM, Monday "Curated tours:
-    /// zoom level", 2026-10-27; RPR, "Need to determine correct zoom levels on-site", 2026-10-28).
-    public var followZoom: Double = 18.8
+    /// Zoom of "Centre on me", of the first position and of the follow, in personalised and curated
+    /// journeys. The follow eases to it from `startZoom` (PM, Monday "Zoom level at start +
+    /// navigation", 2026-10-30).
+    public var followZoom: Double = 19.5
     /// Zoom of the follow while the visitor is in a gallery during a personalised journey, or `nil`
-    /// for `followZoom` (PM, Monday "Navigation to a gallery", 2026-10-27).
-    public var galleryFollowZoom: Double? = 20
+    /// for `followZoom` (PM, Monday "Navigation to a gallery", 2026-10-27). `nil` since the PM asked
+    /// for one zoom in every situation (Monday "Zoom level at start + navigation", 2026-10-30).
+    public var galleryFollowZoom: Double?
     /// The journey map shows the visitor at this zoom for `startZoomSeconds` before it follows them:
     /// when the journey starts, on the first fix and when the position comes back. `nil` follows at
-    /// once (PM, Monday "Zoom level at start + navigation", 2026-10-29).
-    public var startZoom: Double? = 18
+    /// once (PM, Monday "Zoom level at start + navigation", 2026-10-29 and 2026-10-30).
+    public var startZoom: Double? = 17
     /// How long the journey map stays at `startZoom`.
     public var startZoomSeconds: TimeInterval = 2
     /// `true` shows journey stop markers that would overlap as one marker with a badge holding the

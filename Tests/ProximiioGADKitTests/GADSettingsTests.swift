@@ -23,8 +23,8 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.offRouteMeters == 12)
         #expect(GADSettings.standard.levelsWithoutPositioning == [0])
         #expect(GADSettings.standard.levelChangeViewSeconds == 5)
-        // Zoom 18 for 2 s, then the follow (PM, Monday "Zoom level at start + navigation", 2026-10-29).
-        #expect(GADSettings.standard.startZoom == 18)
+        // Zoom 17 for 2 s, then the follow (PM, Monday "Zoom level at start + navigation", 2026-10-30).
+        #expect(GADSettings.standard.startZoom == 17)
         #expect(GADSettings.standard.startZoomSeconds == 2)
     }
 
@@ -61,16 +61,19 @@ struct GADSettingsTests {
         #expect(!MapStyle.journeyStopsHidden.groupsOverlapping)
     }
 
-    /// PM, Monday "Navigation to a gallery" and "Curated tours: zoom level", 2026-10-27; RPR, "Need to
-    /// determine correct zoom levels on-site", 2026-10-28.
-    @Test @MainActor func theFollowZoomIs18Point8And20InAGalleryOfAPersonalisedJourney() {
+    /// One zoom in every situation and both journey kinds (PM, Monday "Zoom level at start +
+    /// navigation", 2026-10-30). A host's `galleryFollowZoom` still applies in a gallery of a
+    /// personalised journey.
+    @Test @MainActor func theFollowZoomIs19Point5Everywhere() {
         let settings = GADSettings.standard
-        #expect(VisitView.followZoom(inGallery: false, kind: .personalised, settings: settings) == 18.8)
-        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 20)
-        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 18.8)
-        var withoutGalleryZoom = settings
-        withoutGalleryZoom.galleryFollowZoom = nil
-        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: withoutGalleryZoom) == 18.8)
+        #expect(settings.galleryFollowZoom == nil)
+        #expect(VisitView.followZoom(inGallery: false, kind: .personalised, settings: settings) == 19.5)
+        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 19.5)
+        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 19.5)
+        var withGalleryZoom = settings
+        withGalleryZoom.galleryFollowZoom = 20
+        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: withGalleryZoom) == 20)
+        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: withGalleryZoom) == 19.5)
     }
 
     @Test func theRelayAPICanBeAURL() throws {

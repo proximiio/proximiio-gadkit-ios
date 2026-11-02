@@ -552,7 +552,9 @@ The map and the background are the same for both.
 
 In a personalised journey, a leg to an artwork in a gallery the visitor is not in ends at that
 gallery. The artwork's `metadata.gallery_id` names the gallery: the gallery geofence
-(`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. The route ends
+(`metadata.geofence_type` `gallery`) and the gallery's POI both have it in `remote_id`. A gallery
+without a geofence uses its polygon feature (`type` `gallery`) with that id in `metadata.gallery_id`
+as the outline. The route ends
 at the POI. The map fills the gallery's polygon feature (else the geofence's outline) with the floor's
 colour. At the POI it draws a red pill with a white border and the POI's title in white ("G303
 Language"), no icon, and the numbered artwork markers are hidden (PM, Monday "Gallery numbers in
@@ -703,8 +705,8 @@ follow.
   top, closes it.
 - Icons: the design's glyph of an amenity kind (restrooms, café, help desk, prayer room, shop,
   stairs, lift), else the icon of the POI's amenity in the venue data, the icon the map draws.
-  - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline, the POI
-    with the same `remote_id` the name, the level, the category (its amenity, such as "Thematic
+  - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline, else the
+    gallery's polygon feature with the id in `metadata.gallery_id`. The POI with the same `remote_id` gives the name, the level, the category (its amenity, such as "Thematic
     Gallery") and the description.
   - Highlights: the artworks that list the "Highlight" amenity in `included_amenities`
     (`VenuePlace.highlightAmenityID`), with `metadata.artist_name` and the gallery.
@@ -797,9 +799,9 @@ let configuration = GADConfiguration(
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `nil`: at any distance. The remaining distance and the instructions follow every position. |
-| `followZoom` | 18.8 | Zoom of "Centre on me", of the first position and of the follow. |
-| `galleryFollowZoom` | 20 | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
-| `startZoom` | 18 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
+| `followZoom` | 19.5 | Zoom of "Centre on me", of the first position and of the follow, in personalised and curated journeys. |
+| `galleryFollowZoom` | `nil` | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
+| `startZoom` | 17 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
 | `startZoomSeconds` | 2 | How long the journey map stays at `startZoom`. |
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
@@ -885,8 +887,8 @@ map.routeAccessibility = RouteAccessibility(avoidsStairs: true, avoidsRevolvingD
 
 - The GAD venue data on 2026-10-14 has staircases and elevators. It has no escalators, no `door`
   features and no `narrowPath` paths, so only `avoidsStairs` changes routes until the data has them.
-- The journey map and the museum map of Journey Complete have an accessible routes button (a wheelchair,
-  with a black outline while on). While it is on, routes avoid all four (`RouteAccessibility.accessible`), whatever the host app set.
+- The journey map and the museum map of Journey Complete have an accessible routes button (the ISA
+  wheelchair of the design, with a black outline while on). While it is on, routes avoid all four (`RouteAccessibility.accessible`), whatever the host app set.
   Its state is kept on the device for both maps and later launches.
 - When no route meets the needs, the museum map shows "No route from here with your accessibility
   settings." In a journey, the stop card shows "No route to this stop with your accessibility
@@ -1015,6 +1017,32 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.32.0 (2026-11-02)
+
+No change for host apps' code.
+
+Changed (PM, Monday, 2026-10-30 to 2026-11-02):
+
+- `GADSettings.startZoom` is 17, was 18, and `followZoom` is 19.5, was 18.8. `galleryFollowZoom` is `nil`,
+  was 20: the follow keeps 19.5 inside galleries too, in personalised and curated journeys. At 19.5 the map
+  style shows the artworks and the furniture ("Zoom level at start + navigation").
+- In List mode the journey map is hidden: the list lies on the host app's background, with white at 60 %
+  over it, as in the Figma list frame. The map stays loaded ("List view transparency").
+- The accessible routes button shows the design's ISA wheelchair (19 × 20 pt, Figma node 16444:202832)
+  in place of the SF Symbol `figure.roll` ("Accessible route icon").
+
+Fixed:
+
+- A gallery with a polygon feature (`type` `gallery`, `metadata.gallery_id`) and a POI with that
+  `remote_id`, but no gallery geofence, was not a gallery: no fill, no pill on the maps, no gallery first.
+  It now uses the polygon as its outline. The GAD venue data has 13 such galleries, such as "205"
+  ("Explore Museum view: gallery highlighting").
+- Right to left, the Map / List selection moved out of the control. Map is now the right part and List
+  the left part, and the selection and a slide follow them ("Arabic toggle functions to the wrong
+  direction").
+- A long amenity list that scrolls ends at its top edge: no chip scrolls up over the search button ("Amenity
+  search when list is long").
 
 ### 1.31.3 (2026-11-02)
 

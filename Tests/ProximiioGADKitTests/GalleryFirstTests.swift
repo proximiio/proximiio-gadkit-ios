@@ -235,6 +235,26 @@ struct GalleryDestinationTests {
         #expect(none.shown == none.gallery)
     }
 
+    /// PM, Monday "Explore Museum view: gallery highlighting", 2026-10-30: gallery "205" has a polygon
+    /// with its `gallery_id` and a POI, and no geofence.
+    @Test func aGalleryWithoutAGeofenceUsesItsPolygon() throws {
+        let poi = VenuePlace(id: "poi-205", title: "205", coordinate: ProximiioCoordinate(latitude: 24.05, longitude: 54.05),
+                             level: 2, remoteID: "placeholder3")
+        let destinations = Gallery.destinations(geofences: [], places: [poi],
+                                                features: [polygon("room-205", level: 2, galleryID: "placeholder3"),
+                                                           polygon("no-poi", level: 2, galleryID: "placeholder99"),
+                                                           polygon("untagged", level: 2)])
+        #expect(destinations.keys.sorted() == ["placeholder3"])
+        let g205 = try #require(destinations["placeholder3"])
+        #expect(g205.gallery.id == "placeholder3")
+        #expect(g205.gallery.name == "205")
+        #expect(g205.gallery.level == 2)
+        #expect(g205.gallery.contains(poi.coordinate, level: 2))
+        #expect(g205.entry == poi.coordinate)
+        #expect(g205.placeID == "poi-205")
+        #expect(g205.shown.id == "room-205")
+    }
+
     @Test func aGeofenceWithoutAnOutlineIsLeftOut() {
         let poi = VenuePlace(id: "poi", title: "G303 Language", coordinate: ProximiioCoordinate(latitude: 24, longitude: 54), level: 3, remoteID: "e1d2cd21")
         #expect(Gallery.destinations(geofences: [geofence(remoteID: "e1d2cd21", polygon: nil)], places: [poi]).isEmpty)
