@@ -1,8 +1,8 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.31.0 uses SDK
-6.0.0-beta.68 and Map 6.0.0-beta.60.
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.33.0 uses SDK
+6.0.0-beta.68 and Map 6.0.0-beta.61.
 
 Each change has a mark:
 
@@ -60,6 +60,7 @@ calls compile unchanged.
 | Map 6.0.0-beta.58 | A map screen reads `features()` once when it opens; changed features come through `venueDataChanges()`. | | Info |
 | Map 6.0.0-beta.59 | The map reads `proximiio:raster:bounds` (`[west, south, east, north]`) from the style metadata and asks for no raster tile outside it. A missing or malformed key keeps the earlier behaviour. | | Info |
 | Map 6.0.0-beta.60 | `JourneyNavigator.markReached(stopID:)`, `drawsNextLegWhileReached` (default `false`) and `RouteFollowRules.progressCorridorMeters` (default `nil`) are off until an app sets them. ProximiioGADKit 1.31.0 sets them from `GADSettings.advancesOnArtworkExit` and `progressCorridorMeters`. | | Info |
+| Map 6.0.0-beta.61 | `JourneyStopMarkerStyle.hiddenStopIDs` (default empty) leaves those stops' markers out; the other stops keep their numbers. ProximiioGADKit 1.33.0 sets it to the artworks outside the visitor's gallery. The binary's files carry the release date, so Xcode rebuilds the module without Clean Build Folder. | | Info |
 
 ### Added
 
