@@ -4,8 +4,10 @@
 //
 //  A point of interest the visitor can open and route to. Built from
 //  `Proximiio.features()`, the local cache that `loadRouteNetwork()` fills. Same rules as
-//  proximiio-blueiot-minimal-ios `VenuePOI`. Title and description are read from
-//  `title_i18n` and `description_i18n` for the app's language when the feature has them.
+//  proximiio-blueiot-minimal-ios `VenuePOI`. Title, description and artist are read from
+//  `title_i18n`, `description_i18n` and `metadata.artist_name` for the app language
+//  (`AppLanguage.current`) when the feature has them. A change of the app language needs the
+//  places read again.
 //
 import Foundation
 import Proximiio
@@ -13,6 +15,9 @@ import Proximiio
 struct VenuePlace: Identifiable, Equatable, Sendable {
     let id: String
     let title: String
+    /// Every title of the POI: the values of `title_i18n`, `title` and `name`. A journey stop with
+    /// one of them takes `title` (`VisitPlan.retitled`).
+    var titles: Set<String> = []
     /// Feature `description`, if set in Proximi.io Portal.
     let details: String?
     let coordinate: ProximiioCoordinate
@@ -132,6 +137,7 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
             ?? Self.text(properties?["title"])
             ?? Self.text(properties?["name"])
             ?? feature.id
+        titles = Self.titles([properties?["title_i18n"], properties?["title"], properties?["name"]])
         details = Self.localized(properties?["description_i18n"]) ?? Self.text(properties?["description"])
         coordinate = ProximiioCoordinate(latitude: latitude, longitude: longitude)
         level = feature.level ?? 0
@@ -167,9 +173,18 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
         self.remoteID = remoteID
     }
 
-    /// The value for the app's current language from an i18n object such as
+    /// The non-empty strings among `values`: strings, and the values of i18n objects. Pure; covered
+    /// by tests.
+    static func titles(_ values: [JSONValue?]) -> Set<String> {
+        Set(values.flatMap { value -> [String] in
+            if case .object(let translations)? = value { return translations.values.compactMap(text) }
+            return text(value).map { [$0] } ?? []
+        })
+    }
+
+    /// The value for the app language (`AppLanguage.current`) from an i18n object such as
     /// `{"en": "Café", "ar": "المقهى"}`. `nil` when the object has no non-empty value for it.
-    static func localized(_ value: JSONValue?, language: String? = Bundle.main.preferredLocalizations.first) -> String? {
+    static func localized(_ value: JSONValue?, language: String? = AppLanguage.current) -> String? {
         guard case .object(let translations)? = value, let language else { return nil }
         let base = String(language.prefix(while: { $0 != "-" }))
         return text(translations[language]) ?? text(translations[base])

@@ -117,6 +117,11 @@ struct MuseumMapView: View {
         .onReceive(venue.data.$version.dropFirst()) { _ in
             Task { await loadPlaces() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: AppLanguage.didChange)) { _ in
+            // iOS 16 builds the screen again (`appLanguage()`); its start reads the places.
+            guard #available(iOS 17, *) else { return }
+            Task { await loadPlaces() }
+        }
         .onReceive(session.$guidance) { _ in
             Task { @MainActor in
                 floorGuide.update(

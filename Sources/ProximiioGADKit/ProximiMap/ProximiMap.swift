@@ -103,6 +103,8 @@ public final class ProximiMap: ObservableObject {
     private var lastWristband: WristbandStatus?
     /// Forwards the changes of `session` and `arrival`.
     private var forwarding: Set<AnyCancellable> = []
+    /// Reads the places again after a change of the app language (`AppLanguage`).
+    private var languageFollowing: AnyCancellable?
     #if DEBUG
     /// `-hostedMap`: the journey of the `ProximiMapView` the debug launch opens.
     @Published var hostedJourney = ProximiJourney(stops: [])
@@ -122,6 +124,10 @@ public final class ProximiMap: ObservableObject {
             nested.sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
                 .store(in: &forwarding)
         }
+        languageFollowing = NotificationCenter.default.publisher(for: AppLanguage.didChange)
+            .sink { [weak self] _ in
+                Task { @MainActor in await self?.venueDataChanged() }
+            }
         #if DEBUG
         if DebugLaunch.current.routeAccessibility != .none {
             routeAccessibility = DebugLaunch.current.routeAccessibility
@@ -249,7 +255,8 @@ public final class ProximiMap: ObservableObject {
         return false
     }
 
-    /// The venue data changed on the backend.
+    /// The venue data changed on the backend, or the app language changed: the places and the
+    /// stored journey's titles follow.
     private func venueDataChanged() async {
         guard let venue else { return }
         await loadPlaces(from: venue)
@@ -335,11 +342,12 @@ public final class ProximiMap: ObservableObject {
         refreshJourney()
     }
 
-    /// Updates the stored journey with the current places (`VisitPlan.reconciled`). While the journey
-    /// screen is open, the screen updates its journey and stores it.
+    /// Updates the stored journey with the current places (`VisitPlan.reconciled`) and their titles
+    /// in the app language (`VisitPlan.retitled`). While the journey screen is open, the screen
+    /// updates its journey and stores it.
     private func reconcileStoredJourney() {
         guard coverScreen != .journey, let stored = VisitStore.load() else { return }
-        let journey = VisitPlan.reconciled(stored, places: places, galleries: galleries)
+        let journey = VisitPlan.retitled(VisitPlan.reconciled(stored, places: places, galleries: galleries), places: places)
         guard journey != stored else { return }
         FieldLog.log("map: stored journey updated · \(stored.stops.count) → \(journey.stops.count) stops")
         VisitStore.save(journey)

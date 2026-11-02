@@ -104,6 +104,11 @@ struct ExploreMuseumView: View {
         .onReceive(venue.data.$version.dropFirst()) { _ in
             Task { await load() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: AppLanguage.didChange)) { _ in
+            // iOS 16 builds the screen again (`appLanguage()`); its start reads the places.
+            guard #available(iOS 17, *) else { return }
+            Task { await load() }
+        }
         .onReceive(session.$selectedFloor) { floor in
             guard !VenueLevel.same(floor.level, level) else { return }
             level = floor.level

@@ -197,6 +197,7 @@ public struct ProximiMapView: View {
         .onValueChange(of: journey) { _, journey in model.journeyChanged(journey) }
         .onReceive(NotificationCenter.default.publisher(for: AppLanguage.didChange)) { _ in
             if #unavailable(iOS 17) { model.startAgain() }
+            Task { await model.languageChanged() }
         }
     }
 }
@@ -271,6 +272,12 @@ final class HostedMapModel: ObservableObject {
         incoming = nil
         generation += 1
         loaded = Loaded(venue: venue, journey: matched.journey, kind: journey.kind, options: options, generation: generation)
+    }
+
+    /// Reads the places again in the new app language, for the host app's next journeys. The open
+    /// screen gives its stops the new titles itself (`VisitController.retitle(places:)`).
+    func languageChanged() async {
+        await loadPlaces()
     }
 
     /// Starts the screen again with the journey as it is now: iOS 16 builds the view again after a

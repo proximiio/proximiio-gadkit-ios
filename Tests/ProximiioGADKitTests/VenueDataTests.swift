@@ -60,6 +60,48 @@ struct VenueDataTests {
         #expect(VisitPlan.reconciled(stored, places: places).stops.last?.id == "cafe")
     }
 
+    /// Nagarro, 2026-11-02: the language changed wrongly while the app ran. The stops kept the POI
+    /// titles of the language the app launched in.
+    @Test func everyStopTakesItsPlacesTitleInTheAppLanguage() {
+        var stored = journey(states: ["a": .done, "b": .active])
+        stored.stops.append(JourneyStop(id: "cafe", title: "Café", coordinate: .init(latitude: 24.5, longitude: 54.4), poiID: "cafe", kind: .detour, state: .active))
+        func arabic(_ id: String, _ title: String, _ english: String) -> VenuePlace {
+            var place = VenuePlace(id: id, title: title, coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1)
+            place.titles = [english, title]
+            return place
+        }
+        let places = [arabic("a", "العمل أ", "Artwork A"), arabic("b", "العمل ب", "Artwork B"),
+                      arabic("c", "العمل ج", "Artwork C"), arabic("cafe", "المقهى", "Café")]
+        let retitled = VisitPlan.retitled(stored, places: places)
+        #expect(retitled.stops.map(\.title) == ["العمل أ", "العمل ب", "العمل ج", "المقهى"])
+        #expect(retitled.stops.map(\.state) == stored.stops.map(\.state))
+        #expect(retitled.stops.map(\.coordinate) == stored.stops.map(\.coordinate))
+        #expect(VisitPlan.retitled(retitled, places: places) == retitled)
+    }
+
+    /// A done stop keeps the title the visitor saw after the POI was renamed (`reconciled`).
+    @Test func aStopWithATitleThePlaceNoLongerHasKeepsIt() {
+        let stored = journey(states: ["a": .done])
+        var renamed = VenuePlace(id: "a", title: "Artwork A (new)", coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1)
+        renamed.titles = ["Artwork A (new)"]
+        #expect(VisitPlan.retitled(stored, places: [renamed]) == stored)
+    }
+
+    @Test func aPlaceHasTheTitlesOfEveryLanguage() throws {
+        let feature = ProximiioFeature(
+            id: "a",
+            geometry: .init(type: "Point", coordinates: .array([.number(54.4), .number(24.5)])),
+            properties: .object([
+                "type": .string("poi"),
+                "title": .string("Artwork A"),
+                "title_i18n": .object(["en": .string("Artwork A"), "ar": .string("العمل أ"), "fr": .string("")]),
+            ])
+        )
+        let place = try #require(VenuePlace(feature: feature))
+        #expect(place.titles == ["Artwork A", "العمل أ"])
+        #expect(place.title == VenuePlace.localized(feature.properties?["title_i18n"], language: AppLanguage.current))
+    }
+
     @Test func featureChangesAreCountedByID() {
         func feature(_ id: String, title: String) -> ProximiioFeature {
             ProximiioFeature(

@@ -318,6 +318,9 @@ struct VisitView: View {
                 if hasStops {
                     if isPaused.wrappedValue { controller.pause() }
                     await controller.start(accessibility: accessibility)
+                    // A journey stored or matched in another language, and iOS 16's new screen
+                    // after a change of the app language.
+                    await controller.retitle(places: places)
                     // A visitor who opens the journey inside the first artwork's geofence.
                     checkArrival()
                 }
@@ -522,6 +525,15 @@ struct VisitView: View {
                     for stop in withoutPlace {
                         emit(.stopPlaceDeleted(stop))
                     }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: AppLanguage.didChange)) { _ in
+                // iOS 16 builds the screen again (`appLanguage()`); its start reads the places.
+                guard #available(iOS 17, *) else { return }
+                Task {
+                    await loadVenueData()
+                    refreshMapLayers()
+                    if isReady, hasStops { await controller.retitle(places: places) }
                 }
             }
             .onReceive(controller.navigator.$journey) { _ in

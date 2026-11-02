@@ -74,10 +74,15 @@ The package views show Arabic when the language is Arabic, else English. The lan
   screens of `.proximiMap(_:)`, when it is not the language the app started in;
 - else the first of the app's `AppleLanguages` (iOS Settings, or an app that sets it itself).
 
-A change applies at once, also to an open map: the package's texts, the layout direction of its views
-(right to left in Arabic) and the map labels. The host app needs no restart for the package views. On
-iOS 16 the open package view is built again in the new language: an open map starts again, at the
-journey's current state.
+A change applies at once, also to an open map: the package's texts, the texts of the venue data
+(`title_i18n`, `description_i18n`, `metadata.artist_name`: POI titles, gallery names, journey stops,
+search results), the layout direction of its views (right to left in Arabic) and the map labels. The
+host app needs no restart for the package views. On iOS 16 the open package view is built again in the
+new language: an open map starts again, at the journey's current state.
+
+A host app that switches its language another way, such as its own string bundle, changes neither the
+`\.locale` nor `AppleLanguages`, and the package views keep their language. The field log shows each
+change the package takes: `app language <ar|en> (host locale <id>)` or `(AppleLanguages)`.
 
 ```swift
 // A host app that switches its language with the SwiftUI environment:
@@ -1010,6 +1015,21 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.31.3 (2026-11-02)
+
+No change for host apps' code.
+
+Fixed (Nagarro, 2026-11-02: the language switching does not work correctly):
+
+- The texts of the venue data follow a change of the app language at once: the POI titles, descriptions and
+  artist names, the gallery names, the journey stops and the search results. Before, they kept the language
+  the app launched in until the next launch. The 1.28.0 entry says "the package's texts"; it covered only
+  the package's own strings.
+- The journey stops take the new titles, the done stops too. A new title routes nothing. A done stop whose
+  POI was renamed in the venue data keeps the title the visitor saw.
+- `ProximiMap` gives the stored journey the titles in the app language.
+- Field log: `journey: <n> stop titles in <ar|en>`.
 
 ### 1.31.2 (2026-10-30)
 

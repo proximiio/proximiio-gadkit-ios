@@ -48,6 +48,22 @@ enum VisitPlan {
         })
     }
 
+    /// `journey` in the app language. A stop whose title is one of its place's `titles` takes the
+    /// place's `title`, whatever its state and kind. A stop with another title keeps it: a done
+    /// stop keeps the title the visitor saw after the POI was renamed (`reconciled`). Pure; covered
+    /// by tests.
+    static func retitled(_ journey: Journey, places: [VenuePlace]) -> Journey {
+        let byID = Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return Journey(stops: journey.stops.map { stop in
+            guard let place = stop.poiID.flatMap({ byID[$0] }), stop.title != place.title,
+                  place.titles.contains(stop.title)
+            else { return stop }
+            var retitled = stop
+            retitled.title = place.title
+            return retitled
+        })
+    }
+
     /// The pending, active and skipped planned stops whose POI is no longer a place. Pure; covered
     /// by tests.
     static func stopsWithoutPlace(in journey: Journey, places: [VenuePlace]) -> [JourneyStop] {

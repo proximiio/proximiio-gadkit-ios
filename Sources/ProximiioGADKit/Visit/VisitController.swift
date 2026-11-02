@@ -818,6 +818,22 @@ final class VisitController: ObservableObject {
         return withoutPlace
     }
 
+    /// Gives the stops the titles of `places`, read in the app language (`VisitPlan.retitled`),
+    /// after the journey changes started before it (`serially`). A new title alone routes nothing.
+    func retitle(places: [VenuePlace]) async {
+        await serially { [weak self] in
+            guard let self else { return }
+            let current = Dictionary(self.navigator.journey.stops.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            var count = 0
+            for stop in VisitPlan.retitled(self.navigator.journey, places: places).stops where current[stop.id] != stop {
+                if await self.navigator.replace(stop) { count += 1 }
+            }
+            guard count > 0 else { return }
+            FieldLog.log("journey: \(count) stop titles in \(AppLanguage.current)")
+            self.persist(self.navigator.journey)
+        }
+    }
+
     /// Takes the host app's journey on the open screen (`ProximiMapView`): stops added, removed,
     /// visited, skipped, reopened and moved. The navigator, its route cache, its event streams and
     /// the camera stay. Calls run one after another; a call during another keeps only the latest
