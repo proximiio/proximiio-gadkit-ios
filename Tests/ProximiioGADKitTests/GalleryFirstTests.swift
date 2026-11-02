@@ -101,6 +101,25 @@ struct GalleryFirstRoutingTests {
         #expect(VisitView.fillStyle(of: "g303", destination: "g303", visited: visited, visitorGallery: "g303") == nil)
     }
 
+    /// The marker of an artwork in a gallery shows only while the visitor is in that gallery, in every
+    /// state; artworks outside every gallery and detours stay (PM, Monday "Gallery numbers in gallery
+    /// navigation", 2026-10-29 and 2026-10-30).
+    @MainActor @Test func artworkMarkersShowOnlyInTheVisitorsGallery() {
+        func stop(_ id: String, gallery: String?, state: JourneyStop.State = .pending, kind: JourneyStop.Kind = .planned) -> JourneyStop {
+            JourneyStop(id: id, title: id, coordinate: .init(latitude: 24.5, longitude: 54.4), poiID: id, group: gallery, kind: kind, state: state)
+        }
+        let stops = [
+            stop("visited-g101", gallery: "g101", state: .done),
+            stop("outside", gallery: nil, state: .done),
+            stop("active-g303", gallery: "g303", state: .active),
+            stop("pending-g303", gallery: "g303"),
+            stop("cafe", gallery: "g101", kind: .detour),
+        ]
+        #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: nil) == ["visited-g101", "active-g303", "pending-g303"])
+        #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: "g303") == ["visited-g101"])
+        #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: "g101") == ["active-g303", "pending-g303"])
+    }
+
     /// Every gallery is a 30 pt pill with its full name, the same size in each style; each style has
     /// its own image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
     @MainActor @Test func everyGalleryIsAPillWithItsName() {

@@ -37,7 +37,7 @@ cases come in minor versions; a `switch` with `default` keeps compiling. The [Ch
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.68 and `proximiio-map-ios-binary`
-6.0.0-beta.60 exactly. The host app needs no dependency on them. A host app that also depends on
+6.0.0-beta.61 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -573,6 +573,13 @@ A curated tour routes straight to the artwork, but shows the galleries as a pers
 does: the gallery of the active artwork is the destination, pill and fill (PM, Monday "Gallery
 numbers in gallery navigation", 2026-10-29).
 
+The numbered marker of an artwork in a gallery shows only while the visitor is in that gallery, in
+every state: pending, active and visited. This applies to personalised journeys and curated tours (PM,
+Monday "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30). The markers of artworks
+outside every gallery and of detours stay. A hidden marker keeps its number: with stop 1 hidden, the
+next stop shows 2. GADKit sets `JourneyStopMarkerStyle.hiddenStopIDs` (map 6.0.0-beta.61) on each
+change of the journey and of the visitor's gallery.
+
 A gallery is visited when its artworks of the journey are all visited or skipped, at least one is
 visited (the customer, 2026-10-28), and the visitor is out of it (PM, 2026-10-29): the map fills it
 with the floor's light colour (level 0 #80FFD9, 1 #B7D3FF, 2 #DDC3F9, 3 #FFF291, 4 #FDC1A8), over the
@@ -1017,6 +1024,19 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.33.0 (2026-11-02)
+
+No change for host apps' code. `proximiio-map-ios-binary` 6.0.0-beta.61 (SDK 6.0.0-beta.68 unchanged). A
+host app that depends on it moves to the same version. From beta.61 on, the map binary's files carry the
+release's date, so Xcode rebuilds the module without Product > Clean Build Folder.
+
+Changed (PM, Monday "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30):
+
+- The numbered marker of an artwork in a gallery shows only while the visitor is in that gallery, in every
+  state, in personalised journeys and curated tours. Before, the markers of a visited gallery stayed until
+  the visitor reached the next gallery. The markers of artworks outside every gallery and of detours stay,
+  and a hidden marker keeps its number. GADKit sets the map's `JourneyStopMarkerStyle.hiddenStopIDs`.
 
 ### 1.32.0 (2026-11-02)
 

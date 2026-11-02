@@ -547,6 +547,7 @@ struct VisitView: View {
                 Task { @MainActor in
                     refreshMapLayers()
                     refreshLevelChanger()
+                    applyStopMarkers()
                 }
             }
             .onValueChange(of: controller.galleryAhead) { _, gallery in galleryAheadChanged(gallery) }
@@ -750,7 +751,9 @@ struct VisitView: View {
 
     /// The numbered stop markers. With gallery first they are hidden while the leg ends at a
     /// gallery, and while the visitor is outside every gallery and the active artwork is in one
-    /// (PM, Monday "Navigation to a gallery", 2026-10-26 and 2026-10-27).
+    /// (PM, Monday "Navigation to a gallery", 2026-10-26 and 2026-10-27). The marker of an artwork in
+    /// a gallery shows only while the visitor is in that gallery, in every state (PM, Monday "Gallery
+    /// numbers in gallery navigation", 2026-10-29 and 2026-10-30).
     private func applyStopMarkers() {
         var style = Self.showsArtworkMarkers(
             guidesToGalleryFirst: kind.guidesToGalleryFirst && !galleryDestinations.isEmpty,
@@ -759,7 +762,17 @@ struct VisitView: View {
             isActiveStopInGallery: controller.navigator.activeStop?.group != nil
         ) ? MapStyle.journeyStops : MapStyle.journeyStopsHidden
         if !settings.groupsStopMarkers { style.groupsOverlapping = false }
+        style.hiddenStopIDs = Self.stopsOutsideTheVisitorsGallery(controller.navigator.journey.stops, visitorGallery: visitorGalleryID)
         if controller.session.journeyStopMarkerStyle != style { controller.session.journeyStopMarkerStyle = style }
+    }
+
+    /// The artwork stops in a gallery (`JourneyStop.group`) other than `visitorGallery`. Artworks
+    /// outside every gallery and detours stay. Pure; covered by tests.
+    static func stopsOutsideTheVisitorsGallery(_ stops: [JourneyStop], visitorGallery: String?) -> Set<String> {
+        Set(stops.compactMap { stop in
+            guard stop.kind != .detour, let gallery = stop.group, gallery != visitorGallery else { return nil }
+            return stop.id
+        })
     }
 
     /// The navigator's reports of leaving and rejoining the route, which a paused journey does not
