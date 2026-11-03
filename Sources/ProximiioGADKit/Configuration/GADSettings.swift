@@ -98,9 +98,11 @@ public struct GADSettings: Equatable, Sendable {
     public var groupsStopMarkers = true
     /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
     /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
-    public var minimumZoom: Double?
-    /// The farthest the visitor can zoom in, or `nil` for the map library's limit.
-    public var maximumZoom: Double?
+    /// 15 since 1.34.0 (user, 2026-11-03).
+    public var minimumZoom: Double? = 15
+    /// The farthest the visitor can zoom in, or `nil` for the map library's limit. 21 since 1.34.0
+    /// (user, 2026-11-03).
+    public var maximumZoom: Double? = 21
     /// `false` draws the position dot on each fix. `true` slides it toward each fix (the map
     /// library's adaptive smoothing), which shows a fix a moment later (PM, Monday "Visual delay",
     /// 2026-10-23).

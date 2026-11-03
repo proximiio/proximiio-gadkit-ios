@@ -63,7 +63,13 @@ struct ProximiMapTests {
         #expect(MapStyle.options(settings: settings).minimumZoom == 16)
         #expect(MapStyle.options(settings: settings).maximumZoom == 20)
         #expect(MapStyle.exploreOptions(settings: settings).maximumZoom == 20)
-        #expect(MapStyle.options().minimumZoom == nil)
+        #expect(MapStyle.options().minimumZoom == 15)
+        #expect(MapStyle.options().maximumZoom == 21)
+        #expect(MapStyle.exploreOptions().minimumZoom == 15)
+        settings.minimumZoom = nil
+        settings.maximumZoom = nil
+        #expect(MapStyle.options(settings: settings).minimumZoom == nil)
+        #expect(MapStyle.options(settings: settings).maximumZoom == nil)
     }
 
     @Test func promptsIsEveryPromptAndEachPromptIsItsOwnOption() {

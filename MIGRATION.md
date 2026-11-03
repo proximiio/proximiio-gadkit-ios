@@ -1,7 +1,7 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.33.0 uses SDK
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.34.0 uses SDK
 6.0.0-beta.68 and Map 6.0.0-beta.61.
 
 Each change has a mark:
@@ -79,7 +79,7 @@ All Info.
   `PrivacyZoneState`.
 - Map 6.0.0-beta.51: `PositionStyle.privacy` and `PositionPrivacyStyle`.
 - Map 6.0.0-beta.52: `MapOptions.minimumZoom`, `maximumZoom` and `with(minimumZoom:maximumZoom:)`.
-  ProximiioGADKit sets them from `GADSettings.minimumZoom` and `maximumZoom`.
+  ProximiioGADKit sets them from `GADSettings.minimumZoom` and `maximumZoom` (15 and 21 since 1.34.0).
 - SDK 6.0.0-beta.65: `ProximiioConfiguration.allowsOfflineStart`, `Proximiio.tokenStatus` and
   `Proximiio.TokenStatus`, data-only bundled seeds from `proximiio-offline-fetch`.
 - SDK 6.0.0-beta.66: `ProximiioAmenity.metadata`, `title(language:)`, `titleTranslations` and
