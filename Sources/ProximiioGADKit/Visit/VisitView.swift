@@ -69,6 +69,8 @@ struct VisitView: View {
     @State private var visitorGalleryID: String?
     /// The follow that starts after `GADSettings.startZoomSeconds` at `startZoom`.
     @State private var startZoomFollow: Task<Void, Never>?
+    /// The camera shows the active stop because the position is not live (`showStopWithoutPosition`).
+    @State private var showsStopWithoutPosition = false
     /// The last field-log line of the gallery fills.
     @State private var galleryFillLine: String?
     /// The ride whose end floor the map shows after the lift or stairs view (`holdFloor(of:)`).
@@ -332,8 +334,13 @@ struct VisitView: View {
                     checkArrival()
                 }
                 // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
-                // map did not turn until "Centre on me").
-                if controller.session.position != nil { showVisitorThenFollow(withHeading: true, reason: "journey started") }
+                // map did not turn until "Centre on me"). Without a live position the camera shows
+                // the active stop.
+                if hasLivePosition {
+                    showVisitorThenFollow(withHeading: true, reason: "journey started")
+                } else {
+                    showStopWithoutPosition(reason: "journey started")
+                }
                 isReady = true
                 destinationChanged(destination.wrappedValue)
             }
@@ -473,12 +480,15 @@ struct VisitView: View {
             }
             // No tracking or wristband alerts: the host app handles the wristband states
             // (PM 2026-10-15).
-            .onValueChange(of: monitor.health) { _, health in
+            .onValueChange(of: monitor.health) { previous, health in
                 emit(.trackingChanged(health))
                 applyPositionStyle(for: health)
+                positionBecameLive(after: previous)
             }
             .onValueChange(of: controller.session.position == nil) { _, hasNoPosition in
-                if !hasNoPosition { showVisitorThenFollow(reason: "first position") }
+                guard !hasNoPosition, hasLivePosition else { return }
+                endStopWithoutPosition()
+                showVisitorThenFollow(reason: "first position")
             }
             .followsVisitorFloor(controller.session, venue: venue, isPaused: floorGuide.isActive || rideFloor != nil)
             .onValueChange(of: ride) { shown, now in
@@ -1042,6 +1052,70 @@ struct VisitView: View {
         }
     }
 
+    /// Seconds since the session's position, or `nil` without a position.
+    private var positionAge: TimeInterval? {
+        controller.session.position.map { Date().timeIntervalSince($0.timestamp) }
+    }
+
+    /// The session's position shows where the visitor is now (`isLive`).
+    private var hasLivePosition: Bool {
+        Self.isLive(health: monitor.health, positionAge: positionAge, settings: settings)
+    }
+
+    /// `true` for a position that shows where the visitor is: positioning is available, or was within
+    /// `GADSettings.trackingLostAfter`, or a privacy zone holds the dot. Before positioning is available
+    /// in the visit (`.waiting`), only a position younger than `trackingLostAfter` counts: a new map
+    /// gets the SDK's last position at any age. In the field test of 2026-11-06 it was 44 min old,
+    /// from a wristband that another phone had taken over. Pure; covered by tests.
+    static func isLive(health: TrackingHealth, positionAge: TimeInterval?, settings: GADSettings) -> Bool {
+        guard let positionAge else { return false }
+        switch health {
+        case .tracking, .privacyZone: return true
+        case .lostPlace, .stoppedResponding: return false
+        case .waiting: return positionAge < settings.trackingLostAfter
+        }
+    }
+
+    /// The stop the camera shows without a live position: the detour, else the active stop, else the
+    /// first stop that is not done. Pure; covered by tests.
+    static func stopWithoutPosition(detour: JourneyStop?, active: JourneyStop?, journey: Journey) -> JourneyStop? {
+        detour ?? active ?? journey.stops.first { $0.state == .pending || $0.state == .active || $0.state == .reached }
+    }
+
+    /// Without a live position the camera shows the stop of `stopWithoutPosition` on its floor at the
+    /// start zoom. It does not show an old position, and it does not keep the style's camera (level 0,
+    /// zoom 15), which looks like a map outside the museum (field tests 2026-11-06). A live position
+    /// moves the camera back to the visitor (`positionBecameLive`).
+    private func showStopWithoutPosition(reason: String) {
+        startZoomFollow?.cancel()
+        startZoomFollow = nil
+        let navigator = controller.navigator
+        guard let stop = Self.stopWithoutPosition(detour: navigator.detourStop, active: navigator.activeStop, journey: navigator.journey) else { return }
+        let centre = CLLocationCoordinate2D(latitude: stop.coordinate.latitude, longitude: stop.coordinate.longitude)
+        // The camera write lets go of the follow.
+        controller.session.camera.setCenter(centre, zoom: settings.startZoom ?? settings.followZoom, animated: false)
+        if let floor = stop.floor { controller.session.select(floor: floor) }
+        showsStopWithoutPosition = true
+        let age = positionAge.map { String(format: "%.0f s old", $0) } ?? "none"
+        FieldLog.log("camera at the stop without a live position (\(reason)) · \(stop.title) L\(stop.floor.map { String(Int($0.level.rounded())) } ?? "-") · health \(monitor.health) · position \(age)")
+    }
+
+    /// The position is live again after none, an old one or a silent wristband: the camera shows the
+    /// visitor at the start zoom, then follows. After `showStopWithoutPosition` the map follows the
+    /// visitor's floor again.
+    private func positionBecameLive(after previous: TrackingHealth) {
+        guard isReady, hasStops, hasLivePosition,
+              !Self.isLive(health: previous, positionAge: positionAge, settings: settings) else { return }
+        endStopWithoutPosition()
+        showVisitorThenFollow(withHeading: true, reason: "position live again")
+    }
+
+    /// After `showStopWithoutPosition` the map follows the visitor's floor again.
+    private func endStopWithoutPosition() {
+        if showsStopWithoutPosition, !floorGuide.isActive { controller.session.followMyFloor() }
+        showsStopWithoutPosition = false
+    }
+
     private static let connectorEndMeters = 2.0
     /// False: no connector. Its bend moved with every fix, so the route looked redrawn "like a
     /// snake" (PM review 2026-10-12, screen recording 21-26-05).
@@ -1169,8 +1243,13 @@ struct VisitView: View {
                         VStack(spacing: 5) {
                             GlassSquareButton(action: {
                                 floorGuide.leave()
-                                controller.session.followMyFloor()
-                                recentre(reason: "Centre on me")
+                                if hasLivePosition || !hasStops {
+                                    showsStopWithoutPosition = false
+                                    controller.session.followMyFloor()
+                                    recentre(reason: "Centre on me")
+                                } else {
+                                    showStopWithoutPosition(reason: "Centre on me")
+                                }
                                 emit(.recentred)
                             }) {
                                 GADIcon.compass.image.resizable().scaledToFit().frame(width: 24, height: 24)

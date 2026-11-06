@@ -24,6 +24,8 @@ final class VisitLiveActivity {
     /// Id of the running activity. The activity itself is looked up by id inside each task,
     /// because `Activity` is not `Sendable`.
     private var activityID: String?
+    /// The activities that `end()` ended in this run of the app.
+    private static var endedInThisRun: Set<String> = []
     private var lastState: VisitActivityAttributes.ContentState?
     private var lastUpdate = Date.distantPast
 
@@ -42,6 +44,10 @@ final class VisitLiveActivity {
         let content = ActivityContent(state: state, staleDate: nil)
         if let activityID {
             Task.detached { await Self.send(content, to: activityID) }
+        } else if let leftover = Self.adoptLeftover() {
+            activityID = leftover
+            FieldLog.log("live activity: continues the activity of an earlier run")
+            Task.detached { await Self.send(content, to: leftover) }
         } else {
             do {
                 activityID = try Activity.request(
@@ -57,14 +63,40 @@ final class VisitLiveActivity {
 
     func end() {
         guard let activityID else { return }
+        Self.endedInThisRun.insert(activityID)
         let final = lastState.map { ActivityContent(state: $0, staleDate: nil) }
         Task.detached { await Self.end(activityID, with: final) }
         self.activityID = nil
         lastState = nil
     }
 
+    /// The id of a running visit activity that an earlier run of the app left, or `nil`. The other
+    /// running ones end at once. An app that is killed during a visit cannot end its activity, and
+    /// ActivityKit refuses a new one when the app has its maximum of running activities
+    /// (`targetMaximumExceeded`, field test 2026-11-06).
+    private static func adoptLeftover() -> String? {
+        let running = Activity<VisitActivityAttributes>.activities
+            .filter { $0.activityState == .active || $0.activityState == .stale }
+            .map(\.id)
+            // An activity this run ended can still be running for a moment.
+            .filter { !endedInThisRun.contains($0) }
+        guard let first = running.first else { return nil }
+        let others = Array(running.dropFirst())
+        if !others.isEmpty {
+            FieldLog.log("live activity: ends \(others.count) more of earlier runs")
+            Task.detached { await endAtOnce(others) }
+        }
+        return first
+    }
+
     // The `Activity` value stays inside these nonisolated functions, so it never crosses
     // an isolation boundary.
+    private nonisolated static func endAtOnce(_ ids: [String]) async {
+        for activity in Activity<VisitActivityAttributes>.activities where ids.contains(activity.id) {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
     private nonisolated static func send(_ content: ActivityContent<VisitActivityAttributes.ContentState>, to id: String) async {
         await Activity<VisitActivityAttributes>.activities.first { $0.id == id }?.update(content)
     }

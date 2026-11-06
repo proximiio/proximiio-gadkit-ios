@@ -648,7 +648,22 @@ do {
 - Positions arrive only while `wristband` is `.connected`. A session stored by the SDK is confirmed
   with the relay-api after `start()`.
 - The package shows no wristband alerts. `ProximiMapEvent.wristbandChanged(_:)` and
-  `trackingChanged(_:)` let the host app show its own.
+  `trackingChanged(_:)` let the host app show its own. `.proximiMap(_:overlay:)` draws a view of the host
+  app over the museum map, Journey ready and the journey, above the screen and below its sheets:
+
+  ```swift
+  RootView()
+      .proximiMap(map) {
+          // The host app's view, for example a notice while `map.wristband` is
+          // `.notConnected(notice:)` on `map.screen == .journey`.
+          WristbandNotice(map: map)
+      }
+  ```
+
+- Without a live position the journey map shows the active stop on its floor at `startZoom`, also after
+  "Centre on me". It does not show the SDK's last position when that position is older than
+  `trackingLostAfter` and positioning has not been available in the journey, or when the wristband has been
+  silent for `trackingLostAfter`. A live position moves the camera back to the visitor.
 
 ## Privacy zones
 
@@ -1024,6 +1039,32 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.35.0 (2026-11-06)
+
+No change for host apps' code (field tests at the Guggenheim, 2026-11-06).
+
+Added:
+
+- `.proximiMap(_:overlay:)`: `.proximiMap(_:)` with a view of the host app over the museum map, Journey
+  ready and the journey, for example a notice after the wristband session ended. The overlay is above the
+  screen and below the screen's sheets.
+
+Changed:
+
+- Without a live position the journey map shows the active stop (or the detour, or the first stop not
+  visited) on its floor at `startZoom`: when the journey starts and after "Centre on me". Before, the map
+  showed the SDK's last position, which was 44 min old in the field test, or the style's camera (level 0,
+  zoom 15) without any position. A position counts as live while positioning is available or was within
+  `trackingLostAfter`, or in a privacy zone. Before positioning was available in the journey, only a
+  position younger than `trackingLostAfter` counts. When the position is live again, the map shows the
+  visitor at `startZoom` and follows them.
+
+Fixed:
+
+- The Live Activity did not start (`targetMaximumExceeded`) after the app had been killed during a few
+  visits: each killed run left its activity running. The journey screen now continues one activity that an
+  earlier run left and ends the others.
 
 ### 1.34.0 (2026-11-03)
 

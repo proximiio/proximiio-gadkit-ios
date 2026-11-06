@@ -7,6 +7,8 @@
 //  Manage journey are sheets. One presentation at a time; `ProximiMap` presents the next one after
 //  the dismissal of the previous.
 //
+//  `.proximiMap(_:overlay:)` also draws a view of the host app over each full-screen screen.
+//
 import Proximiio
 import ProximiioMap
 import SwiftUI
@@ -15,17 +17,27 @@ extension View {
     /// Presents the screens of `map` over this view. Attach it once, to a view that stays on screen
     /// while the app runs, for example the root view.
     public func proximiMap(_ map: ProximiMap) -> some View {
-        modifier(ProximiMapPresenter(map: map))
+        modifier(ProximiMapPresenter(map: map, overlay: { EmptyView() }))
+    }
+
+    /// Presents the screens of `map` over this view, as `proximiMap(_:)` does, and draws `overlay`
+    /// over the museum map, Journey ready and the journey. The overlay is above the screen and below
+    /// the screen's own sheets. `map.screen` names the screen. The package shows no wristband alerts:
+    /// the host app can show its own notice there, for example after the wristband session ended.
+    public func proximiMap<Overlay: View>(_ map: ProximiMap, @ViewBuilder overlay: @escaping () -> Overlay) -> some View {
+        modifier(ProximiMapPresenter(map: map, overlay: overlay))
     }
 }
 
-struct ProximiMapPresenter: ViewModifier {
+struct ProximiMapPresenter<Overlay: View>: ViewModifier {
     @ObservedObject var map: ProximiMap
+    let overlay: () -> Overlay
 
     func body(content: Content) -> some View {
         content
             .fullScreenCover(item: $map.cover, onDismiss: map.coverDismissed) { cover in
                 coverContent(cover)
+                    .overlay { overlay() }
                     .routeAccessibility(map.routeAccessibility)
                     .onVisitEvent { map.handle($0) }
                     .appLanguage()
