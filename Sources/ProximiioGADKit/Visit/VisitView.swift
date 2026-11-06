@@ -71,6 +71,8 @@ struct VisitView: View {
     @State private var startZoomFollow: Task<Void, Never>?
     /// The camera shows the active stop because the position is not live (`showStopWithoutPosition`).
     @State private var showsStopWithoutPosition = false
+    /// `hasLivePosition` at the last health or position change (`livenessChanged`).
+    @State private var wasLive = false
     /// The last field-log line of the gallery fills.
     @State private var galleryFillLine: String?
     /// The ride whose end floor the map shows after the lift or stairs view (`holdFloor(of:)`).
@@ -336,7 +338,8 @@ struct VisitView: View {
                 // Starts the heading-up follow once the journey is drawn (PM review 2026-10-12: the
                 // map did not turn until "Centre on me"). Without a live position the camera shows
                 // the active stop.
-                if hasLivePosition {
+                wasLive = hasLivePosition
+                if wasLive {
                     showVisitorThenFollow(withHeading: true, reason: "journey started")
                 } else {
                     showStopWithoutPosition(reason: "journey started")
@@ -480,13 +483,14 @@ struct VisitView: View {
             }
             // No tracking or wristband alerts: the host app handles the wristband states
             // (PM 2026-10-15).
-            .onValueChange(of: monitor.health) { previous, health in
+            .onValueChange(of: monitor.health) { _, health in
                 emit(.trackingChanged(health))
                 applyPositionStyle(for: health)
-                positionBecameLive(after: previous)
+                livenessChanged()
             }
             .onValueChange(of: controller.session.position == nil) { _, hasNoPosition in
-                guard !hasNoPosition, hasLivePosition else { return }
+                // During the journey `livenessChanged` shows the visitor.
+                guard !hasNoPosition, hasLivePosition, !(isReady && hasStops) else { return }
                 endStopWithoutPosition()
                 showVisitorThenFollow(reason: "first position")
             }
@@ -521,6 +525,7 @@ struct VisitView: View {
                     updateVisitorGallery(controller.session.position)
                     releaseRideFloor(controller.session.position)
                     if let fix = controller.session.position { floorGuide.positionReceived(at: fix.timestamp) }
+                    livenessChanged()
                 }
             }
             .onReceive(controller.navigator.$guidance) { guidance in
@@ -1085,7 +1090,7 @@ struct VisitView: View {
     /// Without a live position the camera shows the stop of `stopWithoutPosition` on its floor at the
     /// start zoom. It does not show an old position, and it does not keep the style's camera (level 0,
     /// zoom 15), which looks like a map outside the museum (field tests 2026-11-06). A live position
-    /// moves the camera back to the visitor (`positionBecameLive`).
+    /// moves the camera back to the visitor (`livenessChanged`).
     private func showStopWithoutPosition(reason: String) {
         startZoomFollow?.cancel()
         startZoomFollow = nil
@@ -1100,12 +1105,16 @@ struct VisitView: View {
         FieldLog.log("camera at the stop without a live position (\(reason)) · \(stop.title) L\(stop.floor.map { String(Int($0.level.rounded())) } ?? "-") · health \(monitor.health) · position \(age)")
     }
 
-    /// The position is live again after none, an old one or a silent wristband: the camera shows the
-    /// visitor at the start zoom, then follows. After `showStopWithoutPosition` the map follows the
-    /// visitor's floor again.
-    private func positionBecameLive(after previous: TrackingHealth) {
-        guard isReady, hasStops, hasLivePosition,
-              !Self.isLive(health: previous, positionAge: positionAge, settings: settings) else { return }
+    /// Called on every change of the tracking health and of the position. When the position turns live
+    /// during the journey, after none, an old one or a silent wristband, the camera shows the visitor at
+    /// the start zoom, then follows. After `showStopWithoutPosition` the map follows the visitor's floor
+    /// again. The two change in either order: a fresh fix can come before the SDK reports positioning
+    /// available (guggenheim-android review, 2026-11-06).
+    private func livenessChanged() {
+        let isLive = hasLivePosition
+        guard isLive != wasLive else { return }
+        wasLive = isLive
+        guard isLive, isReady, hasStops else { return }
         endStopWithoutPosition()
         showVisitorThenFollow(withHeading: true, reason: "position live again")
     }

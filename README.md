@@ -1040,6 +1040,18 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.35.1 (2026-11-06)
+
+No change for host apps' code.
+
+Fixed:
+
+- After a journey that started without a live position, the camera stayed at the stop when a fresh fix
+  arrived before the SDK reported positioning available. The check read the previous tracking health with
+  the fresh fix's age, so the state before the change counted as live. The journey screen now keeps the
+  last result and acts when it turns live, on every change of the tracking health and of the position, in
+  either order (guggenheim-android review).
+
 ### 1.35.0 (2026-11-06)
 
 No change for host apps' code (field tests at the Guggenheim, 2026-11-06).
