@@ -1374,7 +1374,7 @@ struct VisitView: View {
                 options: accessibility.routeOptions
             )
             guard routedAmenity?.id == place.id else { return }
-            controller.session.setRoute(route)
+            controller.session.setRoute(route.extended(to: place.coordinate, maximumMeters: settings.routeToStopMaximumMeters))
             amenityRouteError = nil
         } catch {
             FieldLog.log("route to \(place.title) failed: \(error)")

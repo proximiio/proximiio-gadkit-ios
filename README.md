@@ -821,6 +821,7 @@ let configuration = GADConfiguration(
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `nil`: at any distance. The remaining distance and the instructions follow every position. |
+| `routeToStopMaximumMeters` | 15 m | A route ends where its stop projects onto the path network. The line goes on in a straight line to the stop when the stop is at most this far from that point; the remaining distance and the walking time include that segment. A leg to a gallery's POI (gallery first) ends on the path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from a path, so 15 m extends every route. |
 | `followZoom` | 19.5 | Zoom of "Centre on me", of the first position and of the follow, in personalised and curated journeys. |
 | `galleryFollowZoom` | `nil` | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
 | `startZoom` | 17 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
@@ -1039,6 +1040,23 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.36.0 (2026-11-09)
+
+No change for host apps' code.
+
+Added:
+
+- `GADSettings.routeToStopMaximumMeters` (15 m).
+
+Changed:
+
+- The route goes on from the end of the path to the stop. The SDK's route ends where the stop projects onto
+  the path network, so the line ended short of an artwork beside the path (user, 2026-11-09). The journey
+  legs to an artwork or an amenity and the "Go here" routes of the museum map and the journey map now end at
+  the stop, with a straight segment from the path. The remaining distance, the walking time and the arrive
+  instruction include the segment. The arrival radius of an amenity counts from the amenity, not from the
+  end of the path. A leg to a gallery's POI (gallery first) ends on the path.
 
 ### 1.35.1 (2026-11-06)
 

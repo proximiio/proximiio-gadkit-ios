@@ -13,8 +13,9 @@
 //  (`GADSettings.galleryFirstMarginMeters`) has no gallery (field test 2026-10-19: test copies of
 //  artworks named galleries in another building).
 //
-//  The navigator's legs come from this router (`JourneyRouting`). The walking times that order the
-//  journey come from the SDK's router unchanged.
+//  The navigator's legs come from this router (`JourneyRouting`). A leg that ends at its stop goes
+//  on from the path to the stop (`GADSettings.routeToStopMaximumMeters`); a leg to a gallery ends
+//  on the path. The walking times that order the journey come from the SDK's router unchanged.
 //
 import Foundation
 import os
@@ -49,10 +50,13 @@ final class GalleryFirstRouting: JourneyRouting {
     }
 
     private let inner: any JourneyRouting
+    /// `GADSettings.routeToStopMaximumMeters`.
+    private let routeToStopMaximumMeters: Double
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    init(inner: any JourneyRouting) {
+    init(inner: any JourneyRouting, routeToStopMaximumMeters: Double = GADSettings.standard.routeToStopMaximumMeters) {
         self.inner = inner
+        self.routeToStopMaximumMeters = routeToStopMaximumMeters
     }
 
     /// Turns gallery first on or off and sets the gallery of each artwork. Keeps the reached artworks.
@@ -91,6 +95,7 @@ final class GalleryFirstRouting: JourneyRouting {
 
     func route(origin: MapCoordinate, originFloor: FloorKey, destination: MapCoordinate, destinationFloor: FloorKey) async -> ComputedRoute? {
         await inner.route(origin: origin, originFloor: originFloor, destination: destination, destinationFloor: destinationFloor)
+            .map { toStop($0, destination) }
     }
 
     func route(
@@ -113,7 +118,15 @@ final class GalleryFirstRouting: JourneyRouting {
             _ = state.withLock { $0.withoutRoute.insert(Key(destination)) }
             FieldLog.log("gallery first: no route to \(gallery.gallery.name) (\(reason)) · route ends at the artwork")
         }
-        return await inner.route(origin: origin, originFloor: originFloor, destination: destination, destinationFloor: destinationFloor, options: options)
+        let result = await inner.route(origin: origin, originFloor: originFloor, destination: destination, destinationFloor: destinationFloor, options: options)
+        guard case .route(let route) = result else { return result }
+        return .route(toStop(route, destination))
+    }
+
+    /// `route` up to the stop at `destination` (`ComputedRoute.extended(to:maximumMeters:)`).
+    private func toStop(_ route: ComputedRoute, _ destination: MapCoordinate) -> ComputedRoute {
+        route.extended(to: ProximiioCoordinate(latitude: destination.latitude, longitude: destination.longitude),
+                       maximumMeters: routeToStopMaximumMeters)
     }
 
     func durations(from origins: [JourneyRoutePoint], to destinations: [JourneyRoutePoint]) async -> [[TimeInterval?]] {

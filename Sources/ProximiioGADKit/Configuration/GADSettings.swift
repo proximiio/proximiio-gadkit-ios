@@ -76,6 +76,13 @@ public struct GADSettings: Equatable, Sendable {
     /// remaining distance and the instructions follow every position. `nil`: the walked part follows
     /// the position at any distance (PM, Monday "Route marked as walked too far", 2026-10-30).
     public var progressCorridorMeters: Double? = 3
+    /// A route ends where its stop projects onto the path network. The line goes on in a straight
+    /// line to the stop when the stop is at most this many metres from that point. The remaining
+    /// distance and the walking time include that segment. A leg to a gallery's POI (gallery first)
+    /// ends on the path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from
+    /// a path (`WayfindingRouter.defaultSnapThresholdMeters`), so 15 extends every route (user,
+    /// 2026-11-09).
+    public var routeToStopMaximumMeters: Double = 15
 
     // MARK: Map
 
