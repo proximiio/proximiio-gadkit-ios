@@ -592,17 +592,24 @@ extension ProximiMap {
     /// The host event for a `VisitEvent`, or `nil` for a navigator event the host app does not get.
     /// Pure; covered by tests.
     nonisolated static func event(for event: VisitEvent, places: [VenuePlace]) -> ProximiMapEvent? {
+        func gallery(of placeID: String) -> ProximiGallery? {
+            guard let poi = GalleryNearbyDetector.gallery(of: placeID, in: places), let galleryID = poi.remoteID else { return nil }
+            return ProximiGallery(id: poi.id, galleryID: galleryID, title: poi.title, level: Int(poi.level.rounded()),
+                                  latitude: poi.coordinate.latitude, longitude: poi.coordinate.longitude)
+        }
         func stop(_ stop: JourneyStop) -> ProximiStop {
             let id = stop.poiID ?? stop.id
             return ProximiStop(
                 id: id,
                 title: stop.title,
                 artworkID: places.first { $0.id == id }?.remoteID,
-                level: stop.floor.map { Int($0.level.rounded()) }
+                level: stop.floor.map { Int($0.level.rounded()) },
+                gallery: gallery(of: id)
             )
         }
         func place(_ place: VenuePlace) -> ProximiStop {
-            ProximiStop(id: place.id, title: place.title, artworkID: place.isArtwork ? place.remoteID : nil, level: Int(place.level.rounded()))
+            ProximiStop(id: place.id, title: place.title, artworkID: place.isArtwork ? place.remoteID : nil, level: Int(place.level.rounded()),
+                        gallery: place.isArtwork ? gallery(of: place.id) : nil)
         }
         switch event {
         case .modeChanged(let mode): return .modeChanged(mode)
@@ -620,6 +627,9 @@ extension ProximiMap {
         case .exitConfirmed: return .exitConfirmed
         case .exitCancelled: return .exitCancelled
         case .stopNearby(let s): return .stopNearby(stop(s))
+        case .galleryNearby(let s):
+            let mapped = stop(s)
+            return mapped.gallery.map { .galleryNearby($0, stop: mapped) }
         case .positionUncertain(let s): return .positionUncertain(stop(s))
         case .stopPlaceDeleted(let s): return .stopPlaceDeleted(stop(s))
         case .artworkReached(let s): return .artworkReached(stop(s))

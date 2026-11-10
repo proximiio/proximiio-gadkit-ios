@@ -36,7 +36,7 @@ public struct ProximiMapView: View {
         public static let bottomBar = Options(rawValue: 1 << 0)
         /// The package's background image around the map card. Without it the view is transparent.
         public static let background = Options(rawValue: 1 << 1)
-        /// "Skip this artwork?" after a swipe on a stop in the list. Without it the view reports
+        /// "Leave this artwork out?" after a swipe on a stop in the list. Without it the view reports
         /// `skipRequested` only, and the host app decides.
         public static let skipPrompt = Options(rawValue: 1 << 6)
         /// "Looks like you've left your route" with "Dismiss", `GADSettings.offRouteMeters` off the leg

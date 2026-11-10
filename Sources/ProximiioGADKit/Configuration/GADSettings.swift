@@ -54,6 +54,10 @@ public struct GADSettings: Equatable, Sendable {
     /// `ProximiMapEvent.stopNearby`: the active stop is less than this many metres away, along the
     /// route, or in a straight line without a route. The package posts no notification for it.
     public var stopNearbyMeters: Double = 5
+    /// `ProximiMapEvent.galleryNearby`: the POI of the active stop's gallery is less than this many
+    /// metres away in a straight line, on the visitor's level. A visitor inside the gallery's
+    /// outline is nearby at any distance.
+    public var galleryNearbyMeters: Double = 5
 
     // MARK: Route
 
@@ -100,6 +104,13 @@ public struct GADSettings: Equatable, Sendable {
     public var startZoom: Double? = 17
     /// How long the journey map stays at `startZoom`.
     public var startZoomSeconds: TimeInterval = 2
+    /// The height in points over which the journey map fades out at the top of its card, under the
+    /// Map / List control. The faded part shows what the host app draws behind `ProximiMapView`.
+    /// 0: no fade.
+    public var mapTopFadeHeight: Double = 110
+    /// The height in points over which the journey map fades out at the bottom of its card, under
+    /// the stop card. 0: no fade.
+    public var mapBottomFadeHeight: Double = 170
     /// `true` shows journey stop markers that would overlap as one marker with a badge holding the
     /// number of the others (PM, Monday "Clustering", 2026-10-29).
     public var groupsStopMarkers = true
@@ -110,6 +121,17 @@ public struct GADSettings: Equatable, Sendable {
     /// The farthest the visitor can zoom in, or `nil` for the map library's limit. 21 since 1.34.0
     /// (user, 2026-11-03).
     public var maximumZoom: Double? = 21
+    /// The box the screen stays inside, or `nil` for no limit. It holds for gestures and for every
+    /// camera move the map makes, on the journey map and the Explore Museum map
+    /// (`MapOptions.cameraBounds`, map 6.0.0-beta.62). The map stops zooming out where the box
+    /// covers the view, so a `minimumZoom` below that zoom is not reached. The default is the PM's
+    /// box around the museum (Monday "Zoom out limit", 2026-11-10).
+    public var cameraBounds: GADCameraBounds? = .guggenheimAbuDhabi
+    /// `true` picks the first gallery on a floor and the gallery after a finished one by routed
+    /// walking time (`JourneyOrderStrategy.floorThenGalleryRouted`, map 6.0.0-beta.62). `false`
+    /// picks them by straight-line distance, as before 1.37.0. A stop without a route uses the
+    /// straight line in both (PM, Monday "First stop over birds flight vs along the route").
+    public var ordersGalleriesByWalkingTime = true
     /// `false` draws the position dot on each fix. `true` slides it toward each fix (the map
     /// library's adaptive smoothing), which shows a fix a moment later (PM, Monday "Visual delay",
     /// 2026-10-23).
@@ -201,4 +223,24 @@ public struct GADSettings: Equatable, Sendable {
 
     /// The defaults.
     public static let standard = GADSettings()
+}
+
+/// A box in degrees that limits the map camera (`GADSettings.cameraBounds`).
+public struct GADCameraBounds: Equatable, Sendable {
+    public var south: Double
+    public var west: Double
+    public var north: Double
+    public var east: Double
+
+    public init(south: Double, west: Double, north: Double, east: Double) {
+        self.south = south
+        self.west = west
+        self.north = north
+        self.east = east
+    }
+
+    /// The PM's box around the Guggenheim Abu Dhabi (Monday "Zoom out limit", 2026-11-10).
+    public static let guggenheimAbuDhabi = GADCameraBounds(
+        south: 24.53557985, west: 54.39348543, north: 24.54644005, east: 54.40758853
+    )
 }

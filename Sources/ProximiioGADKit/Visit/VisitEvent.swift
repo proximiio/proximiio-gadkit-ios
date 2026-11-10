@@ -20,9 +20,9 @@ enum VisitEvent: Sendable, Equatable {
     /// The presentation changed: the Map / List toggle.
     case modeChanged(VisitMode)
     /// The visitor swiped a stop in the list, or used its "Skip" accessibility action.
-    /// `VisitView` asks "Skip artwork?".
+    /// `VisitView` asks "Skip it?".
     case skipRequested(JourneyStop)
-    /// The visitor confirmed "Skip artwork". With `ProximiMapView.Options.progress` the stop is
+    /// The visitor confirmed "Skip it". With `ProximiMapView.Options.progress` the stop is
     /// skipped; without it the host app skips it.
     case stopSkipped(JourneyStop)
     /// The visitor answered "Keep it". The stop stays in the journey.
@@ -51,6 +51,10 @@ enum VisitEvent: Sendable, Equatable {
     /// The active stop is less than `GADSettings.stopNearbyMeters` away on the visitor's level.
     /// Once per stop for the whole visit (`StopNearbyDetector`).
     case stopNearby(JourneyStop)
+    /// The gallery of the active stop is nearby: its POI is less than
+    /// `GADSettings.galleryNearbyMeters` away, or the visitor is inside its outline
+    /// (`GalleryNearbyDetector`). Not sent while the journey is paused; sent again after a resume.
+    case galleryNearby(JourneyStop)
     /// The POI of a stop was deleted on the backend while the screen is open. Once per stop. With
     /// `ProximiMapView.Options.progress` the stop is skipped; without it the stop stays and the host
     /// app decides.

@@ -89,6 +89,7 @@ struct VisitView: View {
     /// leave the screen below without taps (Monday "UI gets stuck", 2026-10-15).
     @State private var leavesAfterDismiss = false
     @State private var stopNearby: StopNearbyDetector
+    @State private var galleryNearby: GalleryNearbyDetector
     /// The lift or stairs view and the map of a floor without positioning.
     @StateObject private var floorGuide: FloorWithoutPositioningGuide
     private let venue: VenueService
@@ -159,6 +160,7 @@ struct VisitView: View {
         self.settings = settings
         _monitor = StateObject(wrappedValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
         _stopNearby = State(initialValue: StopNearbyDetector(nearbyMeters: settings.stopNearbyMeters))
+        _galleryNearby = State(initialValue: GalleryNearbyDetector(nearbyMeters: settings.galleryNearbyMeters))
         _liveActivity = State(initialValue: VisitLiveActivity(minimumUpdateInterval: settings.liveActivityMinimumInterval))
         _floorGuide = StateObject(wrappedValue: FloorWithoutPositioningGuide(settings: settings))
         let session = MapStyle.session(
@@ -228,7 +230,7 @@ struct VisitView: View {
 
     /// The map in its glass card, with the list, "Rerouting you…" and the controls over it.
     private var mapCard: some View {
-        MapGlassFrame(onPullDown: pullDownAction) {
+        MapGlassFrame(onPullDown: pullDownAction, topFade: CGFloat(settings.mapTopFadeHeight), bottomFade: CGFloat(settings.mapBottomFadeHeight)) {
             ProximiioMapView(session: controller.session)
                 // List mode shows the host app's background through the card, not the map (PM, Monday
                 // "List view transparency", 2026-11-02; Figma 03.P.03D). The map stays loaded.
@@ -536,6 +538,13 @@ struct VisitView: View {
                 checkStopNearby(position: controller.session.position, guidance: controller.navigator.guidance)
                 checkArrival()
                 applyStopMarkers()
+            }
+            // A resumed journey reports the gallery ahead again (PM, Monday "Sending entered geofences &
+            // approaching gallery at start", 2026-11-10).
+            .onValueChange(of: controller.isPaused) { _, paused in
+                guard !paused else { return }
+                galleryNearby.reset()
+                checkGalleryNearby(position: controller.session.position)
             }
             .onValueChange(of: controller.navigator.journey) { _, journey in controller.persist(journey) }
             .onReceive(venue.data.$version.dropFirst()) { _ in
@@ -868,6 +877,16 @@ struct VisitView: View {
         if let stop = stopNearby.update(position: position, stop: navigator.activeStop, guidance: navigator.hasArrived ? nil : guidance) {
             emit(.stopNearby(stop))
         }
+        checkGalleryNearby(position: position)
+    }
+
+    /// Reports `galleryNearby` for the gallery of the active stop. A paused journey and a detour
+    /// report none; the resume reports the gallery again (`galleryNearby.reset()`).
+    private func checkGalleryNearby(position: VenuePosition?) {
+        guard !controller.isPaused, controller.navigator.detourStop == nil else { return }
+        if let stop = galleryNearby.update(position: position, stop: controller.navigator.activeStop, places: places, outlines: galleryDestinations) {
+            emit(.galleryNearby(stop))
+        }
     }
 
     /// Stop markers and gallery fills for the current journey and floor.
@@ -1008,6 +1027,7 @@ struct VisitView: View {
             returnOrigin = floorDestination?.coordinate
             floorGuide.returnFromFloor()
         }
+        galleryNearby.reset()
         Task { await controller.resumeJourney() }
     }
 
@@ -1153,7 +1173,7 @@ struct VisitView: View {
     /// List mode with a journey. Without stops the map shows, whatever `mode` is.
     private var showsList: Bool { mode == .list && hasStops }
 
-    /// A swipe on a stop in the list: "Skip this artwork?" with `skipPrompt`, else only the event.
+    /// A swipe on a stop in the list: "Leave this artwork out?" with `skipPrompt`, else only the event.
     private func requestSkip(_ stop: JourneyStop) {
         if options.contains(.skipPrompt) { stopToSkip = stop }
         emit(.skipRequested(stop))
@@ -1642,7 +1662,7 @@ private struct VisitCard: View {
             return String(localized: "Head to Level \(returningToLevel) by lift or stairs", bundle: .localized)
         }
         if isOnFloorWithoutPositioning {
-            return String(localized: "Your position is not shown on this level.", bundle: .localized)
+            return String(localized: "Hey, it looks like you’re on a level where I can’t locate you.", bundle: .localized)
         }
         if let stop = navigator.activeStop, case .noAccessibleRoute = navigator.noRouteReasons[stop.id] {
             return String(localized: "No route to this stop with your accessibility settings.", bundle: .localized)
@@ -1731,7 +1751,7 @@ private struct StartingSpinner: View {
     }
 }
 
-/// "Skip this artwork?" bottom sheet.
+/// "Leave this artwork out?" bottom sheet.
 private struct SkipConfirmation: View {
     let stop: JourneyStop
     let onSkip: () -> Void
@@ -1739,12 +1759,12 @@ private struct SkipConfirmation: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Text("Skip this artwork?", bundle: .localized).textStyle(.h1Bold)
+            Text("Leave this artwork out?", bundle: .localized).textStyle(.h1Bold)
             Text(stop.title).textStyle(.largeBodyRegular)
-            Text("It will be removed from your route. Artworks you have visited stay saved.", bundle: .localized)
+            Text("I’ll remove it from your route.", bundle: .localized)
                 .textStyle(.bodySmallRegular)
                 .padding(.bottom, 20)
-            Button(String(localized: "Skip artwork", bundle: .localized), action: onSkip).buttonStyle(.primary)
+            Button(String(localized: "Skip it", bundle: .localized), action: onSkip).buttonStyle(.primary)
             Button(String(localized: "Keep it", bundle: .localized), action: onKeep).buttonStyle(.textAction)
         }
         // Less space under "Keep it" (PM, Monday "Skip artwork popup too large", 2026-10-28).

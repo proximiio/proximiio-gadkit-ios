@@ -206,7 +206,7 @@ final class FloorWithoutPositioningGuide: ObservableObject {
 /// floor without positioning, that the position is not shown there. A tap ends it.
 struct FloorChangeView: View {
     let change: FloorWithoutPositioningGuide.Change
-    /// "Your position is not shown on this level."
+    /// "Hey, it looks like you’re on a level where I can’t locate you."
     var showsNoPositionNote = true
 
     private var icon: GADIcon { change.featureType == "elevator" ? .elevator : .stairs }
@@ -245,7 +245,7 @@ struct FloorChangeView: View {
                     .textStyle(.h1Bold)
                     .multilineTextAlignment(.center)
                 if showsNoPositionNote {
-                    Text("Your position is not shown on this level.", bundle: .localized)
+                    Text("Hey, it looks like you’re on a level where I can’t locate you.", bundle: .localized)
                         .textStyle(.bodySmallRegular)
                         .multilineTextAlignment(.center)
                 }

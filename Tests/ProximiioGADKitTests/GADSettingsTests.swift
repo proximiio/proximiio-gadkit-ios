@@ -4,6 +4,7 @@
 //
 import Foundation
 import Proximiio
+import ProximiioMap
 import Testing
 @testable import ProximiioGADKit
 
@@ -18,6 +19,9 @@ struct GADSettingsTests {
         #expect(configuration.settings == .standard)
         #expect(GADSettings.standard.trackingLostAfter == 110)
         #expect(GADSettings.standard.stopNearbyMeters == 5)
+        #expect(GADSettings.standard.galleryNearbyMeters == 5)
+        #expect(GADSettings.standard.mapTopFadeHeight == 110)
+        #expect(GADSettings.standard.mapBottomFadeHeight == 170)
         // The warning at 12 m off the route (PM, Monday "Personalized tour: off-route and re-route
         // behaviour", 2026-10-28).
         #expect(GADSettings.standard.offRouteMeters == 12)
@@ -39,6 +43,25 @@ struct GADSettingsTests {
         settings.progressCorridorMeters = nil
         #expect(VisitController.artworkGuidanceRules(settings).progressCorridorMeters == nil)
         #expect(VisitController.detourGuidanceRules(settings).progressCorridorMeters == nil)
+    }
+
+    /// The camera stays in the PM's box, and the galleries are ordered by walking time (PM, Monday
+    /// "Zoom out limit" and "First stop over birds flight vs along the route", 2026-11-10; map
+    /// 6.0.0-beta.62).
+    @Test @MainActor func theCameraIsBoundedAndTheGalleriesAreOrderedByWalkingTime() {
+        var settings = GADSettings.standard
+        let box = MapStyle.options(settings: settings).cameraBounds
+        #expect(box?.southWest.latitude == 24.53557985)
+        #expect(box?.southWest.longitude == 54.39348543)
+        #expect(box?.northEast.latitude == 24.54644005)
+        #expect(box?.northEast.longitude == 54.40758853)
+        #expect(box?.canBoundCamera == true)
+        #expect(MapStyle.exploreOptions(settings: settings).cameraBounds == box)
+        #expect(VisitController.orderStrategy(settings) == .floorThenGalleryRouted)
+        settings.cameraBounds = nil
+        settings.ordersGalleriesByWalkingTime = false
+        #expect(MapStyle.options(settings: settings).cameraBounds == nil)
+        #expect(VisitController.orderStrategy(settings) == .floorThenGallery)
     }
 
     /// The heading-up map turns in 1.5 s and ignores changes under 5° (Nagarro, 2026-10-29; map

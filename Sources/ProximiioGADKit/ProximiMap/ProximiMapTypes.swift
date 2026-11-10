@@ -69,12 +69,40 @@ public struct ProximiStop: Equatable, Sendable, Identifiable {
     public var artworkID: String?
     /// The floor, or `nil` when the POI has none.
     public var level: Int?
+    /// The artwork's gallery: the POI whose `remote_id` is the artwork's `metadata.gallery_id`.
+    /// `nil` for an amenity, and for an artwork without a gallery or whose gallery has no POI.
+    public var gallery: ProximiGallery?
 
-    public init(id: String, title: String, artworkID: String? = nil, level: Int? = nil) {
+    public init(id: String, title: String, artworkID: String? = nil, level: Int? = nil, gallery: ProximiGallery? = nil) {
         self.id = id
         self.title = title
         self.artworkID = artworkID
         self.level = level
+        self.gallery = gallery
+    }
+}
+
+/// The gallery of an artwork, in `ProximiStop.gallery` and `ProximiMapEvent.galleryNearby`.
+public struct ProximiGallery: Equatable, Sendable, Identifiable {
+    /// The Proximi.io POI id of the gallery's POI.
+    public var id: String
+    /// The gallery's id (`remote_id` of the gallery's POI), which its artworks name in
+    /// `metadata.gallery_id`.
+    public var galleryID: String
+    public var title: String
+    /// The floor of the gallery's POI.
+    public var level: Int
+    /// The position of the gallery's POI.
+    public var latitude: Double
+    public var longitude: Double
+
+    public init(id: String, galleryID: String, title: String, level: Int, latitude: Double, longitude: Double) {
+        self.id = id
+        self.galleryID = galleryID
+        self.title = title
+        self.level = level
+        self.latitude = latitude
+        self.longitude = longitude
     }
 }
 
@@ -157,6 +185,12 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// The active stop is less than `GADSettings.stopNearbyMeters` away on the visitor's level. Once
     /// per stop. The package posts no notification for it.
     case stopNearby(ProximiStop)
+    /// The gallery of the active stop is nearby: its POI is less than
+    /// `GADSettings.galleryNearbyMeters` away in a straight line on the visitor's level, or the
+    /// visitor is inside the gallery's outline. Sent once while the gallery stays the gallery of
+    /// the active stop, also for a journey opened there. Not sent while the journey is paused;
+    /// sent again when it resumes.
+    case galleryNearby(ProximiGallery, stop: ProximiStop)
     /// The position is uncertain near the active stop: the accuracy is worse than
     /// `GADSettings.uncertainAccuracyMeters` and the stop is within it. Sent by `ProximiMapView` without `Options.uncertainPositionPrompt`,
     /// which otherwise asks "Probably at …". At most once per
@@ -179,7 +213,7 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// app's ids and its new order; the `journey` binding already holds it.
     case stopOrderChanged(ProximiJourney)
     /// The visitor swiped a stop in the list. With `ProximiMapView.Options.skipPrompt` a dialog asks
-    /// "Skip artwork?"; without it the host app decides.
+    /// "Skip it?"; without it the host app decides.
     case skipRequested(ProximiStop)
     case stopSkipped(ProximiStop)
     case skipCancelled(ProximiStop)

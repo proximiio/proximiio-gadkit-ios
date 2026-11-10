@@ -35,6 +35,11 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
     /// A drag down from the handle at the top. `nil`: the handle area takes the touches and does
     /// nothing, so a sheet that holds the view can be pulled down there.
     var onPullDown: (() -> Void)?
+    /// The fades of the map, in points: down to the Map / List control and search at the top, up
+    /// from the bottom over about the stop card (`GADSettings.mapTopFadeHeight`,
+    /// `mapBottomFadeHeight`). The faded map shows what the host app draws behind the card.
+    var topFade: CGFloat = GADSettings.standard.mapTopFadeHeight
+    var bottomFade: CGFloat = GADSettings.standard.mapBottomFadeHeight
     @ViewBuilder let map: Map
     @ViewBuilder let overlay: Overlay
 
@@ -43,10 +48,6 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
     /// The handle area at the top: the map does not pan there (PM, Monday "More space for the pull
     /// down functionality", 2026-10-26).
     private static var handleAreaHeight: CGFloat { 44 }
-    /// The fades of the map: down to the Map / List control and search at the top, up from the
-    /// bottom over about the stop card.
-    private static var topFade: CGFloat { 110 }
-    private static var bottomFade: CGFloat { 170 }
 
     var body: some View {
         ZStack {
@@ -56,9 +57,9 @@ struct MapGlassFrame<Map: View, Overlay: View>: View {
                 // Monday "Map fade at top & bottom", 2026-10-28).
                 .mask {
                     VStack(spacing: 0) {
-                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: Self.topFade)
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: max(topFade, 0))
                         Rectangle()
-                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: Self.bottomFade)
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: max(bottomFade, 0))
                     }
                 }
             VStack(spacing: 0) {

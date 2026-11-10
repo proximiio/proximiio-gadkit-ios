@@ -79,7 +79,14 @@ enum MapStyle {
         // rotation is too fast; map 6.0.0-beta.58).
         options.bearingSettlingTime = settings.bearingSettlingTime
         options.bearingDeadband = settings.bearingDeadband
-        return options.with(minimumZoom: settings.minimumZoom, maximumZoom: settings.maximumZoom)
+        return options
+            .with(minimumZoom: settings.minimumZoom, maximumZoom: settings.maximumZoom)
+            .with(cameraBounds: settings.cameraBounds.map {
+                MapBoundingBox(
+                    southWest: MapCoordinate(latitude: $0.south, longitude: $0.west),
+                    northEast: MapCoordinate(latitude: $0.north, longitude: $0.east)
+                )
+            })
     }
 
     /// The Explore Museum map: no position dot and a camera that never follows. The visitor is not

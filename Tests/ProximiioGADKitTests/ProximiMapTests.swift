@@ -112,6 +112,57 @@ struct ProximiMapTests {
         #expect(ProximiMap.event(for: .trackingChanged(.lostPlace), places: Self.places) == .trackingChanged(.lostPlace))
     }
 
+    /// An artwork in gallery G403, the gallery's POI, and an artwork without a gallery.
+    private static let galleryPlaces: [VenuePlace] = {
+        var artwork = VenuePlace(id: "poi-a", title: "Cloud Canyons", coordinate: .init(latitude: 24.5, longitude: 54.4), level: 3, remoteID: "GAD.2010.00033")
+        artwork.isArtwork = true
+        artwork.galleryID = "G403"
+        var loose = VenuePlace(id: "poi-b", title: "Tongari-kun", coordinate: .init(latitude: 24.5001, longitude: 54.4001), level: 3, remoteID: "GAD.2018.00034")
+        loose.isArtwork = true
+        let gallery = VenuePlace(id: "poi-g403", title: "G403 Weaving", coordinate: .init(latitude: 24.5003, longitude: 54.4003), level: 3, remoteID: "G403")
+        return [artwork, loose, gallery]
+    }()
+
+    @Test func aStopCarriesItsGalleryAndGalleryNearbyNamesIt() {
+        let gallery = ProximiGallery(id: "poi-g403", galleryID: "G403", title: "G403 Weaving", level: 3, latitude: 24.5003, longitude: 54.4003)
+        let inGallery = ProximiStop(id: "poi-a", title: "poi-a", artworkID: "GAD.2010.00033", level: 1, gallery: gallery)
+        #expect(ProximiMap.event(for: .stopNearby(stop("poi-a")), places: Self.galleryPlaces) == .stopNearby(inGallery))
+        #expect(ProximiMap.event(for: .galleryNearby(stop("poi-a")), places: Self.galleryPlaces) == .galleryNearby(gallery, stop: inGallery))
+        // An artwork without a gallery has none, and reports no gallery nearby.
+        #expect(ProximiMap.event(for: .stopNearby(stop("poi-b")), places: Self.galleryPlaces)
+                == .stopNearby(ProximiStop(id: "poi-b", title: "poi-b", artworkID: "GAD.2018.00034", level: 1)))
+        #expect(ProximiMap.event(for: .galleryNearby(stop("poi-b")), places: Self.galleryPlaces) == nil)
+        // An artwork is never taken for a gallery, whatever its `remote_id`.
+        #expect(GalleryNearbyDetector.gallery(of: "poi-g403", in: Self.galleryPlaces) == nil)
+        #expect(GalleryNearbyDetector.gallery(of: "poi-a", in: Self.galleryPlaces)?.id == "poi-g403")
+    }
+
+    @MainActor @Test func aGalleryIsReportedOnceUntilAnotherGalleryIsAheadOrTheJourneyResumes() {
+        let detector = GalleryNearbyDetector(nearbyMeters: 5)
+        let poi = Self.galleryPlaces[2].coordinate
+        func position(metresNorth: Double, level: Double) -> VenuePosition {
+            VenuePosition(coordinate: MapCoordinate(latitude: poi.latitude + metresNorth / 111_320, longitude: poi.longitude),
+                          horizontalAccuracy: 1, floor: FloorKey(level: level), timestamp: Date())
+        }
+        let near = position(metresNorth: 3, level: 3)
+        let far = position(metresNorth: 30, level: 3)
+        let below = position(metresNorth: 3, level: 1)
+        func update(_ position: VenuePosition?, _ id: String) -> String? {
+            detector.update(position: position, stop: stop(id), places: Self.galleryPlaces, outlines: [])?.id
+        }
+        #expect(update(far, "poi-a") == nil)
+        #expect(update(below, "poi-a") == nil)
+        #expect(update(nil, "poi-a") == nil)
+        #expect(update(near, "poi-a") == "poi-a")
+        #expect(update(near, "poi-a") == nil)
+        // A stop without a gallery in between: the gallery is ahead again afterwards.
+        #expect(update(near, "poi-b") == nil)
+        #expect(update(near, "poi-a") == "poi-a")
+        // The journey resumed after a pause.
+        detector.reset()
+        #expect(update(near, "poi-a") == "poi-a")
+    }
+
     @Test func geofenceEventsNameTheArtwork() {
         let artwork = ProximiioGeofence(id: "g1", name: "Cloud Canyons", metadata: .object(["geofence_type": .string("artwork")]), remoteId: "GAD.2010.00033")
         #expect(ProximiMap.event(for: .entered(artwork)) == .geofenceEntered(ProximiGeofence(id: "g1", name: "Cloud Canyons", type: "artwork", artworkID: "GAD.2010.00033")))

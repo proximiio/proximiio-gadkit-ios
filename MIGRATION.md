@@ -1,8 +1,8 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.34.0 uses SDK
-6.0.0-beta.68 and Map 6.0.0-beta.61.
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.37.0 uses SDK
+6.0.0-beta.70 and Map 6.0.0-beta.62.
 
 Each change has a mark:
 
@@ -61,6 +61,10 @@ calls compile unchanged.
 | Map 6.0.0-beta.59 | The map reads `proximiio:raster:bounds` (`[west, south, east, north]`) from the style metadata and asks for no raster tile outside it. A missing or malformed key keeps the earlier behaviour. | | Info |
 | Map 6.0.0-beta.60 | `JourneyNavigator.markReached(stopID:)`, `drawsNextLegWhileReached` (default `false`) and `RouteFollowRules.progressCorridorMeters` (default `nil`) are off until an app sets them. ProximiioGADKit 1.31.0 sets them from `GADSettings.advancesOnArtworkExit` and `progressCorridorMeters`. | | Info |
 | Map 6.0.0-beta.61 | `JourneyStopMarkerStyle.hiddenStopIDs` (default empty) leaves those stops' markers out; the other stops keep their numbers. ProximiioGADKit 1.33.0 sets it to the artworks outside the visitor's gallery. The binary's files carry the release date, so Xcode rebuilds the module without Clean Build Folder. | | Info |
+| SDK 6.0.0-beta.70 | New overload `geofenceEvents(replayingEntered:)`. `sdk.geofenceEvents` as a function reference without a call is ambiguous. | Call the function: `sdk.geofenceEvents()`. | **Required** with a bare reference |
+| Map 6.0.0-beta.62 | New case `JourneyOrderStrategy.floorThenGalleryRouted`. | An exhaustive `switch` over `JourneyOrderStrategy` without `default` does not compile. Add the case. | **Required** with an exhaustive `switch` |
+| Map 6.0.0-beta.62 | `MapCamera.fit` and every `MapCanvasCamera` member that reaches the map view stop in a precondition when called off the main thread, in Release builds too. `session.camera`, `ProximiioMapSession` and `JourneyNavigator` are `@MainActor` and are unaffected. | Call them on the main actor. | **Check** |
+| Map 6.0.0-beta.62 | `MapOptions.cameraBounds` (default `nil`) keeps the screen inside a box. ProximiioGADKit 1.37.0 sets it from `GADSettings.cameraBounds`. | | Info |
 
 ### Added
 
@@ -141,8 +145,8 @@ The SDK and Map changelogs of these versions have the full entries.
 
 - Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.27.0`,
   and the product `ProximiioGADKit` to the app target.
-- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.68` and `proximiio-map-ios-binary` to exactly
-  `6.0.0-beta.59`. ProximiioGADKit pins these versions; with other versions the packages do not
+- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.70` and `proximiio-map-ios-binary` to exactly
+  `6.0.0-beta.62`. ProximiioGADKit pins these versions; with other versions the packages do not
   resolve.
 - ProximiioGADKit does not re-export the SDK and the Map. Files that use their types keep
   `import Proximiio` and `import ProximiioMap`. The file that shows the map adds
@@ -262,7 +266,10 @@ app matches the one its journey uses.
 
 ### Step 8: SDK streams (Info)
 
-`sdk.geofenceEvents()` and `sdk.positions()` stay as they are. Every call returns a new stream. The
+`sdk.geofenceEvents()` and `sdk.positions()` stay as they are. Every call returns a new stream.
+`sdk.geofenceEvents(replayingEntered: true)` (SDK 6.0.0-beta.70) first sends an enter event for every
+geofence and privacy zone the visitor is in. Open it when the journey starts and again when a paused
+journey resumes. The
 view opens its own streams and takes no events from the app's. The view reports no geofence event.
 It follows `sdk.venueDataChanges()` itself: the open map draws changed venue data, and the journey
 routes again after a change of features.

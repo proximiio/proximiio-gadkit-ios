@@ -142,7 +142,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "%lld مساحات"
+            "value" : "%lld مناطق"
           }
         },
         "en" : {
@@ -848,12 +848,12 @@
         }
       }
     },
-    "It will be removed from your route. Artworks you have visited stay saved." : {
+    "I’ll remove it from your route." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "ستتم إزالته من مسارك. تبقى الأعمال الفنية التي زرتها محفوظة."
+            "value" : "سأزيله من مسارك."
           }
         }
       }
@@ -1406,12 +1406,12 @@
         }
       }
     },
-    "Skip artwork" : {
+    "Skip it" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "تخطي العمل الفني"
+            "value" : "تخطيه"
           }
         }
       }
@@ -1426,12 +1426,12 @@
         }
       }
     },
-    "Skip this artwork?" : {
+    "Leave this artwork out?" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "هل تريد تخطي هذا العمل الفني؟"
+            "value" : "هل تريد استبعاد هذا العمل الفني؟"
           }
         }
       }
@@ -1441,7 +1441,7 @@
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "المساحات"
+            "value" : "المناطق"
           }
         }
       }
@@ -2068,12 +2068,12 @@
         }
       }
     },
-    "Your position is not shown on this level." : {
+    "Hey, it looks like you’re on a level where I can’t locate you." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "لا يظهر موقعك في هذا الطابق."
+            "value" : "يبدو أنك في طابق لا أستطيع تحديد موقعك فيه."
           }
         }
       }

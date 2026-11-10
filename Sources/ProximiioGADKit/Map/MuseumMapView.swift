@@ -269,7 +269,7 @@ struct MuseumMapView: View {
     /// The route's next step. On a floor without positioning the guidance follows fixes from
     /// another floor, so the card says that the position is not shown.
     private var instruction: String? {
-        if floorGuide.isActive { return String(localized: "Your position is not shown on this level.", bundle: .localized) }
+        if floorGuide.isActive { return String(localized: "Hey, it looks like you’re on a level where I can’t locate you.", bundle: .localized) }
         return session.guidance.map { GuidanceText.instruction(for: $0, markers: session.routeRenderer?.geometry?.markers ?? []) }
     }
 

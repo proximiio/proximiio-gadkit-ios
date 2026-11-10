@@ -139,6 +139,13 @@ final class VisitController: ObservableObject {
     /// wait for a fix before ordering, the out-of-order dwell, the detour arrival, the off-route
     /// alert and the route snapping.
     private let settings: GADSettings
+    /// The rule for the order of the stops (`GADSettings.ordersGalleriesByWalkingTime`).
+    private var orderStrategy: JourneyOrderStrategy { Self.orderStrategy(settings) }
+
+    /// `orderStrategy` for `settings`. Pure; covered by tests.
+    static func orderStrategy(_ settings: GADSettings) -> JourneyOrderStrategy {
+        settings.ordersGalleriesByWalkingTime ? .floorThenGalleryRouted : .floorThenGallery
+    }
 
     /// Guidance on a leg to an artwork. The infinite dwell turns the SDK's arrival by distance
     /// off; the artwork geofence is the only arrival. Off the leg beyond `GADSettings.offRouteMeters`.
@@ -299,7 +306,7 @@ final class VisitController: ObservableObject {
         await waitForFix(upTo: .seconds(settings.lateOrderWindow))
         guard session.position != nil, !navigator.hasArrived,
               navigator.journey.stops.allSatisfy({ $0.state == .pending || $0.state == .active }),
-              let proposal = await navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
+              let proposal = await navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
               proposal.isImprovement
         else { return }
         await apply(proposal)
@@ -516,7 +523,7 @@ final class VisitController: ObservableObject {
         tasks.append(Task { [weak self] in
             await self?.serially { [weak self] in
                 guard let self, self.isOffRouteEpisode, self.navigator.activeStop?.id == active.id,
-                      let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
+                      let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
                       proposal.isImprovement, let first = proposal.order.first, first != active.id
                 else { return }
                 FieldLog.log("off route: \(first) is nearer than \(active.title) · journey ordered again")
@@ -597,7 +604,7 @@ final class VisitController: ObservableObject {
             await self?.serially { [weak self] in
                 guard let self else { return }
                 await self.rerouting {
-                    if reorders, let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
+                    if reorders, let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
                        proposal.isImprovement {
                         await self.apply(proposal)
                     }
@@ -759,7 +766,7 @@ final class VisitController: ObservableObject {
 
     /// Orders the stops still ahead from the visitor, floor by floor and gallery by gallery.
     private func orderRemaining() async {
-        guard !keepsOrder, let proposal = await navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery),
+        guard !keepsOrder, let proposal = await navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
               proposal.isImprovement
         else { return }
         await apply(proposal)
@@ -767,10 +774,10 @@ final class VisitController: ObservableObject {
 
     /// The floor-then-gallery order from the visitor's fix, or from the first stop without a fix.
     private func proposedOrder() async -> JourneyOrderProposal? {
-        if let proposal = await navigator.proposeOrder(from: .visitor, strategy: .floorThenGallery) {
+        if let proposal = await navigator.proposeOrder(from: .visitor, strategy: orderStrategy) {
             return proposal
         }
-        return await navigator.proposeOrder(from: .activeStop, strategy: .floorThenGallery)
+        return await navigator.proposeOrder(from: .activeStop, strategy: orderStrategy)
     }
 
     func advance() async {
