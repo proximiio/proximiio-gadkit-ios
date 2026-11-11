@@ -1062,6 +1062,18 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.37.1 (2026-11-11)
+
+Fixed (PM, Monday "Skipping in Arabic goes the wrong way" and "When all artworks skipped, remove 'skip
+artwork' text"):
+
+- In a right-to-left layout a stop in the journey list slides right to reveal the skip action, and the
+  action is at the left. Before, the stop slid left in every layout.
+- The hint under the journey list is "Swipe right to skip an artwork" in a right-to-left layout, in Arabic
+  "إسحب لليمين لتخطي العمل الفني" (the PM's text).
+- The hint is shown only while the list has a stop that can be skipped. With every artwork skipped or
+  visited, it is hidden.
+
 ### 1.37.0 (2026-11-10)
 
 Breaking: `proximiio-sdk-ios-binary` 6.0.0-beta.70 and `proximiio-map-ios-binary` 6.0.0-beta.62. A host

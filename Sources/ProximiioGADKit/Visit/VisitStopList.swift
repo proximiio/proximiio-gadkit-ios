@@ -60,6 +60,7 @@ private struct StopList: View {
     @State private var revealedStopID: String?
     /// True while a row is dragged horizontally; vertical scrolling pauses meanwhile.
     @State private var isSwiping = false
+    @Environment(\.layoutDirection) private var layoutDirection
 
     var body: some View {
         let numbers = VisitPlan.numbers(for: navigator.journey)
@@ -78,7 +79,7 @@ private struct StopList: View {
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityIdentifier("journeyListHeader")
                     case .stop(let stop):
-                        let canSkip = allowsSkip && (stop.state == .pending || stop.state == .active)
+                        let canSkip = allowsSkip && SkipSwipe.canSkip(stop)
                         SwipeToSkipRow(
                             isRevealed: Binding(
                                 get: { revealedStopID == stop.id },
@@ -95,8 +96,15 @@ private struct StopList: View {
                         }
                     }
                 }
-                if allowsSkip {
-                    Text("Swipe left to skip an artwork", bundle: .localized)
+                // No hint without a stop to skip: every artwork skipped or visited (PM, Monday
+                // "When all artworks skipped, remove 'skip artwork' text").
+                if allowsSkip, visibleStops.contains(where: SkipSwipe.canSkip) {
+                    // The row slides towards the leading edge: right in a right-to-left layout.
+                    Text(
+                        layoutDirection == .rightToLeft
+                            ? "Swipe right to skip an artwork" : "Swipe left to skip an artwork",
+                        bundle: .localized
+                    )
                         .textStyle(.bodyExtraSmall)
                         .foregroundStyle(Palette.ink)
                         .padding(.top, 10)
@@ -167,9 +175,43 @@ struct ArtworkBadges: View {
     }
 }
 
-/// Swipe left on a row to reveal the skip action (Figma journey list, node 11820:71364): the
-/// row slides left, its number badge turns red, and a glass panel with the skip glyph
-/// appears at the trailing edge. The drag locks to one axis: a horizontal drag pauses
+/// The swipe that reveals the skip action of a row. Distances are logical: negative is towards
+/// the leading edge, which is left in a left-to-right layout and right in a right-to-left one.
+enum SkipSwipe {
+    /// Distance the row slides to reveal the skip panel.
+    static let revealWidth: CGFloat = 72
+
+    /// Only a stop still ahead can be skipped.
+    static func canSkip(_ stop: JourneyStop) -> Bool {
+        stop.state == .pending || stop.state == .active
+    }
+
+    /// 1 in a left-to-right layout, -1 in a right-to-left one. Multiplies a screen distance, such
+    /// as a drag's translation, to get a logical one. SwiftUI's `offset(x:)` takes a logical one.
+    static func sign(_ direction: LayoutDirection) -> CGFloat {
+        direction == .rightToLeft ? -1 : 1
+    }
+
+    /// The logical offset of the row for a logical drag. It rubber-bands past the open position
+    /// and past the closed one.
+    static func offset(isRevealed: Bool, drag: CGFloat) -> CGFloat {
+        let raw = (isRevealed ? -revealWidth : 0) + drag
+        if raw > 0 { return raw * 0.2 }
+        if raw < -revealWidth { return -revealWidth + (raw + revealWidth) * 0.3 }
+        return raw
+    }
+
+    /// True when a drag that would end `projected` logical points from its start leaves the skip
+    /// panel revealed.
+    static func reveals(isRevealed: Bool, projected: CGFloat) -> Bool {
+        (isRevealed ? -revealWidth : 0) + projected < -revealWidth / 2
+    }
+}
+
+/// Swipe a row towards the leading edge to reveal the skip action (Figma journey list, node
+/// 11820:71364): the row slides left, its number badge turns red, and a glass panel with the skip
+/// glyph appears at the trailing edge. In a right-to-left layout the row slides right and the panel
+/// is at the left (PM, Monday "Skipping in Arabic goes the wrong way"). The drag locks to one axis: a horizontal drag pauses
 /// scrolling; a vertical drag scrolls and leaves the row in place.
 private struct SwipeToSkipRow<Content: View>: View {
     @Binding var isRevealed: Bool
@@ -185,16 +227,15 @@ private struct SwipeToSkipRow<Content: View>: View {
     /// True while the drag gesture runs. SwiftUI resets it when the gesture ends or is cancelled;
     /// a cancelled drag does not call `onEnded`, which left scrolling paused (PM review 2026-10-12).
     @GestureState private var isDragging = false
-    /// Distance the row slides to reveal the skip panel.
-    private let revealWidth: CGFloat = 72
+    @Environment(\.layoutDirection) private var layoutDirection
+    private let revealWidth = SkipSwipe.revealWidth
 
+    /// 1 or -1: screen distance to logical distance.
+    private var sign: CGFloat { SkipSwipe.sign(layoutDirection) }
+
+    /// The logical offset of the row; `dragX` is a screen distance.
     private var offset: CGFloat {
-        let base: CGFloat = isRevealed ? -revealWidth : 0
-        // Rubber-band past the open position and to the right of the closed one.
-        let raw = base + dragX
-        if raw > 0 { return raw * 0.2 }
-        if raw < -revealWidth { return -revealWidth + (raw + revealWidth) * 0.3 }
-        return raw
+        SkipSwipe.offset(isRevealed: isRevealed, drag: dragX * sign)
     }
 
     var body: some View {
@@ -213,6 +254,7 @@ private struct SwipeToSkipRow<Content: View>: View {
                 .opacity(min(1, -offset / revealWidth))
                 .accessibilityHidden(true)
             }
+            // `offset(x:)` follows the layout direction: a negative x is towards the leading edge.
             draggable(content.offset(x: offset))
                 .onTapGesture {
                     if isRevealed { withAnimation(.snappy) { isRevealed = false } }
@@ -245,10 +287,10 @@ private struct SwipeToSkipRow<Content: View>: View {
                 onBegan: {},
                 onChanged: { dragX = $0 },
                 onEnded: { translation, velocity in
-                    let projected = (isRevealed ? -revealWidth : 0) + translation + velocity * 0.2
+                    let projected = (translation + velocity * 0.2) * sign
                     withAnimation(.snappy(duration: 0.25)) {
                         dragX = 0
-                        isRevealed = projected < -revealWidth / 2
+                        isRevealed = SkipSwipe.reveals(isRevealed: isRevealed, projected: projected)
                     }
                 },
                 onCancelled: {
@@ -279,10 +321,10 @@ private struct SwipeToSkipRow<Content: View>: View {
                     isSwiping = false
                 }
                 guard axis == .horizontal else { return }
-                let projected = (isRevealed ? -revealWidth : 0) + value.predictedEndTranslation.width
+                let projected = value.predictedEndTranslation.width * sign
                 withAnimation(.snappy(duration: 0.25)) {
                     dragX = 0
-                    isRevealed = projected < -revealWidth / 2
+                    isRevealed = SkipSwipe.reveals(isRevealed: isRevealed, projected: projected)
                 }
             }
     }

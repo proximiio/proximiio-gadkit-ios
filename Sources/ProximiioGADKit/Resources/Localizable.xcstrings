@@ -1506,6 +1506,16 @@
         }
       }
     },
+    "Swipe right to skip an artwork" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إسحب لليمين لتخطي العمل الفني"
+          }
+        }
+      }
+    },
     "Take the %@ to level %lld" : {
       "localizations" : {
         "ar" : {
