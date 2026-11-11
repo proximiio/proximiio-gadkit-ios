@@ -1,8 +1,8 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.37.0 uses SDK
-6.0.0-beta.70 and Map 6.0.0-beta.62.
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.38.0 uses SDK
+6.0.0-beta.71 and Map 6.0.0-beta.63.
 
 Each change has a mark:
 
@@ -65,6 +65,7 @@ calls compile unchanged.
 | Map 6.0.0-beta.62 | New case `JourneyOrderStrategy.floorThenGalleryRouted`. | An exhaustive `switch` over `JourneyOrderStrategy` without `default` does not compile. Add the case. | **Required** with an exhaustive `switch` |
 | Map 6.0.0-beta.62 | `MapCamera.fit` and every `MapCanvasCamera` member that reaches the map view stop in a precondition when called off the main thread, in Release builds too. `session.camera`, `ProximiioMapSession` and `JourneyNavigator` are `@MainActor` and are unaffected. | Call them on the main actor. | **Check** |
 | Map 6.0.0-beta.62 | `MapOptions.cameraBounds` (default `nil`) keeps the screen inside a box. ProximiioGADKit 1.37.0 sets it from `GADSettings.cameraBounds`. | | Info |
+| SDK 6.0.0-beta.71, Map 6.0.0-beta.63 | In a venue with barrier features (`properties.metadata.type` `"barrier"`), a position that jumps through a wall stops at the wall. Geofence events, the dot and the arrival use the stopped point. A venue without barrier features behaves as before. | To turn it off: `ProximiioConfiguration.positioning.barriers.isEnabled = false`. | **Check** |
 
 ### Added
 
@@ -145,8 +146,8 @@ The SDK and Map changelogs of these versions have the full entries.
 
 - Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.27.0`,
   and the product `ProximiioGADKit` to the app target.
-- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.70` and `proximiio-map-ios-binary` to exactly
-  `6.0.0-beta.62`. ProximiioGADKit pins these versions; with other versions the packages do not
+- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.71` and `proximiio-map-ios-binary` to exactly
+  `6.0.0-beta.63`. ProximiioGADKit pins these versions; with other versions the packages do not
   resolve.
 - ProximiioGADKit does not re-export the SDK and the Map. Files that use their types keep
   `import Proximiio` and `import ProximiioMap`. The file that shows the map adds

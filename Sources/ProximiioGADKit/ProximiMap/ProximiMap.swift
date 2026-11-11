@@ -99,6 +99,8 @@ public final class ProximiMap: ObservableObject {
     private var startTask: Task<Void, Error>?
     private var sessionTask: Task<Void, Never>?
     private var tasks: [Task<Void, Never>] = []
+    /// Follows the SDK's geofence events (`followGeofences(replayingEntered:)`).
+    private var geofenceTask: Task<Void, Never>?
     private let notifier = GeofenceNotifier()
     private var lastWristband: WristbandStatus?
     /// Forwards the changes of `session` and `arrival`.
@@ -197,22 +199,14 @@ public final class ProximiMap: ObservableObject {
                     return
                 }
             })
-            tasks.append(Task { [weak self] in
-                for await event in await venue.sdk.geofenceEvents() {
-                    guard let self else { return }
-                    if let mapped = Self.event(for: event) { self.emit(mapped) }
-                }
-            })
+            if configuration.settings.postsGeofenceNotifications { notifier.showInForeground() }
+            followGeofences(replayingEntered: false)
             tasks.append(Task { [weak self] in
                 for await event in await venue.sdk.syncEvents() where Self.isTokenRefusal(event) {
                     self?.tokenRefused()
                     return
                 }
             })
-            if configuration.settings.postsGeofenceNotifications {
-                let posts = configuration.settings.notifiesGeofenceEvents
-                tasks.append(Task { [notifier] in await notifier.run(sdk: venue.sdk, posts: posts) })
-            }
             status = .ready
             FieldLog.log("map: ready · \(places.count) places · start \(MapDiagnostics.Timing.text(MapDiagnostics.seconds(since: started)))")
             #if DEBUG
@@ -223,6 +217,26 @@ public final class ProximiMap: ObservableObject {
             let failure = ProximiMapError.startFailed(String(describing: error))
             status = .failed(failure)
             throw failure
+        }
+    }
+
+    /// Follows the SDK's geofence events in one stream, for `geofenceEntered` / `geofenceExited` and
+    /// for the geofence notifications. A call ends the stream before it. With `replayingEntered` the
+    /// new stream starts with an enter event for every geofence the visitor is in (SDK
+    /// 6.0.0-beta.70): the journey start and the resume of a paused journey use it, so the host app
+    /// gets the geofences the visitor already stands in. A notification of a replayed enter replaces
+    /// the one shown before for that geofence.
+    private func followGeofences(replayingEntered: Bool) {
+        guard let venue else { return }
+        geofenceTask?.cancel()
+        let settings = configuration.settings
+        let posts = settings.postsGeofenceNotifications && settings.notifiesGeofenceEvents
+        geofenceTask = Task { [weak self, notifier] in
+            for await event in await venue.sdk.geofenceEvents(replayingEntered: replayingEntered) {
+                guard let self, !Task.isCancelled else { return }
+                if let mapped = Self.event(for: event) { self.emit(mapped) }
+                if posts { await notifier.post(event) }
+            }
         }
     }
 
@@ -240,6 +254,8 @@ public final class ProximiMap: ObservableObject {
         FieldLog.log("map: the API refused the token; the SDK stopped and deleted the venue data")
         tasks.forEach { $0.cancel() }
         tasks = []
+        geofenceTask?.cancel()
+        geofenceTask = nil
         venue?.data.onChange = nil
         close()
         places = []
@@ -410,6 +426,7 @@ public final class ProximiMap: ObservableObject {
         case .museumMap, .journeyReady, .journey: coverScreen = screen
         }
         emit(.opened(screen))
+        if screen == .journey { followGeofences(replayingEntered: true) }
     }
 
     /// Runs `next` now, or after the cover or sheet on screen has been dismissed. A presentation that
@@ -461,6 +478,7 @@ public final class ProximiMap: ObservableObject {
     func visitStarted() {
         coverScreen = .journey
         emit(.opened(.journey))
+        followGeofences(replayingEntered: true)
     }
 
     /// "Start" in the stop picker: stores the personalised journey and opens Journey ready.
@@ -494,6 +512,7 @@ public final class ProximiMap: ObservableObject {
         FieldLog.log("visit event: \(event)")
         guard let mapped = Self.event(for: event, places: places) else { return }
         emit(mapped)
+        if case .journeyResumed = mapped { followGeofences(replayingEntered: true) }
     }
 
     private func emit(_ event: ProximiMapEvent) {

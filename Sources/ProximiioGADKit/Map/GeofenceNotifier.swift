@@ -30,17 +30,17 @@ final class GeofenceNotifier {
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert])
     }
 
-    /// Shows notifications in the foreground and, with `posts`, posts one for every geofence enter
-    /// and exit event of `sdk`. Returns when the stream finishes or the calling task is cancelled.
-    func run(sdk: Proximiio, posts: Bool = true) async {
-        let center = UNUserNotificationCenter.current()
-        center.delegate = Self.presenter
-        guard posts else { return }
-        for await event in await sdk.geofenceEvents() {
-            guard let request = Self.request(for: event) else { continue }
-            FieldLog.log("notification: \(request.identifier) \(request.content.title)")
-            try? await center.add(request)
-        }
+    /// Shows notifications while the app is in the foreground.
+    func showInForeground() {
+        UNUserNotificationCenter.current().delegate = Self.presenter
+    }
+
+    /// Posts the notification of a geofence enter or exit event (`request(for:)`). `ProximiMap`
+    /// calls it for every event of its geofence stream.
+    func post(_ event: GeofenceEvent) async {
+        guard let request = Self.request(for: event) else { return }
+        FieldLog.log("notification: \(request.identifier) \(request.content.title)")
+        try? await UNUserNotificationCenter.current().add(request)
     }
 
     /// The notification for a geofence enter or exit, or `nil` for a geofence without a name and
