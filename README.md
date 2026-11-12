@@ -835,6 +835,7 @@ let configuration = GADConfiguration(
 | `artworkAdvanceDelay` | 2 s | With `advancesOnArtworkExit` `false`: from the arrival at an artwork (its geofence) to the route to the next stop. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order (personalised journeys only). |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
+| `positionBarriers` | `BarrierConfiguration()` | How barrier features stop a position that jumps through a wall (`ProximiioConfiguration.positioning.barriers`, SDK 6.0.0-beta.71): `isEnabled` (`true`), `armingPositions` (10 positions on a floor before any is stopped), `maxWalkingSpeed` (2 m/s), `wallMargin` (0.4 m), `releasePositions` (10) and `releaseMinimumDuration` (5 s). No effect in a venue without barrier features. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. |
 | `geofenceExitDelay` | 5 s | Time outside an entered geofence or privacy zone before the SDK reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK default 3 s). Enters are reported at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. 0 reports the exit at the first position outside. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
 | `galleryNearbyMeters` | 5 m | The distance of `ProximiMapEvent.galleryNearby`, from the gallery's POI. |
@@ -1065,6 +1066,14 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.39.0 (2026-11-12)
+
+Added:
+
+- `GADSettings.positionBarriers` (`BarrierConfiguration`, the SDK's defaults): how barrier features stop
+  a position that jumps through a wall. `ProximiMap` passes it to
+  `ProximiioConfiguration.positioning.barriers`. `ProximiMapView` uses the host app's SDK configuration.
 
 ### 1.38.0 (2026-11-11)
 

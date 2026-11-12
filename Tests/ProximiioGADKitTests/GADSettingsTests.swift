@@ -64,6 +64,23 @@ struct GADSettingsTests {
         #expect(VisitController.orderStrategy(settings) == .floorThenGallery)
     }
 
+    /// The barrier settings reach the SDK configuration (SDK 6.0.0-beta.71).
+    @Test @MainActor func theBarrierSettingsReachTheSDK() throws {
+        var configuration = GADConfiguration(
+            apiBaseURL: try #require(URL(string: "https://api.example.com")),
+            applicationToken: "token",
+            relayAPI: try #require(BlueiotCloudRelayEndpoint(text: "https://relay.example.com")),
+            relayAPIAppToken: "relay"
+        )
+        #expect(GADSettings.standard.positionBarriers == BarrierConfiguration())
+        #expect(VenueService.configuration(for: configuration).positioning.barriers.isEnabled)
+        configuration.settings.positionBarriers.isEnabled = false
+        configuration.settings.positionBarriers.maxWalkingSpeed = 3
+        let barriers = VenueService.configuration(for: configuration).positioning.barriers
+        #expect(!barriers.isEnabled)
+        #expect(barriers.maxWalkingSpeed == 3)
+    }
+
     /// The heading-up map turns in 1.5 s and ignores changes under 5° (Nagarro, 2026-10-29; map
     /// 6.0.0-beta.58).
     @Test @MainActor func theMapTurnsSlowlyAndIgnoresSmallHeadingChanges() {

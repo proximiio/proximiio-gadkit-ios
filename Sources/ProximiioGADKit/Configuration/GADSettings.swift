@@ -6,6 +6,7 @@
 //  `GADConfiguration.settings`. The defaults are the PM's values as of 2026-10-14.
 //
 import Foundation
+import Proximiio
 
 public struct GADSettings: Equatable, Sendable {
     // MARK: Wristband tracking
@@ -201,6 +202,16 @@ public struct GADSettings: Equatable, Sendable {
     /// The shortest gap in seconds between two Live Activity updates of the instruction. A new
     /// step is sent at once.
     public var liveActivityMinimumInterval: TimeInterval = 5
+
+    // MARK: Position barriers
+
+    /// How walls drawn as barrier features stop a position that jumps through them
+    /// (`ProximiioConfiguration.positioning.barriers`, SDK 6.0.0-beta.71). The default is the SDK's:
+    /// on, 10 positions on a floor before any is stopped, 2 m/s walking speed, 0.4 m from the wall,
+    /// and the newest position accepted again after 10 stopped positions over 5 s. No effect in a
+    /// venue without barrier features. `ProximiMap` sets it when it starts the SDK; `ProximiMapView`
+    /// uses the host app's SDK configuration.
+    public var positionBarriers = BarrierConfiguration()
 
     // MARK: Notifications
 

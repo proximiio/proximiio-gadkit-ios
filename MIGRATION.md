@@ -1,7 +1,7 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.38.0 uses SDK
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.39.0 uses SDK
 6.0.0-beta.71 and Map 6.0.0-beta.63.
 
 Each change has a mark:
