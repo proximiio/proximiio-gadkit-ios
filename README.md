@@ -36,8 +36,8 @@ repository. From 1.0.0 a minor or patch version does not break the public API. N
 cases come in minor versions; a `switch` with `default` keeps compiling. The [Changelog](#changelog)
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.71 and `proximiio-map-ios-binary`
-6.0.0-beta.63 exactly. The host app needs no dependency on them. A host app that also depends on
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.73 and `proximiio-map-ios-binary`
+6.0.0-beta.64 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -248,7 +248,7 @@ The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
-- uses `proximiio-sdk-ios-binary` 6.0.0-beta.71, the version this package pins;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.73, the version this package pins;
 - closes the view when the SDK stops on a refused token (`syncFailed(reason: "unauthorized")`,
   `tokenStatus == .rejected`). The map drops the venue and the navigator ends. After a new successful
   `authenticate()` and `start()`, a new view draws the journey again;
@@ -837,6 +837,7 @@ let configuration = GADConfiguration(
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `positionBarriers` | `BarrierConfiguration()` | How barrier features stop a position that jumps through a wall (`ProximiioConfiguration.positioning.barriers`, SDK 6.0.0-beta.71): `isEnabled` (`true`), `armingPositions` (10 positions on a floor before any is stopped), `maxWalkingSpeed` (2 m/s), `wallMargin` (0.4 m), `releasePositions` (10) and `releaseMinimumDuration` (5 s). No effect in a venue without barrier features. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. |
 | `geofenceExitDelay` | 5 s | Time outside an entered geofence or privacy zone before the SDK reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK default 3 s). Enters are reported at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. 0 reports the exit at the first position outside. |
+| `privacyZoneExitDelay` | 1 s | Time outside an entered privacy zone before the SDK reports its exit (`ProximiioConfiguration.privacyZoneExitDelay`, SDK 6.0.0-beta.72). The first position after a privacy zone comes after this time. `nil` uses `geofenceExitDelay`. Set by `ProximiMap`; `ProximiMapView` uses the host app's SDK configuration. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
 | `galleryNearbyMeters` | 5 m | The distance of `ProximiMapEvent.galleryNearby`, from the gallery's POI. |
 | `mapTopFadeHeight`, `mapBottomFadeHeight` | 110 pt, 170 pt | The heights over which the journey map fades out at the top and the bottom of its card. The faded part, and the whole card in List mode, show what the host app draws behind `ProximiMapView`. 0: no fade. |
@@ -1066,6 +1067,32 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.40.0 (2026-11-13)
+
+Breaking: `proximiio-sdk-ios-binary` 6.0.0-beta.73 and `proximiio-map-ios-binary` 6.0.0-beta.64. A host
+app that pins them sets these versions. No API of the package changed.
+
+Added:
+
+- `GADSettings.privacyZoneExitDelay` (1 s; `nil` uses `geofenceExitDelay`). `ProximiMap` passes it to
+  `ProximiioConfiguration.privacyZoneExitDelay` (SDK 6.0.0-beta.72).
+
+Changed:
+
+- With `ProximiMap`, the first position after a privacy zone comes 1 s after the visitor left the zone.
+  It was `geofenceExitDelay`, 5 s. Artwork geofences still report the exit after `geofenceExitDelay`.
+  A host app on `ProximiMapView` sets `privacyZoneExitDelay` on its own `ProximiioConfiguration`.
+- SDK 6.0.0-beta.73, no API change:
+  - The venue data package is checked about once an hour. It was every 5 minutes while the change log
+    was quiet. Edits still arrive through the change log within the sync interval. A deletion that never
+    reaches the change log leaves the phone within about an hour; it was 5 to 15 minutes.
+  - Visitor analytics that the server refuses for good are dropped. They were retried without end.
+  - A failed upload waits before the next try: 60 s, doubling up to 30 min, dropped after 10 answered
+    failures. The backlog leaves within 30 s after the network returns. Nothing queued offline is
+    dropped for being offline.
+  - The relay's polling fallback after 3 failed streams runs every 5 s. It was 1 s.
+  - A failed API request waits a random time before the retry on the same server.
 
 ### 1.39.0 (2026-11-12)
 

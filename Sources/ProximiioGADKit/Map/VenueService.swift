@@ -64,6 +64,7 @@ final class VenueService {
         // since 6.0.0-beta.58; it is set here so a later default does not turn it off.
         configuration.visitorReportingEnabled = true
         configuration.geofenceExitDelay = backend.settings.geofenceExitDelay
+        configuration.privacyZoneExitDelay = backend.settings.privacyZoneExitDelay
         configuration.positioning.barriers = backend.settings.positionBarriers
         // In a privacy zone `positions()` yields no fix and positioning counts as available, so the
         // map holds a grey dot at the last fix before the zone (SDK 6.0.0-beta.64). The relay's

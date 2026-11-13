@@ -64,6 +64,23 @@ struct GADSettingsTests {
         #expect(VisitController.orderStrategy(settings) == .floorThenGallery)
     }
 
+    /// The privacy zone exit delay reaches the SDK configuration (SDK 6.0.0-beta.72).
+    @Test @MainActor func thePrivacyZoneExitDelayReachesTheSDK() throws {
+        var configuration = GADConfiguration(
+            apiBaseURL: try #require(URL(string: "https://api.example.com")),
+            applicationToken: "token",
+            relayAPI: try #require(BlueiotCloudRelayEndpoint(text: "https://relay.example.com")),
+            relayAPIAppToken: "relay"
+        )
+        #expect(GADSettings.standard.privacyZoneExitDelay == 1)
+        #expect(VenueService.configuration(for: configuration).privacyZoneExitDelay == 1)
+        #expect(VenueService.configuration(for: configuration).geofenceExitDelay == 5)
+        configuration.settings.privacyZoneExitDelay = 3
+        #expect(VenueService.configuration(for: configuration).privacyZoneExitDelay == 3)
+        configuration.settings.privacyZoneExitDelay = nil
+        #expect(VenueService.configuration(for: configuration).privacyZoneExitDelay == nil)
+    }
+
     /// The barrier settings reach the SDK configuration (SDK 6.0.0-beta.71).
     @Test @MainActor func theBarrierSettingsReachTheSDK() throws {
         var configuration = GADConfiguration(

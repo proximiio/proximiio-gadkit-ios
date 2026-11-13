@@ -1,5 +1,5 @@
 {
-  "originHash" : "82b47c21afec7e5e53ac731d496a0065f5575f44705cb1e7f61073e1bc2b1f85",
+  "originHash" : "7778ab2849346589d7fab9f70813296a33ef922c1054bfe887fee808473d951f",
   "pins" : [
     {
       "identity" : "lottie-spm",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/proximiio/proximiio-map-ios-binary",
       "state" : {
-        "revision" : "b869f7ce83fd3054edb7f50635f380fdd9ffc1fd",
-        "version" : "6.0.0-beta.63"
+        "revision" : "6644bb4e12cf69cf57a06d30bad3b077d1d83cb5",
+        "version" : "6.0.0-beta.64"
       }
     },
     {
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/proximiio/proximiio-sdk-ios-binary",
       "state" : {
-        "revision" : "a8567cc8d9a47beefdced2faa2884d31d37bb772",
-        "version" : "6.0.0-beta.71"
+        "revision" : "5e0f21128becdb743aff572a807e695afc8308fc",
+        "version" : "6.0.0-beta.73"
       }
     }
   ],

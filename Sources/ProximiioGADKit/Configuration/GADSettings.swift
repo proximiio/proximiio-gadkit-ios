@@ -49,6 +49,11 @@ public struct GADSettings: Equatable, Sendable {
     /// at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` runs on the host app's
     /// SDK, which has its own value. 0 reports the exit at the first position outside.
     public var geofenceExitDelay: TimeInterval = 5
+    /// Seconds the position stays outside an entered privacy zone before the SDK reports its exit
+    /// (`ProximiioConfiguration.privacyZoneExitDelay`, SDK 6.0.0-beta.72). The first position after
+    /// a privacy zone comes after this time. `nil` uses `geofenceExitDelay`. `ProximiMap` sets it
+    /// when it starts the SDK; `ProximiMapView` runs on the host app's SDK, which has its own value.
+    public var privacyZoneExitDelay: TimeInterval? = 1
 
     // MARK: Next stop nearby
 
