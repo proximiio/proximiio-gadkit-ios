@@ -291,7 +291,7 @@ struct MuseumMapView: View {
                                uniquingKeysWith: { first, _ in first })
         availableAmenities = AmenityListing.search(amenities).searchShortcuts(places: places, amenities: amenities, icons: icons)
         let levelChangers = LevelChangerPlace.all(in: features)
-        mapLayers.updateLevelChangers(levelChangers)
+        mapLayers.updateLevelChangers(levelChangers, amenityIcons: LevelChangerPlace.amenityIcons(of: amenities, icons: icons))
         mapLayers.updateCones(VenueCone.all(in: features))
         session.hiddenFeatureIDs = Set(levelChangers.map(\.id))
             .union(VenuePlace.galleryEntranceIDs(in: allPlaces, amenityID: entranceAmenityID))

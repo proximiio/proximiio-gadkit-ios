@@ -681,7 +681,7 @@ struct VisitView: View {
         // level changers on every floor they serve.
         let levelChangers = LevelChangerPlace.all(in: features)
         levelChangerPlaces = levelChangers
-        mapLayers.updateLevelChangers(levelChangers)
+        mapLayers.updateLevelChangers(levelChangers, amenityIcons: LevelChangerPlace.amenityIcons(of: amenities, icons: amenityIcons))
         mapLayers.updateCones(VenueCone.all(in: features))
         hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
             .union(VenuePlace.galleryEntranceIDs(in: allPlaces, amenityID: settings.galleryEntranceAmenityID))

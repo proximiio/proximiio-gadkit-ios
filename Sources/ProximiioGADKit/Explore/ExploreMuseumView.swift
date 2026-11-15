@@ -422,7 +422,7 @@ struct ExploreMuseumView: View {
         catalog = ExploreCatalog(places: places, destinations: destinations,
                                  categories: categories, levelChangerTypes: Set(levelChangers.map(\.featureType)),
                                  facilities: .facilities(amenities))
-        mapLayers.updateLevelChangers(levelChangers)
+        mapLayers.updateLevelChangers(levelChangers, amenityIcons: LevelChangerPlace.amenityIcons(of: amenities, icons: amenityIcons))
         mapLayers.updateCones(VenueCone.all(in: features))
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
         // amenities: the Amenities list and the callout show them (PM, Monday "Explore museum view:

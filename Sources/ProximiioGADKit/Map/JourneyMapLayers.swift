@@ -58,6 +58,9 @@ final class JourneyMapLayers {
 
         /// The amenity icon of a level changer that is not on the route.
         static func standardImageName(for featureType: String) -> String { "gad-level-changer-standard-\(featureType)" }
+
+        /// The venue data icon of a level changer's amenity.
+        static func amenityImageName(for amenityID: String) -> String { "gad-level-changer-amenity-\(amenityID)" }
     }
 
     /// The amenity picked in the menu.
@@ -142,6 +145,8 @@ final class JourneyMapLayers {
     private var connector: [ProximiioCoordinate] = []
     private var changer: LevelChanger?
     private var changers: [LevelChangerPlace] = []
+    /// The venue data icons level changers show, by amenity id.
+    private var changerAmenityIcons: [String: UIImage] = [:]
     private var highlight: Highlight?
     private var galleryMarkers: [GalleryMarker] = []
     private var stopDots: [StopDot] = []
@@ -183,11 +188,22 @@ final class JourneyMapLayers {
     }
 
     /// The venue's lifts, staircases and escalators. Each shows on the floors it serves.
-    func updateLevelChangers(_ changers: [LevelChangerPlace]) {
-        guard changers != self.changers else { return }
+    /// `amenityIcons` are the venue data icons level changers show, by amenity id
+    /// (`LevelChangerPlace.amenityIcons(of:icons:)`).
+    func updateLevelChangers(_ changers: [LevelChangerPlace], amenityIcons: [String: UIImage] = [:]) {
+        let sameIcons = Set(amenityIcons.keys) == Set(changerAmenityIcons.keys)
+        guard changers != self.changers || !sameIcons else { return }
         self.changers = changers
-        guard let style = session?.canvas?.style else { return }
+        changerAmenityIcons = amenityIcons
+        guard let canvas = session?.canvas, let style = canvas.style else { return }
+        registerChangerAmenityIcons(on: canvas)
         applyLevelChanger(on: style)
+    }
+
+    private func registerChangerAmenityIcons(on canvas: ProximiioMapCanvas) {
+        for (amenityID, image) in changerAmenityIcons {
+            canvas.floors.register(image, named: LevelChanger.amenityImageName(for: amenityID))
+        }
     }
 
     /// The highlighted level changer, or `nil` for none.
@@ -276,6 +292,7 @@ final class JourneyMapLayers {
                     canvas.floors.register(image, named: LevelChanger.standardImageName(for: type))
                 }
             }
+            registerChangerAmenityIcons(on: canvas)
             for icon in Set(AmenityKind.allCases.map(\.icon)) {
                 if let image = Self.redMarker(glyph: icon) { canvas.floors.register(image, named: Highlight.imageName(for: icon)) }
             }
@@ -367,7 +384,11 @@ final class JourneyMapLayers {
         let highlighted = changer.flatMap { sameLevel($0.level) ? $0 : nil }
         var features = changers
             .filter { $0.serves(level) && $0.coordinate != highlighted?.coordinate }
-            .map { Self.point($0.coordinate, image: LevelChanger.standardImageName(for: $0.featureType), sort: 0) }
+            .map { changer in
+                let amenityID = changer.amenityID.flatMap { changerAmenityIcons[$0] == nil ? nil : $0 }
+                let image = amenityID.map(LevelChanger.amenityImageName(for:)) ?? LevelChanger.standardImageName(for: changer.featureType)
+                return Self.point(changer.coordinate, image: image, sort: 0)
+            }
         if let highlighted {
             features.append(Self.point(highlighted.coordinate, image: highlighted.imageName, sort: 1))
         }

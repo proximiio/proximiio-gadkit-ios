@@ -1078,6 +1078,19 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.47.0 (2026-11-15)
+
+No breaking change.
+
+Changed:
+
+- A level changer that is not on the route shows the icon of its amenity from the venue data when the
+  amenity names neither stairs nor a lift: a ramp or an escalator with its own amenity shows that icon.
+  Before, every level changer but a lift showed the stairs icon (GAD PM, Monday "Ramp icon is not visible",
+  2026-11-12). Stairs and lifts keep the design's icons. The level changer of the route keeps its red marker.
+- A point feature of type `ramp` or `hill` is a level changer on the map, as in the SDK router: it is drawn
+  on every floor of its `levels`.
+
 ### 1.46.1 (2026-11-15)
 
 No breaking change.
