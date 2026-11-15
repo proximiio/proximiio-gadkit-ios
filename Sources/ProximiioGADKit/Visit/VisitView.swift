@@ -160,7 +160,8 @@ struct VisitView: View {
         self.settings = settings
         _monitor = StateObject(wrappedValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
         _stopNearby = State(initialValue: StopNearbyDetector(nearbyMeters: settings.stopNearbyMeters))
-        _galleryNearby = State(initialValue: GalleryNearbyDetector(nearbyMeters: settings.galleryNearbyMeters))
+        _galleryNearby = State(initialValue: GalleryNearbyDetector(nearbyMeters: settings.galleryNearbyMeters,
+                                                                         entranceAmenityID: settings.galleryEntranceAmenityID))
         _liveActivity = State(initialValue: VisitLiveActivity(minimumUpdateInterval: settings.liveActivityMinimumInterval))
         _floorGuide = StateObject(wrappedValue: FloorWithoutPositioningGuide(settings: settings))
         let session = MapStyle.session(
@@ -889,7 +890,9 @@ struct VisitView: View {
     /// report none; the resume reports the gallery again (`galleryNearby.reset()`).
     private func checkGalleryNearby(position: VenuePosition?) {
         guard !controller.isPaused, controller.navigator.detourStop == nil else { return }
-        if let stop = galleryNearby.update(position: position, stop: controller.navigator.activeStop, places: places, outlines: galleryDestinations) {
+        let openStops = controller.navigator.journey.stops.filter { $0.kind != .detour && $0.state == .pending }
+        if let stop = galleryNearby.update(position: position, stop: controller.navigator.activeStop, places: places,
+                                           outlines: galleryDestinations, openStops: openStops) {
             emit(.galleryNearby(stop))
         }
     }
@@ -1471,8 +1474,14 @@ struct VisitView: View {
         guard routedDestination == routed else { return }
         if controller.navigator.noRouteReasons[stopID] != nil {
             await controller.cancelDetour()
-            destinationFailed(routed.requested, .noRoute)
+            return destinationFailed(routed.requested, .noRoute)
         }
+        // As "Add a stop": the host app's pause control shows the journey paused, and its resume is
+        // "Resume your Journey" (Nagarro, 2026-11-15: a destination paused the journey on the map
+        // only).
+        detourPausesJourney = true
+        setPaused(true)
+        emit(.journeyPaused)
     }
 
     /// Ends the route the destination started, after the host app set it to `nil`.

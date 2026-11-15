@@ -3,8 +3,12 @@
 //  ProximiioGADKit
 //
 //  Detects when the gallery of the journey's active stop is nearby: the visitor is less than
-//  `GADSettings.galleryNearbyMeters` from the gallery's POI in a straight line, on its level, or
-//  inside the gallery's outline. `VisitView` reports it as `VisitEvent.galleryNearby`; the host app
+//  `GADSettings.galleryNearbyMeters` from an entrance of the gallery in a straight line, on its
+//  level, or inside the gallery's outline. An entrance is a POI with the amenity
+//  `GADSettings.galleryEntranceAmenityID` and the gallery's id in `metadata.gallery_id`; a gallery
+//  without one uses its own POI (GAD PM, Monday "Entry POIs, connected to gallery", 2026-11-15).
+//  A visitor inside the outline of another gallery with an artwork still to visit is reported too,
+//  with the first such artwork: the visitor left the route and entered that gallery. `VisitView` reports it as `VisitEvent.galleryNearby`; the host app
 //  can start the gallery's introduction on it (Nagarro, PM, Monday "Approaching gallery
 //  information", 2026-11-10).
 //
@@ -21,21 +25,52 @@ import ProximiioMap
 @MainActor
 final class GalleryNearbyDetector {
     private let nearbyMeters: CLLocationDistance
+    private let entranceAmenityID: String
     /// The `gallery_id` of the last gallery reported, while it is still the active stop's gallery.
     private var reportedGalleryID: String?
+    /// The `gallery_id` of another gallery of the journey reported while the visitor is inside it.
+    private var reportedOtherGalleryID: String?
 
-    init(nearbyMeters: CLLocationDistance = GADSettings.standard.galleryNearbyMeters) {
+    init(nearbyMeters: CLLocationDistance = GADSettings.standard.galleryNearbyMeters,
+         entranceAmenityID: String = GADSettings.standard.galleryEntranceAmenityID) {
         self.nearbyMeters = nearbyMeters
+        self.entranceAmenityID = entranceAmenityID
     }
 
     /// The next `update` reports the active stop's gallery again when it is nearby.
     func reset() {
         reportedGalleryID = nil
+        reportedOtherGalleryID = nil
     }
 
-    /// `stop` when its gallery is nearby and was not reported yet, else `nil`. `outlines` are the
-    /// gallery outlines by `gallery_id` (`GalleryDestination`).
-    func update(position: VenuePosition?, stop: JourneyStop?, places: [VenuePlace], outlines: [GalleryDestination]) -> JourneyStop? {
+    /// The stop whose gallery is reported now, else `nil`: `stop` when its gallery is nearby and was
+    /// not reported yet, else the first of `openStops` whose gallery the visitor is inside.
+    /// `outlines` are the gallery outlines by `gallery_id` (`GalleryDestination`); `openStops` the
+    /// stops still to visit, in the journey's order.
+    func update(position: VenuePosition?, stop: JourneyStop?, places: [VenuePlace], outlines: [GalleryDestination],
+                openStops: [JourneyStop] = []) -> JourneyStop? {
+        if let reported = active(position: position, stop: stop, places: places, outlines: outlines) { return reported }
+        guard let position else { return nil }
+        let here = position.coordinate.proximiio
+        let level = position.floor?.level
+        let activeGalleryID = stop.flatMap { Self.gallery(of: $0.poiID ?? $0.id, in: places) }?.remoteID
+        for other in openStops where other.id != stop?.id {
+            guard let gallery = Self.gallery(of: other.poiID ?? other.id, in: places), let galleryID = gallery.remoteID,
+                  galleryID != activeGalleryID,
+                  outlines.first(where: { $0.id == galleryID })?.gallery.contains(here, level: level) == true
+            else { continue }
+            guard galleryID != reportedOtherGalleryID else { return nil }
+            reportedOtherGalleryID = galleryID
+            FieldLog.log("gallery nearby: \(gallery.title) · stop \(other.title) · inside, not the active stop's gallery")
+            return other
+        }
+        // Outside every other gallery of the journey: the next entry reports again.
+        reportedOtherGalleryID = nil
+        return nil
+    }
+
+    /// `stop` when its gallery is nearby and was not reported yet, else `nil`.
+    private func active(position: VenuePosition?, stop: JourneyStop?, places: [VenuePlace], outlines: [GalleryDestination]) -> JourneyStop? {
         guard let stop, let gallery = Self.gallery(of: stop.poiID ?? stop.id, in: places), let galleryID = gallery.remoteID else {
             // A stop without a gallery ends the last report: the next stop in that gallery reports it again.
             if stop != nil { reportedGalleryID = nil }
@@ -48,11 +83,26 @@ final class GalleryNearbyDetector {
         let here = position.coordinate.proximiio
         let level = position.floor?.level
         let isInside = outlines.first { $0.id == galleryID }?.gallery.contains(here, level: level) ?? false
-        guard isInside || Self.isNearby(here, level: level, gallery: gallery.coordinate, galleryLevel: gallery.level, within: nearbyMeters)
-        else { return nil }
+        if isInside, galleryID == reportedOtherGalleryID {
+            // Reported when the visitor entered it; it is the active stop's gallery now.
+            reportedGalleryID = galleryID
+            reportedOtherGalleryID = nil
+            return nil
+        }
+        let entrances = Self.entrances(of: galleryID, in: places, amenityID: entranceAmenityID)
+        let points = entrances.isEmpty ? [gallery] : entrances
+        guard isInside || points.contains(where: {
+            Self.isNearby(here, level: level, gallery: $0.coordinate, galleryLevel: $0.level, within: nearbyMeters)
+        }) else { return nil }
         reportedGalleryID = galleryID
-        FieldLog.log("gallery nearby: \(gallery.title) · stop \(stop.title)\(isInside ? " · inside" : "")")
+        FieldLog.log("gallery nearby: \(gallery.title) · stop \(stop.title)\(isInside ? " · inside" : "") · \(entrances.count) entrances")
         return stop
+    }
+
+    /// The entrance POIs of the gallery `galleryID`: the places with the amenity `amenityID` and
+    /// `metadata.gallery_id` equal to it. Pure; covered by tests.
+    nonisolated static func entrances(of galleryID: String, in places: [VenuePlace], amenityID: String) -> [VenuePlace] {
+        places.filter { $0.amenityID == amenityID && $0.galleryID == galleryID }
     }
 
     /// The gallery POI of the artwork `placeID`: the place that is not an artwork and whose

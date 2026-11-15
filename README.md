@@ -781,7 +781,7 @@ position, search and routes.
 | `journeyChanged(JourneySummary?)` | A new, planned, edited or deleted (`nil`) journey, and the progress after the journey screen closed. |
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
 | `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The package posts no notification for it. |
-| `galleryNearby(ProximiGallery, stop: ProximiStop)` | The gallery of the active stop is nearby: its POI is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
+| `galleryNearby(ProximiGallery, stop: ProximiStop)` | The gallery of the active stop is nearby: one of its entrances is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. An entrance is a POI with the amenity `galleryEntranceAmenityID` and the gallery's id in `metadata.gallery_id`; a gallery without an entrance POI uses its own POI. Since 1.42.0 it is also sent when the visitor enters another gallery that has an artwork of the journey still to visit, once per entry, with the first such artwork as `stop`. Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
 | `positionUncertain(ProximiStop)` | `ProximiMapView` without `.uncertainPositionPrompt`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.uncertainPositionPrompt` the view asks "Probably at …" instead. |
 | `artworkArrived(ProximiStop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence, just before its `artworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
 | `artworkVisited(ProximiStop, cause: ArtworkVisitCause)` | An artwork of the journey is visited: its stop is done. Sent for every cause: `.left` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `.enteredAnotherArtwork` (a fix in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `.advanceDelay` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `.outOfOrder` (personalised journeys: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `.journeyMovedOn` (a detour ended or the visitor chose another stop while at the artwork) and `.app` (the host app set the stop to `.visited` through the `journey` binding of `ProximiMapView`). The host app does not set the stop to `.visited` again for this event. For one artwork the order is `artworkArrived`, `artworkVisited`, then `nextStop`, `stopOrderChanged` or `journeyFinished`. The SDK's `geofenceExited` of the artwork does not move the journey. |
@@ -793,7 +793,7 @@ position, search and routes.
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
 | `detourStarted(ProximiStop)`, `detourEnded(ProximiStop, completed:)` | "Add a stop" on an amenity's card during a journey, or the host app's `destination`; the detour reached (`completed`) or left. |
 | `destinationUnavailable(poiID:reason:)` | `ProximiMapView` does not route to the host app's `destination`: `.unknownPlace`, `.noRoute` or `.noPosition`. `poiID` is the id the host app gave. The view sets the binding back to `nil`. |
-| `journeyPaused` | "Add a stop" on an amenity's card during a journey, after `detourStarted`: the journey waits for "Resume your Journey" or the host app's `isPaused` `false`. `isPaused` is `true` before it. |
+| `journeyPaused` | "Add a stop" on an amenity's card during a journey, or a `destination` of the host app that became a detour (since 1.42.0), after `detourStarted`: the journey waits for "Resume your Journey" or the host app's `isPaused` `false`. `isPaused` is `true` before it. |
 | `journeyResumed` | "Resume your Journey": after a detour, or on the card of a journey the host app paused (`ProximiMapView`'s `isPaused`). |
 | `offRoute(duration:)`, `backOnRoute` | The visitor has been off the route for `offRouteSeconds`; the visitor is on the route again. |
 | `journeyFinished` | Every stop is visited or skipped. Journey Complete shows with `ProximiMap` and with `ProximiMapView.Options.journeyComplete`. |
@@ -844,7 +844,8 @@ let configuration = GADConfiguration(
 | `geofenceExitDelay` | 5 s | Time outside an entered geofence or privacy zone before the SDK reports the exit (`ProximiioConfiguration.geofenceExitDelay`, SDK default 3 s). Enters are reported at once. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. 0 reports the exit at the first position outside. |
 | `privacyZoneExitDelay` | 1 s | Time outside an entered privacy zone before the SDK reports its exit (`ProximiioConfiguration.privacyZoneExitDelay`, SDK 6.0.0-beta.72). The first position after a privacy zone comes after this time. `nil` uses `geofenceExitDelay`. Set by `ProximiMap`; `ProximiMapView` uses the host app's SDK configuration. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
-| `galleryNearbyMeters` | 5 m | The distance of `ProximiMapEvent.galleryNearby`, from the gallery's POI. |
+| `galleryNearbyMeters` | 5 m | The distance of `ProximiMapEvent.galleryNearby`, from an entrance of the gallery, or from the gallery's POI when it has no entrance POI. |
+| `galleryEntranceAmenityID` | the GAD entrance amenity | The amenity of the gallery entrance POIs. An entrance names its gallery in `metadata.gallery_id`; a gallery can have several (GAD PM, 2026-11-15). |
 | `mapTopFadeHeight`, `mapBottomFadeHeight` | 110 pt, 170 pt | The heights over which the journey map fades out at the top and the bottom of its card. The faded part, and the whole card in List mode, show what the host app draws behind `ProximiMapView`. 0: no fade. |
 | `offRouteMeters`, `offRouteSeconds` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, or off the journey this long. Back within two thirds of the distance the visitor is on the leg again. |
 | `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
@@ -1072,6 +1073,32 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.42.0 (2026-11-15)
+
+No breaking change.
+
+Fixed:
+
+- A `destination` that became a detour of a journey paused the journey on the map only. It now sets
+  `isPaused` to `true` and reports `journeyPaused` after `detourStarted`, as "Add a stop" does. "Resume
+  your Journey" sets `isPaused` to `false` and reports `journeyResumed` (Nagarro, 2026-11-15). A
+  destination that is a stop of the journey still to visit becomes the next stop, without a pause.
+
+Added:
+
+- `GADSettings.galleryEntranceAmenityID`: the amenity of the gallery entrance POIs.
+
+Changed:
+
+- `galleryNearby` measures `galleryNearbyMeters` from the entrances of the gallery: the POIs with the
+  entrance amenity and the gallery's id in `metadata.gallery_id`. A gallery without an entrance POI uses
+  its own POI, as before (GAD PM, 2026-11-15).
+- `galleryNearby` is also sent when the visitor enters another gallery that has an artwork of the journey
+  still to visit. `stop` is the first such artwork. It is sent once per entry, and not again when that
+  artwork becomes the next stop while the visitor is still inside.
+
+Not verified in the running app.
 
 ### 1.41.0 (2026-11-15)
 

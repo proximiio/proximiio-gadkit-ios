@@ -172,6 +172,60 @@ struct ProximiMapTests {
         #expect(update(near, "poi-a") == "poi-a")
     }
 
+    @MainActor @Test func aGalleryWithEntrancesIsNearbyAtAnEntranceNotAtItsPOI() {
+        let amenity = GADSettings.standard.galleryEntranceAmenityID
+        let poi = Self.galleryPlaces[2].coordinate
+        // Two entrances of G403, 40 m north and 40 m south of the gallery's POI, and one of another gallery at the POI.
+        func entrance(_ id: String, metresNorth: Double, gallery: String) -> VenuePlace {
+            var place = VenuePlace(id: id, title: "Entrance", coordinate: .init(latitude: poi.latitude + metresNorth / 111_320, longitude: poi.longitude),
+                                   level: 3, amenityID: amenity)
+            place.galleryID = gallery
+            return place
+        }
+        let places = Self.galleryPlaces + [entrance("e1", metresNorth: 40, gallery: "G403"), entrance("e2", metresNorth: -40, gallery: "G403"),
+                                           entrance("e3", metresNorth: 0, gallery: "G101")]
+        #expect(GalleryNearbyDetector.entrances(of: "G403", in: places, amenityID: amenity).map(\.id) == ["e1", "e2"])
+        #expect(GalleryNearbyDetector.entrances(of: "G403", in: Self.galleryPlaces, amenityID: amenity).isEmpty)
+        func position(metresNorth: Double) -> VenuePosition {
+            VenuePosition(coordinate: MapCoordinate(latitude: poi.latitude + metresNorth / 111_320, longitude: poi.longitude),
+                          horizontalAccuracy: 1, floor: FloorKey(level: 3), timestamp: Date())
+        }
+        let detector = GalleryNearbyDetector(nearbyMeters: 5)
+        // At the gallery's POI: not nearby, the gallery has entrances.
+        #expect(detector.update(position: position(metresNorth: 2), stop: stop("poi-a"), places: places, outlines: []) == nil)
+        #expect(detector.update(position: position(metresNorth: -37), stop: stop("poi-a"), places: places, outlines: [])?.id == "poi-a")
+        detector.reset()
+        #expect(detector.update(position: position(metresNorth: 43), stop: stop("poi-a"), places: places, outlines: [])?.id == "poi-a")
+    }
+
+    @MainActor @Test func anotherGalleryOfTheJourneyIsReportedWhenTheVisitorEntersIt() {
+        // G403 around its POI, 20 m wide. poi-c is an artwork in G403; the active stop poi-b has no gallery.
+        let poi = Self.galleryPlaces[2].coordinate
+        let d = 10 / 111_320.0
+        let ring = [(-d, -d), (-d, d), (d, d), (d, -d)].map { ProximiioCoordinate(latitude: poi.latitude + $0.0, longitude: poi.longitude + $0.1) }
+        let outline = GalleryDestination(gallery: Gallery(id: "G403", name: "G403 Weaving", level: 3, ring: ring), entry: poi, placeID: "poi-g403")
+        func position(metresNorth: Double) -> VenuePosition {
+            VenuePosition(coordinate: MapCoordinate(latitude: poi.latitude + metresNorth / 111_320, longitude: poi.longitude),
+                          horizontalAccuracy: 1, floor: FloorKey(level: 3), timestamp: Date())
+        }
+        let detector = GalleryNearbyDetector(nearbyMeters: 5)
+        let open = [stop("poi-b"), stop("poi-a")]
+        func update(_ metresNorth: Double, active: String = "poi-b") -> String? {
+            detector.update(position: position(metresNorth: metresNorth), stop: stop(active), places: Self.galleryPlaces,
+                            outlines: [outline], openStops: open)?.id
+        }
+        #expect(update(60) == nil)
+        // Inside G403 while the route leads to poi-b: reported once, with the artwork of G403.
+        #expect(update(2) == "poi-a")
+        #expect(update(3) == nil)
+        // Out and in again: reported again.
+        #expect(update(60) == nil)
+        #expect(update(2) == "poi-a")
+        // The artwork of G403 becomes the active stop while the visitor is still inside: not reported twice.
+        #expect(update(2, active: "poi-a") == nil)
+        #expect(update(3, active: "poi-a") == nil)
+    }
+
     @Test func geofenceEventsNameTheArtwork() {
         let artwork = ProximiioGeofence(id: "g1", name: "Cloud Canyons", metadata: .object(["geofence_type": .string("artwork")]), remoteId: "GAD.2010.00033")
         #expect(ProximiMap.event(for: .entered(artwork)) == .geofenceEntered(ProximiGeofence(id: "g1", name: "Cloud Canyons", type: "artwork", artworkID: "GAD.2010.00033")))

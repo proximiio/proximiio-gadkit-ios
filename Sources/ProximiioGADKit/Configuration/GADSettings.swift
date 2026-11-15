@@ -65,10 +65,13 @@ public struct GADSettings: Equatable, Sendable {
     /// `ProximiMapEvent.stopNearby`: the active stop is less than this many metres away, along the
     /// route, or in a straight line without a route. The package posts no notification for it.
     public var stopNearbyMeters: Double = 5
-    /// `ProximiMapEvent.galleryNearby`: the POI of the active stop's gallery is less than this many
-    /// metres away in a straight line, on the visitor's level. A visitor inside the gallery's
-    /// outline is nearby at any distance.
+    /// `ProximiMapEvent.galleryNearby`: an entrance of the active stop's gallery is less than this
+    /// many metres away in a straight line, on the visitor's level. A gallery without an entrance
+    /// POI uses its own POI. A visitor inside the gallery's outline is nearby at any distance.
     public var galleryNearbyMeters: Double = 5
+    /// The amenity of the gallery entrance POIs. An entrance names its gallery in
+    /// `metadata.gallery_id`; a gallery can have several (GAD PM, 2026-11-15).
+    public var galleryEntranceAmenityID = "7405e6e6-d9f6-4146-adda-de6adbf4a8a1:3c274297-2461-4c4b-b380-262d76a5eca5"
 
     // MARK: Route
 

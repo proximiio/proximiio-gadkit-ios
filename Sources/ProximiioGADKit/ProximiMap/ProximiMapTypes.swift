@@ -185,11 +185,16 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// The active stop is less than `GADSettings.stopNearbyMeters` away on the visitor's level. Once
     /// per stop. The package posts no notification for it.
     case stopNearby(ProximiStop)
-    /// The gallery of the active stop is nearby: its POI is less than
+    /// The gallery of the active stop is nearby: one of its entrances is less than
     /// `GADSettings.galleryNearbyMeters` away in a straight line on the visitor's level, or the
-    /// visitor is inside the gallery's outline. Sent once while the gallery stays the gallery of
+    /// visitor is inside the gallery's outline. An entrance is a POI with the amenity
+    /// `GADSettings.galleryEntranceAmenityID` and the gallery's id in `metadata.gallery_id`; a
+    /// gallery without one uses its own POI. Sent once while the gallery stays the gallery of
     /// the active stop, also for a journey opened there. Not sent while the journey is paused;
     /// sent again when it resumes.
+    ///
+    /// Also sent when the visitor enters another gallery with an artwork of the journey still to
+    /// visit: `stop` is the first such artwork. Once per entry.
     case galleryNearby(ProximiGallery, stop: ProximiStop)
     /// The position is uncertain near the active stop: the accuracy is worse than
     /// `GADSettings.uncertainAccuracyMeters` and the stop is within it. Sent by `ProximiMapView` without `Options.uncertainPositionPrompt`,
