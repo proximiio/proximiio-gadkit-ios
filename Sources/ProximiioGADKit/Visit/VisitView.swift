@@ -1227,6 +1227,7 @@ struct VisitView: View {
 
     /// A swipe on a stop in the list: "Leave this artwork out?" with `skipPrompt`, else only the event.
     private func requestSkip(_ stop: JourneyStop) {
+        FieldLog.log("skip requested: \(stop.id) \(stop.state.rawValue)")
         if options.contains(.skipPrompt) { stopToSkip = stop }
         emit(.skipRequested(stop))
     }

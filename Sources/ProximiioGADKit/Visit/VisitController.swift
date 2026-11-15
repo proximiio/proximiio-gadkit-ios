@@ -826,7 +826,12 @@ final class VisitController: ObservableObject {
     }
 
     func skip(stopID: String) async {
-        guard await navigator.skip(stopID: stopID) else { return }
+        let active = navigator.activeStop
+        FieldLog.log("skip \(stopID): \(stop(stopID)?.state.rawValue ?? "-") · active \(active?.id ?? "-") \(active?.state.rawValue ?? "-")")
+        guard await navigator.skip(stopID: stopID) else {
+            FieldLog.log("skip \(stopID): refused")
+            return
+        }
         persist(navigator.journey)
     }
 

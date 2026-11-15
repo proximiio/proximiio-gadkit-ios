@@ -1078,6 +1078,14 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.46.1 (2026-11-15)
+
+No breaking change.
+
+Changed:
+
+- The field log names every skip: the stop, its state, the active stop, and a refused skip.
+
 ### 1.46.0 (2026-11-15)
 
 No breaking change.
