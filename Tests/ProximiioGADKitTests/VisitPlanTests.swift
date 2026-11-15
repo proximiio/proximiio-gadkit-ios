@@ -183,3 +183,39 @@ extension VisitPlan {
         return journey
     }
 }
+
+struct ArtworkLeaveTests {
+    @Test func theDistanceToAnArtworkAreaIsMeasuredFromItsBorder() {
+        let center = ProximiioCoordinate(latitude: 24.5, longitude: 54.4)
+        let circle = ArtworkArea(center: center, radius: 3)
+        #expect(circle.distance(to: center) == 0)
+        let north10 = ProximiioCoordinate(latitude: 24.5 + 10 / 111_320.0, longitude: 54.4)
+        #expect(abs(circle.distance(to: north10) - 7) < 0.1)
+        #expect(ArtworkArea(center: nil, radius: 0).distance(to: center) == .infinity)
+
+        // A square of about 4 m: corners 2 m east, west, north and south of the centre.
+        let dLat = 2 / 111_320.0, dLng = 2 / (111_320.0 * cos(24.5 * .pi / 180))
+        let square = ArtworkArea(center: nil, radius: 0, polygon: [
+            [54.4 - dLng, 24.5 - dLat], [54.4 + dLng, 24.5 - dLat], [54.4 + dLng, 24.5 + dLat], [54.4 - dLng, 24.5 + dLat],
+        ])
+        #expect(square.distance(to: center) == 0)
+        // 6 m east of the centre: 4 m from the east side.
+        let east6 = ProximiioCoordinate(latitude: 24.5, longitude: 54.4 + 3 * dLng)
+        #expect(abs(square.distance(to: east6) - 4) < 0.05)
+        // 5 m east and 6 m north of the centre: 3 m and 4 m from the corner, 5 m away.
+        let corner = ProximiioCoordinate(latitude: 24.5 + 3 * dLat, longitude: 54.4 + 2.5 * dLng)
+        #expect(abs(square.distance(to: corner) - 5) < 0.05)
+    }
+
+    @Test func anArtworkIsLeftBeyondTheVisitDistance() {
+        var settings = GADSettings()
+        #expect(settings.artworkVisitedMeters == 5)
+        #expect(settings.artworkVisitedSeconds == 2)
+        #expect(!VisitController.isBeyondVisit(distance: 0, settings: settings))
+        #expect(!VisitController.isBeyondVisit(distance: 5, settings: settings))
+        #expect(VisitController.isBeyondVisit(distance: 5.1, settings: settings))
+        #expect(VisitController.isBeyondVisit(distance: .infinity, settings: settings))
+        settings.artworkVisitedMeters = 0
+        #expect(VisitController.isBeyondVisit(distance: 0.1, settings: settings))
+    }
+}

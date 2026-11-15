@@ -122,7 +122,7 @@ struct MuseumApp: App {
                 .task {
                     for await event in map.events {
                         switch event {
-                        case .artworkReached(let stop): print("At \(stop.artworkID ?? stop.title)")
+                        case .artworkArrived(let stop): print("At \(stop.artworkID ?? stop.title)")
                         case .craftNewJourneyRequested: print("Show the audio guide")
                         default: break
                         }
@@ -290,7 +290,7 @@ Each option turns on something the view does beyond drawing the journey. `Proxim
 | `.uncertainPositionPrompt` | "Probably at …" when the position is uncertain near the active stop. | `positionUncertain` reports it. |
 | `.leaveTourPrompt` | "Leave the tour here" after Back on the bottom bar during a journey in progress (with `.bottomBar` and `onClose`). | Back calls `onClose` at once. |
 | `.prompts` | All four prompts above. | |
-| `.progress` | The view moves the journey on and writes it to the binding: an artwork is visited when the visitor enters its geofence (`artworkReached`) or, in a personalised journey, stays at it out of order (`artworkVisitedOutOfOrder`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and writes nothing. |
+| `.progress` | The view moves the journey on and writes it to the binding: an artwork is visited when the visitor leaves it after the arrival in its geofence or, in a personalised journey, stays at it out of order (`artworkArrived`, `artworkVisited`); a personalised journey is ordered floor by floor and gallery by gallery; a stop whose POI is deleted is skipped. | Only the host app's journey changes the stops. The view keeps the host app's order and writes nothing. |
 | `.liveActivity` | The journey's Live Activity. The widget extension needs `ProximiioGADLiveActivity`. | No Live Activity. |
 | `.journeyComplete` | Journey Complete when the last stop is done. | `journeyFinished` reports the end; nothing shows. |
 
@@ -330,7 +330,8 @@ With `.progress` the view also writes:
 
 - the journey after every change of the order or of a stop state. A personalised journey is ordered
   from the visitor at the start, so the first write can be the new order;
-- `.visited` when the visitor leaves the artwork's geofence (`advancesOnArtworkExit`), or
+- `.visited` when the visitor leaves the artwork (`advancesOnArtworkExit`: more than
+  `artworkVisitedMeters` from its geofence for `artworkVisitedSeconds`, or in another artwork's geofence), or
   `artworkAdvanceDelay` after the arrival without it. The stop the route leads to is `.pending`, also while
   the visitor is at it;
 - the stops that match no POI unchanged, after the other stops;
@@ -341,9 +342,9 @@ With `.progress` the view also writes:
 `onEvent` receives the journey screen's events of the [Events](#events) table: `trackingChanged`,
 `nextStop`, `stopNearby`, `galleryNearby`, `positionUncertain`, `stopPlaceDeleted`, `skipRequested`, the amenity and
 detour events, `destinationUnavailable`, `journeyPaused`, `journeyResumed`, `offRoute`, `backOnRoute`,
-`journeyFinished`, the floor without positioning events, `modeChanged`, `recentred` and
-`accessibleRoutesChanged`; with `.skipPrompt` also `stopSkipped` and `skipCancelled`; with `.progress`
-also `artworkReached`, `artworkVisitedOutOfOrder` and `stopOrderChanged`; with `.bottomBar`,
+`journeyFinished`, the floor without positioning events, `modeChanged`, `recentred`,
+`accessibleRoutesChanged` and `artworkVisited` (without `.progress` only with the cause `.app`); with `.skipPrompt` also `stopSkipped` and `skipCancelled`; with `.progress`
+also `artworkArrived`, `artworkReached`, `artworkVisitedOutOfOrder` and `stopOrderChanged`; with `.bottomBar`,
 `.leaveTourPrompt` and `onClose` also the exit events. Screen, wristband,
 arrival, geofence and `journeyChanged` events come only from `ProximiMap`; geofence enter and exit
 events are on the host app's SDK (`geofenceEvents()`).
@@ -555,7 +556,7 @@ A journey the visitor built with the guide is `.personalised`; a tour by the mus
 | List | Stops under gallery names. | Stops without gallery names. |
 | Skip | The visitor can skip an artwork. | No skip. |
 | Order | Ordered floor by floor and gallery by gallery from the visitor, at the start and after a detour or an artwork visited out of order. | The curators' order. |
-| Another artwork | An artwork further on that the visitor stays at counts as visited (`artworkVisitedOutOfOrder`). | Ignored: only the next artwork counts. An artwork the visitor passes stays open. |
+| Another artwork | An artwork further on that the visitor stays at counts as visited (`artworkVisited` with the cause `.outOfOrder`). | Ignored: only the next artwork counts. An artwork the visitor passes stays open. |
 
 The map and the background are the same for both.
 
@@ -782,9 +783,11 @@ position, search and routes.
 | `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The package posts no notification for it. |
 | `galleryNearby(ProximiGallery, stop: ProximiStop)` | The gallery of the active stop is nearby: its POI is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
 | `positionUncertain(ProximiStop)` | `ProximiMapView` without `.uncertainPositionPrompt`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.uncertainPositionPrompt` the view asks "Probably at …" instead. |
-| `artworkReached(ProximiStop)` | The visitor was in the artwork geofence of the active stop (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it) and left it: the SDK's `geofenceExited`, `geofenceExitDelay` outside it without that event, or a fix in another open artwork's geofence. The stop is done and the route leads to the next stop. With `advancesOnArtworkExit` `false`: `artworkAdvanceDelay` after the arrival. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
-| `artworkVisitedOutOfOrder(ProximiStop)` | Personalised journeys only: the visitor stayed at an artwork further down the journey. It counts as visited, and the stops ahead are ordered again. A curated tour ignores such an artwork. |
-| `stopOrderChanged(ProximiJourney)` | `ProximiMapView` with `.progress`: the view ordered the stops again, from the visitor's first position, after `artworkVisitedOutOfOrder` or after a detour. The journey in the host app's ids and its new order; the `journey` binding already holds it. A change of the states alone does not send it. |
+| `artworkArrived(ProximiStop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence, just before its `artworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
+| `artworkVisited(ProximiStop, cause: ArtworkVisitCause)` | An artwork of the journey is visited: its stop is done. Sent for every cause: `.left` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `.enteredAnotherArtwork` (a fix in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `.advanceDelay` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `.outOfOrder` (personalised journeys: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `.journeyMovedOn` (a detour ended or the visitor chose another stop while at the artwork) and `.app` (the host app set the stop to `.visited` through the `journey` binding of `ProximiMapView`). The host app does not set the stop to `.visited` again for this event. For one artwork the order is `artworkArrived`, `artworkVisited`, then `nextStop`, `stopOrderChanged` or `journeyFinished`. The SDK's `geofenceExited` of the artwork does not move the journey. |
+| `artworkReached(ProximiStop)` | Use `artworkVisited`. Sent after `artworkVisited` for every cause but `.outOfOrder` and `.app`. Removed in a later release. |
+| `artworkVisitedOutOfOrder(ProximiStop)` | Use `artworkVisited` with the cause `.outOfOrder`. Sent after it. Removed in a later release. |
+| `stopOrderChanged(ProximiJourney)` | `ProximiMapView` with `.progress`: the view ordered the stops again, from the visitor's first position, after an artwork visited out of order or after a detour. The journey in the host app's ids and its new order; the `journey` binding already holds it. A change of the states alone does not send it. |
 | `skipRequested`, `stopSkipped`, `skipCancelled` (`ProximiStop`) | A swipe on a stop in the list, "Skip it", "Keep it". `ProximiMapView` without `.skipPrompt` sends only `skipRequested`. `skipUndone` is not sent since 1.13.0. |
 | `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
 | `amenitySelected(ProximiStop)` | An amenity picked on the map. A card shows it with "Go here"; the map marks it in red and shows it with the visitor, or its own floor around it (`amenityFramingMinimumMeters`). |
@@ -831,8 +834,10 @@ let configuration = GADConfiguration(
 |---|---|---|
 | `trackingLostAfter` | 110 s | Seconds without positioning before `ProximiMapEvent.trackingChanged(.lostPlace)`. The SDK reports positioning unavailable about 10 s after the last fix: about 2 min. |
 | `trackingStoppedAfter` | 170 s | Seconds without positioning before `ProximiMapEvent.trackingChanged(.stoppedResponding)` (about 3 min). |
-| `advancesOnArtworkExit` | `true` | The journey moves to the next stop when the visitor leaves the active artwork's geofence (Nagarro, 2026-10-30). Inside it the card and the destination marker keep the artwork, with no instruction, and the route shows the leg to the next stop (GAD PM and Nagarro, 2026-10-30). `false`: `artworkAdvanceDelay` after entering it. |
+| `advancesOnArtworkExit` | `true` | The journey moves to the next stop when the visitor leaves the active artwork: `artworkVisitedMeters` and `artworkVisitedSeconds`, or a fix in another artwork's geofence (Nagarro, 2026-10-30; GAD PM, 2026-11-15). Inside it the card and the destination marker keep the artwork, with no instruction, and the route shows the leg to the next stop (GAD PM and Nagarro, 2026-10-30). `false`: `artworkAdvanceDelay` after entering it. |
 | `artworkAdvanceDelay` | 2 s | With `advancesOnArtworkExit` `false`: from the arrival at an artwork (its geofence) to the route to the next stop. |
+| `artworkVisitedMeters` | 5 m | With `advancesOnArtworkExit`: the artwork the visitor arrived at is visited when they are more than this far from the border of its geofence for `artworkVisitedSeconds` (GAD PM, 2026-11-15). A visitor on another level counts as beyond it. |
+| `artworkVisitedSeconds` | 2 s | The time beyond `artworkVisitedMeters`. One position beyond the distance does not end the visit. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as visited out of order (personalised journeys only). |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `positionBarriers` | `BarrierConfiguration()` | How barrier features stop a position that jumps through a wall (`ProximiioConfiguration.positioning.barriers`, SDK 6.0.0-beta.71): `isEnabled` (`true`), `armingPositions` (10 positions on a floor before any is stopped), `maxWalkingSpeed` (2 m/s), `wallMargin` (0.4 m), `releasePositions` (10) and `releaseMinimumDuration` (5 s). No effect in a venue without barrier features. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. |
@@ -1067,6 +1072,39 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.41.0 (2026-11-15)
+
+Breaking: `ProximiMapEvent` has two new cases, `artworkArrived` and `artworkVisited`. A host app that
+switches over `ProximiMapEvent` without a `default` adds them. The pins are unchanged.
+
+Added:
+
+- `ProximiMapEvent.artworkArrived(ProximiStop)`: the visitor is at an artwork of the journey. Before
+  1.41.0 no event came at the arrival.
+- `ProximiMapEvent.artworkVisited(ProximiStop, cause: ArtworkVisitCause)`: an artwork of the journey is
+  visited, for every cause. `ArtworkVisitCause`: `left`, `enteredAnotherArtwork`, `advanceDelay`,
+  `outOfOrder`, `journeyMovedOn`, `app`.
+- `artworkVisited` with the cause `.app` is also sent when the host app sets a stop to `.visited` through
+  the `journey` binding of `ProximiMapView`, with or without `Options.progress` (GAD PM, 2026-11-15: the
+  host app gets the event in every case). The host app does not set the stop again for this event.
+- `GADSettings.artworkVisitedMeters` (5 m) and `GADSettings.artworkVisitedSeconds` (2 s).
+
+Changed:
+
+- With `advancesOnArtworkExit`, the artwork the visitor arrived at is visited when they are more than
+  `artworkVisitedMeters` from the border of its geofence for `artworkVisitedSeconds` (GAD PM,
+  2026-11-15). Before, it was visited on the SDK's `geofenceExited`, or after `geofenceExitDelay` (5 s)
+  outside the geofence. A visitor who stands less than 5 m from the geofence keeps the artwork as the
+  current stop.
+- The SDK's `geofenceExited` of an artwork no longer moves the journey. `geofenceExitDelay` still sets
+  when the SDK reports exits.
+- A curated tour: a fix in the geofence of the next artwork ends the visit of the active one. Before,
+  only personalised journeys did this, for every open artwork.
+- `artworkReached` and `artworkVisitedOutOfOrder` are still sent, after `artworkVisited`. They are
+  removed in a later release; use `artworkVisited`.
+
+Not verified in the running app.
 
 ### 1.40.0 (2026-11-13)
 

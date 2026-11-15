@@ -1,7 +1,7 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.40.0 uses SDK
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.41.0 uses SDK
 6.0.0-beta.73 and Map 6.0.0-beta.64.
 
 Each change has a mark:
@@ -262,6 +262,11 @@ It does not see calls on the navigator that change the journey, and its next cha
 | `resumeJourney()` | No call. The route follows a visitor who left it. |
 | `setRouteOptions(_:)` | The `routeAccessibility:` parameter (`RouteAccessibility`) |
 
+The view reports `ProximiMapEvent.artworkVisited(stop, cause: .app)` on `onEvent` after the app set a
+stop to `.visited`, also without `Options.progress` (1.41.0). The app does not set the stop again for
+this event. An audio guide that marks an artwork visited sets `journey.stops[i].state = .visited`; the
+map, the route and the list follow.
+
 A swipe on a stop in the list reports `ProximiMapEvent.skipRequested(stop)` on `onEvent` and changes
 nothing. The app sets the stop to `.skipped`, or asks the visitor first. Without this the swipe has no
 effect. `ProximiStop.id` is the POI id and `ProximiStop.artworkID` the collection id (`remote_id`); the
@@ -286,7 +291,7 @@ The navigator from `onNavigator` has the view's rules, not the map library's def
 |---|---|
 | `.stopSkipped`, `.legChanged`, `.journeyFinished` | Sent when the view applies the app's change of the binding. |
 | `.farFromRoute`, `.offRouteTooLong` | After `GADSettings.offRouteMeters` (30 m) and `GADSettings.offRouteSeconds` (300 s). |
-| `.stopReached` and the cue `.arrived` | Only for a detour to an amenity. A leg to an artwork never reports an arrival. The visitor reaches an artwork by entering its geofence, which the app's `geofenceEvents()` reports. |
+| `.stopReached` and the cue `.arrived` | Only for a detour to an amenity. A leg to an artwork never reports an arrival. The visitor reaches an artwork by entering its geofence, which the app's `geofenceEvents()` reports. With `Options.progress` the view also reports `ProximiMapEvent.artworkArrived` and `artworkVisited` (1.41.0). |
 | The cue `.approachingDestination` | 15 m before the end of the leg. In a personalised journey a leg to an artwork in another gallery ends at that gallery; other legs end at the artwork. |
 
 Every time and distance of the view is in `GADSettings` (README "Settings"), passed as `settings:`.

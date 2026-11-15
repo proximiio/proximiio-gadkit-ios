@@ -283,8 +283,15 @@ struct VisitView: View {
                 Task { await controller.setAccessibility(accessibility) }
             }
             .task {
-                controller.onArtworkDone = { [emit] stop, isActiveStop in
-                    emit(isActiveStop ? .artworkReached(stop) : .artworkVisitedOutOfOrder(stop))
+                controller.onArtworkArrived = { [emit] stop in emit(.artworkArrived(stop)) }
+                controller.onArtworkVisited = { [emit] stop, cause in
+                    emit(.artworkVisited(stop, cause: cause))
+                    // The events of host apps written before 1.41.0.
+                    switch cause {
+                    case .outOfOrder: emit(.artworkVisitedOutOfOrder(stop))
+                    case .app: break
+                    default: emit(.artworkReached(stop))
+                    }
                 }
                 floorGuide.onEnter = { [emit, controller] change in
                     // Under the Map / List toggle, beside the map buttons, above the stop card.
@@ -387,8 +394,6 @@ struct VisitView: View {
                         }
                     case .entered(let geofence) where geofence.isArtwork:
                         controller.artworkGeofenceEntered(remoteID: geofence.remoteId)
-                    case .exited(let geofence, _) where geofence.isArtwork:
-                        controller.artworkGeofenceExited(remoteID: geofence.remoteId)
                     default: break
                     }
                 }

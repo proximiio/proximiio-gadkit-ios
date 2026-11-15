@@ -63,9 +63,12 @@ enum VisitEvent: Sendable, Equatable {
     /// `ProximiMapView.Options.uncertainPositionPrompt` the view reports it instead of asking. At most once per
     /// `GADSettings.locationQuestionQuietPeriod`.
     case positionUncertain(JourneyStop)
-    /// The visitor reached the artwork of the active stop: they entered its geofence or stand in
-    /// its area. The stop is done 2 s later, when this event arrives, and the route leads to the
-    /// next stop. The navigator reports no `stopReached` for artworks.
+    /// The visitor is at an artwork of the journey (`ProximiMapEvent.artworkArrived`).
+    case artworkArrived(JourneyStop)
+    /// An artwork of the journey is visited (`ProximiMapEvent.artworkVisited`).
+    case artworkVisited(JourneyStop, cause: ArtworkVisitCause)
+    /// The active artwork is visited. Sent after `artworkVisited`, for host apps written before
+    /// 1.41.0.
     case artworkReached(JourneyStop)
     /// The visitor stayed at an artwork further down the journey. The stop is done and the stops
     /// still ahead are ordered again from the visitor.

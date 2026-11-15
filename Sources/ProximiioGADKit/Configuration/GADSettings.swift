@@ -20,9 +20,9 @@ public struct GADSettings: Equatable, Sendable {
 
     // MARK: Arrival
 
-    /// `true`: the journey moves to the next stop when the visitor leaves the geofence of the active
-    /// artwork: on the SDK's exit event, or after `geofenceExitDelay` outside it without one (Nagarro,
-    /// 2026-10-30: the next stop comes from the exit event). Inside the geofence the artwork is
+    /// `true`: the journey moves to the next stop when the visitor leaves the active artwork: they
+    /// are more than `artworkVisitedMeters` from its geofence for `artworkVisitedSeconds`, or they
+    /// enter the geofence of another artwork of the journey (GAD PM, 2026-11-15). Inside the geofence the artwork is
     /// reached: the card and the destination marker keep the artwork, and the route shows the leg to
     /// the next stop (`JourneyNavigator.drawsNextLegWhileReached`; GAD PM and Nagarro, 2026-10-30).
     /// `false`: `artworkAdvanceDelay` after the visitor entered it.
@@ -30,6 +30,11 @@ public struct GADSettings: Equatable, Sendable {
     /// With `advancesOnArtworkExit` `false`: seconds between the arrival at an artwork (its geofence)
     /// and the route to the next stop.
     public var artworkAdvanceDelay: TimeInterval = 2
+    /// With `advancesOnArtworkExit`: the artwork the visitor arrived at is visited when they are more
+    /// than this many metres from the border of its geofence…
+    public var artworkVisitedMeters: Double = 5
+    /// …for this many seconds. One position beyond the distance does not end the visit.
+    public var artworkVisitedSeconds: TimeInterval = 2
     /// Seconds inside the geofence of an artwork that is not the next stop before it counts as
     /// visited out of order. A longer time keeps a visitor who crosses it on the way from marking it.
     public var outOfOrderDwell: TimeInterval = 0

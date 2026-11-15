@@ -16,9 +16,11 @@
 //  `ProximiioConfiguration.geofenceExitDelay` after the position left it (`ProximiMap`:
 //  `GADSettings.geofenceExitDelay`, 5 s; the SDK default is 3 s), so an artwork counts as inside up
 //  to that long after the visitor left it. The journey moves to the next stop when the visitor
-//  leaves the artwork's geofence (`GADSettings.advancesOnArtworkExit`; Nagarro, 2026-10-30): on the
-//  SDK's exit event (`artworkGeofenceExited`), after `geofenceExitDelay` outside it without one, or
-//  at once when the visitor is in another open artwork's geofence. Until then the artwork is reached
+//  leaves the artwork (`GADSettings.advancesOnArtworkExit`; Nagarro, 2026-10-30): more than
+//  `GADSettings.artworkVisitedMeters` from the border of its geofence for
+//  `GADSettings.artworkVisitedSeconds`, or at once when the visitor is in another open artwork's
+//  geofence (GAD PM, 2026-11-15; in a curated tour the next artwork's). The SDK's exit event does
+//  not move the journey. Until then the artwork is reached
 //  (`JourneyNavigator.markReached(stopID:)`): it stays the active stop with the destination marker,
 //  and the navigator draws the leg to the next stop from the visitor (`drawsNextLegWhileReached`;
 //  GAD PM and Nagarro, 2026-10-30). A reached artwork that the navigator moves past (a detour, a
@@ -117,10 +119,11 @@ final class VisitController: ObservableObject {
     /// The stop the navigator walks to for a moment while an artwork visited out of order moves
     /// ahead. `VisitView` reports no `nextStop` for it.
     @Published private(set) var passingStopID: String?
-    /// Called after an artwork stop is marked done: `true` for the active stop, `false` for an
-    /// artwork visited out of order. `VisitView` reports `VisitEvent.artworkReached` and
-    /// `artworkVisitedOutOfOrder`.
-    var onArtworkDone: ((JourneyStop, _ isActiveStop: Bool) -> Void)?
+    /// Called when the visitor is at an artwork of the journey. `VisitView` reports
+    /// `VisitEvent.artworkArrived`.
+    var onArtworkArrived: ((JourneyStop) -> Void)?
+    /// Called after an artwork stop is done. `VisitView` reports `VisitEvent.artworkVisited`.
+    var onArtworkVisited: ((JourneyStop, ArtworkVisitCause) -> Void)?
     private var tasks: [Task<Void, Never>] = []
     private var isStarted = false
     /// `true` once `navigator.start()` has returned.
@@ -199,7 +202,8 @@ final class VisitController: ObservableObject {
     private var arrivedStopID: String?
     /// The artwork the navigator holds reached (`markReached`) and that is not yet reported visited.
     private var reachedStopID: String?
-    /// The first fix outside the geofence of `arrivedStopID`, for a leave without an exit event.
+    /// The first fix more than `GADSettings.artworkVisitedMeters` from the geofence of
+    /// `arrivedStopID`; `nil` while the visitor is closer.
     private var outsideArrivedSince: Date?
     /// Time inside the geofence of each open artwork that is not the active stop.
     private var outOfOrderDwell = GeofenceDwell()
@@ -322,7 +326,7 @@ final class VisitController: ObservableObject {
         refreshGalleryAhead()
         switch event {
         case .stopReached(let stop) where stop.kind != .detour && !settings.advancesOnArtworkExit:
-            scheduleDone(stop.id, after: settings.artworkAdvanceDelay)
+            scheduleDone(stop.id, after: settings.artworkAdvanceDelay, cause: .advanceDelay)
         case .detourEnded(_, completed: true):
             tasks.append(Task { [weak self] in
                 await self?.serially { [weak self] in
@@ -356,7 +360,7 @@ final class VisitController: ObservableObject {
         guard let id = reachedStopID, let stop = stop(id), stop.state == .done else { return }
         reachedStopID = nil
         FieldLog.log("artwork left (the journey moved on): \(id)")
-        onArtworkDone?(stop, true)
+        onArtworkVisited?(stop, .journeyMovedOn)
     }
 
     /// The visitor entered an artwork geofence. With `GADSettings.advancesOnArtworkExit` the active
@@ -366,11 +370,13 @@ final class VisitController: ObservableObject {
     func artworkGeofenceEntered(remoteID: String?) {
         guard managesProgress, !isPaused, navigator.detourStop == nil, let id = Self.activeStopID(forRemoteID: remoteID, in: navigator.journey, remoteIDs: artworkRemoteIDs) else { return }
         guard settings.advancesOnArtworkExit else {
+            guard !scheduledDone.contains(id) else { return }
             FieldLog.log("artwork geofence arrival: \(id) remote \(remoteID ?? "-")")
-            return scheduleDone(id, after: settings.artworkAdvanceDelay)
+            if let stop = stop(id) { onArtworkArrived?(stop) }
+            return scheduleDone(id, after: settings.artworkAdvanceDelay, cause: .advanceDelay)
         }
-        outsideArrivedSince = nil
         guard arrivedStopID != id else { return }
+        outsideArrivedSince = nil
         arrivedStopID = id
         FieldLog.log("artwork geofence arrival: \(id) remote \(remoteID ?? "-") · next stop at the exit")
         tasks.append(Task { [weak self] in
@@ -380,6 +386,7 @@ final class VisitController: ObservableObject {
                 self.navigator.drawsNextLegWhileReached = true
                 guard await self.navigator.markReached(stopID: id) else { return }
                 self.reachedStopID = id
+                if let stop = self.stop(id) { self.onArtworkArrived?(stop) }
                 // A next leg from inside the next artwork's gallery ends at the artwork. Without the mark,
                 // `checkGalleryFirst` routed that leg again at the first fix after the exit.
                 if let next = self.navigator.upcomingStop, let gallery = self.galleryRouting.gallery(of: next.coordinate),
@@ -393,22 +400,14 @@ final class VisitController: ObservableObject {
         })
     }
 
-    /// The SDK reports that the visitor left an artwork geofence. Leaving the active artwork they
-    /// arrived at moves the journey to the next stop (`GADSettings.advancesOnArtworkExit`).
-    func artworkGeofenceExited(remoteID: String?) {
-        guard managesProgress, !isPaused, let arrived = arrivedStopID, let remoteID,
-              artworkRemoteIDs[stop(arrived)?.poiID ?? arrived] == remoteID else { return }
-        leaveArrivedArtwork(reason: "exit event")
-    }
-
     /// The visitor left the active artwork they arrived at: the journey moves to the next stop.
-    private func leaveArrivedArtwork(reason: String) {
+    private func leaveArrivedArtwork(reason: String, cause: ArtworkVisitCause) {
         guard let id = arrivedStopID else { return }
         arrivedStopID = nil
         outsideArrivedSince = nil
         guard navigator.activeStop?.id == id else { return }
         FieldLog.log("artwork left (\(reason)): \(id) · next stop")
-        scheduleDone(id, after: 0)
+        scheduleDone(id, after: 0, cause: cause)
     }
 
     /// Checks the fix against the geofences of the open artworks on the visitor's floor, and
@@ -434,19 +433,28 @@ final class VisitController: ObservableObject {
             reachedStopID = activeID
         }
         var inside: Set<String> = []
-        var isInsideActive = false
+        // Metres from the border of the active artwork's geofence; 0 inside it.
+        var activeDistance = Double.infinity
+        // A curated tour counts no artwork out of order, but the next artwork's geofence still ends
+        // the visit of the active one (GAD PM, 2026-11-15).
+        let upcomingID = navigator.hasArrived ? navigator.upcomingStop?.id : nil
+        var isInsideUpcoming = false
         for stop in navigator.journey.stops
         where stop.kind != .detour && (stop.state == .pending || stop.state == .active || stop.state == .reached) {
             guard let remoteID = artworkRemoteIDs[stop.poiID ?? stop.id],
                   let areas = artworkAreas[remoteID]
             else { continue }
             if !VenueLevel.matches(stop.floor?.level, level) { continue }
+            if stop.id == activeID {
+                activeDistance = areas.map { $0.distance(to: point) }.min() ?? .infinity
+            }
             guard areas.contains(where: { enteredGeofenceIDs.contains($0.id) || $0.contains(point) }) else { continue }
             if stop.id == activeID {
-                isInsideActive = true
                 artworkGeofenceEntered(remoteID: remoteID)
             } else if countsOutOfOrder {
                 inside.insert(stop.id)
+            } else if stop.id == upcomingID {
+                isInsideUpcoming = true
             }
         }
         if let arrived = arrivedStopID {
@@ -454,18 +462,21 @@ final class VisitController: ObservableObject {
                 // Skipped, reordered or visited otherwise.
                 arrivedStopID = nil
                 outsideArrivedSince = nil
-            } else if !inside.isEmpty {
+            } else if !inside.isEmpty || isInsideUpcoming {
                 // In another open artwork: the visitor has moved on. That artwork counts from the
                 // next fix, after the journey moved on.
-                leaveArrivedArtwork(reason: "in another artwork")
+                leaveArrivedArtwork(reason: "in another artwork", cause: .enteredAnotherArtwork)
                 inside = []
-            } else if !isInsideActive {
-                // No exit event: the SDK did not count the visitor inside, or the event was missed.
+            } else if Self.isBeyondVisit(distance: activeDistance, settings: settings) {
                 let since = outsideArrivedSince ?? .now
                 outsideArrivedSince = since
-                if Date.now.timeIntervalSince(since) >= settings.geofenceExitDelay {
-                    leaveArrivedArtwork(reason: "outside for \(settings.geofenceExitDelay) s")
+                if Date.now.timeIntervalSince(since) >= settings.artworkVisitedSeconds {
+                    leaveArrivedArtwork(
+                        reason: "more than \(settings.artworkVisitedMeters) m away for \(settings.artworkVisitedSeconds) s",
+                        cause: .left)
                 }
+            } else {
+                outsideArrivedSince = nil
             }
         }
         for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: settings.outOfOrderDwell) {
@@ -710,7 +721,8 @@ final class VisitController: ObservableObject {
                 let isDone = await self.navigator.markDone(stopID: stopID)
                 self.passingStopID = nil
                 if isDone, let stop = self.stop(stopID) {
-                    self.onArtworkDone?(stop, false)
+                    self.onArtworkArrived?(stop)
+                    self.onArtworkVisited?(stop, .outOfOrder)
                 }
                 await self.orderRemaining()
                 if let activeStopID, self.navigator.activeStop?.id == activeStopID {
@@ -732,6 +744,12 @@ final class VisitController: ObservableObject {
         ).mapValues { $0.map(ArtworkArea.init) }
     }
 
+    /// Whether `distance` metres from the border of the artwork's geofence is beyond
+    /// `GADSettings.artworkVisitedMeters`. Pure; covered by tests.
+    nonisolated static func isBeyondVisit(distance: Double, settings: GADSettings) -> Bool {
+        distance > settings.artworkVisitedMeters
+    }
+
     /// The active artwork stop when its POI has `remoteID`, else `nil`. Pure; covered by tests.
     nonisolated static func activeStopID(forRemoteID remoteID: String?, in journey: Journey, remoteIDs: [String: String]) -> String? {
         guard let remoteID, !remoteID.isEmpty,
@@ -743,7 +761,7 @@ final class VisitController: ObservableObject {
 
     /// Marks `stopID` visited after `delay` seconds if it is still the active stop. The leg to the
     /// next artwork is drawn.
-    private func scheduleDone(_ stopID: String, after delay: TimeInterval) {
+    private func scheduleDone(_ stopID: String, after delay: TimeInterval, cause: ArtworkVisitCause) {
         guard scheduledDone.insert(stopID).inserted else { return }
         tasks.append(Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
@@ -755,7 +773,7 @@ final class VisitController: ObservableObject {
                 if self.reachedStopID == stopID { self.reachedStopID = nil }
                 let changed = await self.navigator.markDone(stopID: stopID)
                 self.persist(self.navigator.journey)
-                if changed, let stop = self.stop(stopID) { self.onArtworkDone?(stop, true) }
+                if changed, let stop = self.stop(stopID) { self.onArtworkVisited?(stop, cause) }
             }
         })
     }
@@ -868,7 +886,17 @@ final class VisitController: ObservableObject {
     /// the navigator has already made stays. The navigator was created with the host app's list, so
     /// the first call merges against it.
     private func performApply(_ target: Journey) async {
+        // The artworks the host app marks visited with this journey.
+        let done = Set(navigator.journey.stops.filter { $0.state == .done }.map(\.id))
+        let marked = target.stops.filter { $0.kind != .detour && $0.state == .done && !done.contains($0.id) }.map(\.id)
+        // Reported below, not by `reportReachedStopDone` on the leg change.
+        if let reached = reachedStopID, marked.contains(reached) { reachedStopID = nil }
         let taken = await navigator.update(to: target)
+        for id in marked {
+            guard let stop = stop(id), stop.state == .done else { continue }
+            FieldLog.log("artwork visited (the host app): \(id)")
+            onArtworkVisited?(stop, .app)
+        }
         FieldLog.log("journey applied · \(target.stops.count) stops · \(taken ? "taken" : "not taken: two stops with one id")")
     }
 
@@ -1015,6 +1043,31 @@ struct ArtworkArea: Equatable, Sendable {
         }
         guard let center, center.latitude != 0 || center.longitude != 0, radius > 0 else { return false }
         return GeoMath.haversineDistance(from: center, to: point) <= radius
+    }
+
+    /// Metres from `point` to the border of the area; 0 inside it, infinite without a shape.
+    func distance(to point: ProximiioCoordinate) -> Double {
+        if let polygon, polygon.count >= 3 {
+            if GeoMath.isPointInPolygon(point, polygon: polygon) { return 0 }
+            // Metres east and north of `point`.
+            let metersPerDegree = 111_320.0
+            let east = metersPerDegree * cos(point.latitude * .pi / 180)
+            let corners = polygon.filter { $0.count >= 2 }.map {
+                (x: ($0[0] - point.longitude) * east, y: ($0[1] - point.latitude) * metersPerDegree)
+            }
+            var nearest = Double.infinity
+            for (index, a) in corners.enumerated() {
+                let b = corners[(index + 1) % corners.count]
+                let dx = b.x - a.x, dy = b.y - a.y
+                let length = dx * dx + dy * dy
+                let t = length > 0 ? min(max(-(a.x * dx + a.y * dy) / length, 0), 1) : 0
+                let x = a.x + t * dx, y = a.y + t * dy
+                nearest = min(nearest, (x * x + y * y).squareRoot())
+            }
+            return nearest
+        }
+        guard let center, center.latitude != 0 || center.longitude != 0, radius > 0 else { return .infinity }
+        return max(0, GeoMath.haversineDistance(from: center, to: point) - radius)
     }
 }
 

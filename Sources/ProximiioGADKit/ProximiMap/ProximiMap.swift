@@ -651,6 +651,8 @@ extension ProximiMap {
             return mapped.gallery.map { .galleryNearby($0, stop: mapped) }
         case .positionUncertain(let s): return .positionUncertain(stop(s))
         case .stopPlaceDeleted(let s): return .stopPlaceDeleted(stop(s))
+        case .artworkArrived(let s): return .artworkArrived(stop(s))
+        case .artworkVisited(let s, let cause): return .artworkVisited(stop(s), cause: cause)
         case .artworkReached(let s): return .artworkReached(stop(s))
         case .artworkVisitedOutOfOrder(let s): return .artworkVisitedOutOfOrder(stop(s))
         case .trackingChanged(let health): return .trackingChanged(health)

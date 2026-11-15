@@ -102,6 +102,15 @@ struct ProximiMapTests {
     @Test func visitEventsBecomeHostEventsWithTheArtworkID() {
         let reached = ProximiMap.event(for: .artworkReached(stop("poi-a")), places: Self.places)
         #expect(reached == .artworkReached(ProximiStop(id: "poi-a", title: "poi-a", artworkID: "GAD.2010.00033", level: 1)))
+        let arrived = ProximiMap.event(for: .artworkArrived(stop("poi-a")), places: Self.places)
+        let visited = ProximiMap.event(for: .artworkVisited(stop("poi-a"), cause: .left), places: Self.places)
+        if case .artworkReached(let mapped) = reached {
+            #expect(arrived == .artworkArrived(mapped))
+            #expect(visited == .artworkVisited(mapped, cause: .left))
+            #expect(visited != .artworkVisited(mapped, cause: .app))
+        } else {
+            Issue.record("artworkReached is not mapped")
+        }
         let detour = ProximiMap.event(for: .detourStarted(Self.places[2]), places: Self.places)
         #expect(detour == .detourStarted(ProximiStop(id: "poi-cafe", title: "Café", artworkID: nil, level: 0)))
         #expect(ProximiMap.event(for: .journey(.journeyFinished), places: Self.places) == .journeyFinished)

@@ -201,12 +201,24 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// changes the journey; that change starts the screen again without it. With `.progress` the
     /// stop is skipped.
     case stopPlaceDeleted(ProximiStop)
-    /// The visitor left the geofence of the active stop's artwork (`GADSettings.advancesOnArtworkExit`),
-    /// or `GADSettings.artworkAdvanceDelay` after they reached it without that setting: the stop is
-    /// done and the route leads to the next stop.
+    /// The visitor is at an artwork of the journey. Once per visit of the artwork.
+    ///
+    /// The active stop: the visitor entered its geofence, or the leg started inside it. An artwork
+    /// further down a personalised journey: the visitor was inside its geofence for
+    /// `GADSettings.outOfOrderDwell`; `artworkVisited` follows at once. Not sent during a detour,
+    /// while the journey is paused, or for an artwork the host app marked visited.
+    case artworkArrived(ProximiStop)
+    /// An artwork of the journey is visited: its stop is done. `cause` says why
+    /// (`ArtworkVisitCause`). Also sent when the host app marked the stop visited through the
+    /// `journey` binding (`.app`); the host app does not mark the stop again for this event.
+    ///
+    /// For one artwork: `artworkArrived`, `artworkVisited`, then `nextStop`, `stopOrderChanged` or
+    /// `journeyFinished`.
+    case artworkVisited(ProximiStop, cause: ArtworkVisitCause)
+    /// Use `artworkVisited`. The active artwork is visited: sent after `artworkVisited` for every
+    /// cause but `.outOfOrder` and `.app`. Removed in a later release.
     case artworkReached(ProximiStop)
-    /// The visitor stayed at an artwork further down the journey. It counts as visited. A
-    /// personalised journey orders the stops ahead again.
+    /// Use `artworkVisited` with the cause `.outOfOrder`. Sent after it. Removed in a later release.
     case artworkVisitedOutOfOrder(ProximiStop)
     /// `ProximiMapView` with `Options.progress`: the view ordered the stops again, from the visitor's
     /// first position, after `artworkVisitedOutOfOrder` or after a detour. The journey in the host
@@ -286,4 +298,22 @@ public enum ProximiMapError: LocalizedError, Equatable, Sendable {
             String(localized: "None of these artworks is on the museum map.", bundle: .localized)
         }
     }
+}
+
+/// Why an artwork of the journey is visited (`ProximiMapEvent.artworkVisited`).
+public enum ArtworkVisitCause: String, Equatable, Sendable {
+    /// The visitor left the artwork they arrived at: more than `GADSettings.artworkVisitedMeters`
+    /// from the border of its geofence for `GADSettings.artworkVisitedSeconds`.
+    case left
+    /// The visitor entered the geofence of another artwork of the journey while at this one.
+    case enteredAnotherArtwork
+    /// `GADSettings.artworkAdvanceDelay` passed after the arrival (`advancesOnArtworkExit` `false`).
+    case advanceDelay
+    /// A personalised journey: the visitor was at an artwork further down the journey.
+    case outOfOrder
+    /// The journey moved past the artwork the visitor was at: a detour ended or the visitor chose
+    /// another stop.
+    case journeyMovedOn
+    /// The host app marked the stop visited through the `journey` binding of `ProximiMapView`.
+    case app
 }
