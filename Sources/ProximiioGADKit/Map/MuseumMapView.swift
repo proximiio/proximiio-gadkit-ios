@@ -283,7 +283,9 @@ struct MuseumMapView: View {
     private func loadPlaces() async {
         let features = await venue.data.features()
         let amenities = await venue.data.amenities()
-        places = VenuePlace.all(in: features, amenities: amenities)
+        let allPlaces = VenuePlace.all(in: features, amenities: amenities)
+        let entranceAmenityID = venue.settings.galleryEntranceAmenityID
+        places = VenuePlace.withoutGalleryEntrances(allPlaces, amenityID: entranceAmenityID)
         let scale = UIScreen.main.scale
         let icons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
                                uniquingKeysWith: { first, _ in first })
@@ -292,6 +294,7 @@ struct MuseumMapView: View {
         mapLayers.updateLevelChangers(levelChangers)
         mapLayers.updateCones(VenueCone.all(in: features))
         session.hiddenFeatureIDs = Set(levelChangers.map(\.id))
+            .union(VenuePlace.galleryEntranceIDs(in: allPlaces, amenityID: entranceAmenityID))
     }
 
     private func placeSubtitle(_ place: VenuePlace) -> String { place.cardSubtitle }

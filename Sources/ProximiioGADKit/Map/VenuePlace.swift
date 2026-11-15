@@ -98,6 +98,19 @@ struct VenuePlace: Identifiable, Equatable, Sendable {
         places.first { $0.id == id } ?? places.first { $0.id.hasSuffix(":" + id) }
     }
 
+    /// `places` without the gallery entrance POIs (amenity `amenityID`,
+    /// `GADSettings.galleryEntranceAmenityID`). The maps and the search do not show them; `galleryNearby`
+    /// measures from them (PM, Monday "Entry POIs, connected to gallery", 2026-11-15). Pure; covered by
+    /// tests.
+    static func withoutGalleryEntrances(_ places: [VenuePlace], amenityID: String) -> [VenuePlace] {
+        places.filter { $0.amenityID != amenityID }
+    }
+
+    /// The ids of the gallery entrance POIs of `places` (amenity `amenityID`). Pure; covered by tests.
+    static func galleryEntranceIDs(in places: [VenuePlace], amenityID: String) -> Set<String> {
+        Set(places.filter { $0.amenityID == amenityID }.map(\.id))
+    }
+
     /// Case- and diacritic-insensitive substring match on the title. An empty query matches all.
     static func matching(_ query: String, in places: [VenuePlace]) -> [VenuePlace] {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)

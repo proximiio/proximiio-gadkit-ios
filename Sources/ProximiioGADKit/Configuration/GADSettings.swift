@@ -128,6 +128,10 @@ public struct GADSettings: Equatable, Sendable {
     /// `true` shows journey stop markers that would overlap as one marker with a badge holding the
     /// number of the others (PM, Monday "Clustering", 2026-10-29).
     public var groupsStopMarkers = true
+    /// `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork
+    /// in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads
+    /// to a gallery. `false` shows nothing there, as before 1.43.0.
+    public var showsStopDots = true
     /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
     /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
     /// 15 since 1.34.0 (user, 2026-11-03).

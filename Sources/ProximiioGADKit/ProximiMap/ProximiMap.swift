@@ -243,7 +243,8 @@ public final class ProximiMap: ObservableObject {
     private func loadPlaces(from venue: VenueService) async {
         let features = await venue.data.features()
         places = VenuePlace.all(in: features, amenities: await venue.data.amenities())
-        galleries = await Gallery.load(from: venue.sdk, features: features, geofences: await venue.data.geofences(), places: places)
+        galleries = await Gallery.load(from: venue.sdk, features: features, geofences: await venue.data.geofences(),
+                                           places: VenuePlace.withoutGalleryEntrances(places, amenityID: venue.settings.galleryEntranceAmenityID))
     }
 
     /// The API kept refusing the token for at least two hours. The SDK has stopped and deleted the

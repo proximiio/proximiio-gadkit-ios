@@ -186,6 +186,10 @@ struct ProximiMapTests {
                                            entrance("e3", metresNorth: 0, gallery: "G101")]
         #expect(GalleryNearbyDetector.entrances(of: "G403", in: places, amenityID: amenity).map(\.id) == ["e1", "e2"])
         #expect(GalleryNearbyDetector.entrances(of: "G403", in: Self.galleryPlaces, amenityID: amenity).isEmpty)
+        // The maps and the search leave the entrances out and hide their features.
+        #expect(VenuePlace.withoutGalleryEntrances(places, amenityID: amenity) == Self.galleryPlaces)
+        #expect(VenuePlace.galleryEntranceIDs(in: places, amenityID: amenity) == ["e1", "e2", "e3"])
+        #expect(VenuePlace.matching("entrance", in: VenuePlace.withoutGalleryEntrances(places, amenityID: amenity)).isEmpty)
         func position(metresNorth: Double) -> VenuePosition {
             VenuePosition(coordinate: MapCoordinate(latitude: poi.latitude + metresNorth / 111_320, longitude: poi.longitude),
                           horizontalAccuracy: 1, floor: FloorKey(level: 3), timestamp: Date())

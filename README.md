@@ -858,6 +858,7 @@ let configuration = GADConfiguration(
 | `startZoom` | 17 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
 | `startZoomSeconds` | 2 | How long the journey map stays at `startZoom`. |
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
+| `showsStopDots` | `true` | A journey artwork without a numbered marker shows as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `false` shows nothing there. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
 | `bearingDeadband` | 5° | Heading changes smaller than this do not turn the map (`MapOptions.bearingDeadband`, map default 0°). |
 | `minimumZoom`, `maximumZoom` | 15, 21 | The zoom levels the visitor cannot go beyond on every map of the package; `nil` for the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
@@ -1073,6 +1074,24 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.43.0 (2026-11-15)
+
+No breaking change.
+
+Added:
+
+- A journey artwork without a numbered marker shows as a 14 pt dot without a number, in the colours of
+  its state: white with a grey ring for an artwork still to visit, white with a red ring for a visited
+  one, red for the active one, grey for a skipped one. This applies to an artwork in a gallery the
+  visitor is not in, to a skipped artwork, and to every artwork while the route leads to a gallery.
+  Before, the map showed nothing there (Nagarro, GAD PM 2026-11-15).
+- `GADSettings.showsStopDots` (`true`): `false` shows no dots.
+
+Changed:
+
+- The maps do not draw the gallery entrance POIs (`GADSettings.galleryEntranceAmenityID`), and the
+  search does not list them (GAD PM, 2026-11-15). `galleryNearby` still measures from them.
 
 ### 1.42.0 (2026-11-15)
 

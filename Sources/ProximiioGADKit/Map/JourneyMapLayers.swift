@@ -91,6 +91,25 @@ final class JourneyMapLayers {
     }
 
     /// `place` with the icon of its amenity kind; `nil` for a place of no `AmenityKind`.
+    /// The dot of a journey artwork that has no numbered marker (`VisitView.stopDots`).
+    struct StopDot: Equatable {
+        enum Style: String, CaseIterable {
+            /// Still to visit: white with the grey ring of a pending stop marker.
+            case pending
+            /// Visited: white with the red ring of a visited stop marker.
+            case visited
+            /// The active stop: red with a white ring.
+            case active
+            /// Skipped: grey with a white ring.
+            case skipped
+        }
+        let coordinate: ProximiioCoordinate
+        let level: Double
+        let style: Style
+
+        static func imageName(for style: Style) -> String { "gad-stop-dot-\(style.rawValue)" }
+    }
+
     static func highlight(of place: VenuePlace?) -> Highlight? {
         guard let place, let kind = AmenityKind.allCases.first(where: { $0.matches(place) }) else { return nil }
         return Highlight(coordinate: place.coordinate, level: place.level, icon: kind.icon)
@@ -108,6 +127,8 @@ final class JourneyMapLayers {
     private static let connectorLayer = "gad-route-connector"
     private static let changerSource = "gad-level-changer"
     private static let changerLayer = "gad-level-changer"
+    private static let stopDotSource = "gad-stop-dots"
+    private static let stopDotLayer = "gad-stop-dots"
     /// The standard and visited gallery names. They give way to each other, to the destination's
     /// name and to the stop markers (Monday, the PM's crowded map of 2026-10-29).
     private static let galleryNameLayer = "gad-gallery-names"
@@ -123,6 +144,7 @@ final class JourneyMapLayers {
     private var changers: [LevelChangerPlace] = []
     private var highlight: Highlight?
     private var galleryMarkers: [GalleryMarker] = []
+    private var stopDots: [StopDot] = []
     private var cones: [VenueCone] = []
     /// The cones' images, drawn when their floor first shows.
     private var coneShadings: [String: ConeShading] = [:]
@@ -146,6 +168,7 @@ final class JourneyMapLayers {
         apply(on: style)
         if levelChanged {
             applyLevelChanger(on: style)
+            applyStopDots(on: style)
             applyCones(on: style)
         }
     }
@@ -189,6 +212,14 @@ final class JourneyMapLayers {
         galleryMarkers = markers
         guard let style = session?.canvas?.style else { return }
         applyLevelChanger(on: style)
+    }
+
+    /// The dots of the journey artworks without a numbered marker.
+    func updateStopDots(_ dots: [StopDot]) {
+        guard dots != stopDots else { return }
+        stopDots = dots
+        guard let style = session?.canvas?.style else { return }
+        applyStopDots(on: style)
     }
 
     // MARK: Style
@@ -273,11 +304,62 @@ final class JourneyMapLayers {
             destination.iconAllowsOverlap = NSExpression(forConstantValue: true)
             canvas.addLayer(destination, at: .above(layerID: Self.galleryNameLayer))
         }
+        if style.source(withIdentifier: Self.stopDotSource) == nil {
+            for dot in StopDot.Style.allCases {
+                canvas.floors.register(Self.stopDotImage(style: dot), named: StopDot.imageName(for: dot))
+            }
+            let source = MLNShapeSource(identifier: Self.stopDotSource, shape: nil)
+            style.addSource(source)
+            let layer = MLNSymbolStyleLayer(identifier: Self.stopDotLayer, source: source)
+            layer.iconImageName = NSExpression(forKeyPath: "image")
+            layer.iconAllowsOverlap = NSExpression(forConstantValue: true)
+            layer.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+            // The active stop's dot over the others.
+            layer.symbolSortKey = NSExpression(forKeyPath: "sort")
+            // Above the route, below the level changers, the gallery names and the numbered markers.
+            canvas.addLayer(layer, at: .below(layerID: Self.changerLayer))
+        }
         apply(on: style)
         applyConnector(on: style)
         applyLevelChanger(on: style)
+        applyStopDots(on: style)
         applyCones(on: style)
         styleConeOutlines(on: style)
+    }
+
+    private func applyStopDots(on style: MLNStyle) {
+        guard let source = style.source(withIdentifier: Self.stopDotSource) as? MLNShapeSource else { return }
+        let features = stopDots.filter { sameLevel($0.level) }.map { dot -> MLNPointFeature in
+            let feature = MLNPointFeature()
+            feature.coordinate = CLLocationCoordinate2D(latitude: dot.coordinate.latitude, longitude: dot.coordinate.longitude)
+            feature.attributes = ["image": StopDot.imageName(for: dot.style), "sort": NSNumber(value: dot.style == .active ? 1 : 0)]
+            return feature
+        }
+        source.shape = MLNShapeCollectionFeature(shapes: features)
+    }
+
+    /// The diameter of a stop dot, in points.
+    static let stopDotDiameter: CGFloat = 14
+
+    /// A circle of `stopDotDiameter` in the colours of the stop marker of the same state
+    /// (`MapStyle.journeyStops`), without the number.
+    static func stopDotImage(style: StopDot.Style) -> UIImage {
+        let fill: UIColor, stroke: UIColor, width: CGFloat
+        switch style {
+        case .pending: (fill, stroke, width) = (.white, UIColor(hex: 0xEEEDED), 1)
+        case .visited: (fill, stroke, width) = (.white, UIColor(hex: 0xED3731), 2)
+        case .active: (fill, stroke, width) = (UIColor(hex: 0xED3731), .white, 2)
+        case .skipped: (fill, stroke, width) = (UIColor(hex: 0xBDBDBD), .white, 1)
+        }
+        let size = CGSize(width: stopDotDiameter, height: stopDotDiameter)
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            let circle = UIBezierPath(ovalIn: CGRect(origin: .zero, size: size).insetBy(dx: width / 2, dy: width / 2))
+            fill.setFill()
+            circle.fill()
+            stroke.setStroke()
+            circle.lineWidth = width
+            circle.stroke()
+        }
     }
 
     private func applyLevelChanger(on style: MLNStyle) {

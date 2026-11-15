@@ -30,6 +30,8 @@ struct VisitView: View {
     @State private var stopToSkip: JourneyStop?
     @StateObject private var monitor: TrackingMonitor
     @State private var places: [VenuePlace] = []
+    /// `places` and the gallery entrance POIs, for `galleryNearby`.
+    @State private var allPlaces: [VenuePlace] = []
     /// The search shortcuts' choice and order (`in_search`, `search_order`).
     /// The amenity shortcuts of the search, from the amenities' `in_search` and `search_order`.
     @State private var searchShortcuts: [AmenityShortcut] = []
@@ -664,7 +666,8 @@ struct VisitView: View {
     private func loadVenueData() async {
         let features = await venue.data.features()
         let amenities = await venue.data.amenities()
-        places = VenuePlace.all(in: features, amenities: amenities)
+        allPlaces = VenuePlace.all(in: features, amenities: amenities)
+        places = VenuePlace.withoutGalleryEntrances(allPlaces, amenityID: settings.galleryEntranceAmenityID)
         let scale = UIScreen.main.scale
         amenityIcons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
                                   uniquingKeysWith: { first, _ in first })
@@ -681,6 +684,7 @@ struct VisitView: View {
         mapLayers.updateLevelChangers(levelChangers)
         mapLayers.updateCones(VenueCone.all(in: features))
         hiddenFeatureIDs = Set(places.filter(\.isArtwork).map(\.id) + levelChangers.map(\.id))
+            .union(VenuePlace.galleryEntranceIDs(in: allPlaces, amenityID: settings.galleryEntranceAmenityID))
         let geofences = await venue.data.geofences()
         controller.artworkAreas = VisitController.artworkAreas(of: geofences)
         let destinations = Gallery.destinations(geofences: geofences, places: places, features: features)
@@ -716,7 +720,8 @@ struct VisitView: View {
         FieldLog.log("gallery first: \(gallery.map { "route ends at \($0.gallery.name)" } ?? "route ends at the artwork")")
     }
 
-    /// The features the map does not draw: the artworks and level changers (`hiddenFeatureIDs`) and
+    /// The features the map does not draw: the artworks, level changers and gallery entrances
+    /// (`hiddenFeatureIDs`) and
     /// the galleries' POIs, whose names `galleryMarkers` draws.
     private func applyHiddenFeatures() {
         var hidden = hiddenFeatureIDs
@@ -784,16 +789,42 @@ struct VisitView: View {
     /// (PM, Monday "Navigation to a gallery", 2026-10-26 and 2026-10-27). The marker of an artwork in
     /// a gallery shows only while the visitor is in that gallery, in every state (PM, Monday "Gallery
     /// numbers in gallery navigation", 2026-10-29 and 2026-10-30).
+    ///
+    /// An artwork without a numbered marker shows as a dot (`stopDots`, `GADSettings.showsStopDots`).
     private func applyStopMarkers() {
-        var style = Self.showsArtworkMarkers(
+        let showsNumbers = Self.showsArtworkMarkers(
             guidesToGalleryFirst: kind.guidesToGalleryFirst && !galleryDestinations.isEmpty,
             hasGalleryAhead: controller.galleryAhead != nil,
             isInGallery: visitorGalleryPlaceID != nil,
             isActiveStopInGallery: controller.navigator.activeStop?.group != nil
-        ) ? MapStyle.journeyStops : MapStyle.journeyStopsHidden
+        )
+        var style = showsNumbers ? MapStyle.journeyStops : MapStyle.journeyStopsHidden
         if !settings.groupsStopMarkers { style.groupsOverlapping = false }
-        style.hiddenStopIDs = Self.stopsOutsideTheVisitorsGallery(controller.navigator.journey.stops, visitorGallery: visitorGalleryID)
+        let stops = controller.navigator.journey.stops
+        style.hiddenStopIDs = Self.stopsOutsideTheVisitorsGallery(stops, visitorGallery: visitorGalleryID)
         if controller.session.journeyStopMarkerStyle != style { controller.session.journeyStopMarkerStyle = style }
+        mapLayers.updateStopDots(settings.showsStopDots
+            ? Self.stopDots(stops, hiddenStopIDs: style.hiddenStopIDs, showsNumbers: showsNumbers) : [])
+    }
+
+    /// The dots of the artworks that have no numbered marker: every artwork while the numbers are
+    /// hidden (`showsNumbers` false), else the artworks in `hiddenStopIDs` and the skipped ones.
+    /// A detour and a stop without a floor have none. Nagarro reported the artworks as disappearing
+    /// from the map (PM, Monday "Artwork icons disappearing from the map" and "Numbers diappearing",
+    /// 2026-11-15). Pure; covered by tests.
+    static func stopDots(_ stops: [JourneyStop], hiddenStopIDs: Set<String>, showsNumbers: Bool) -> [JourneyMapLayers.StopDot] {
+        stops.compactMap { stop in
+            guard stop.kind != .detour, let level = stop.floor?.level,
+                  !showsNumbers || hiddenStopIDs.contains(stop.id) || stop.state == .skipped else { return nil }
+            let style: JourneyMapLayers.StopDot.Style = switch stop.state {
+            case .pending: .pending
+            case .active, .reached: .active
+            case .done: .visited
+            case .skipped: .skipped
+            @unknown default: .pending
+            }
+            return JourneyMapLayers.StopDot(coordinate: stop.coordinate.proximiio, level: level, style: style)
+        }
     }
 
     /// The artwork stops in a gallery (`JourneyStop.group`) other than `visitorGallery`. Artworks
@@ -891,7 +922,7 @@ struct VisitView: View {
     private func checkGalleryNearby(position: VenuePosition?) {
         guard !controller.isPaused, controller.navigator.detourStop == nil else { return }
         let openStops = controller.navigator.journey.stops.filter { $0.kind != .detour && $0.state == .pending }
-        if let stop = galleryNearby.update(position: position, stop: controller.navigator.activeStop, places: places,
+        if let stop = galleryNearby.update(position: position, stop: controller.navigator.activeStop, places: allPlaces,
                                            outlines: galleryDestinations, openStops: openStops) {
             emit(.galleryNearby(stop))
         }

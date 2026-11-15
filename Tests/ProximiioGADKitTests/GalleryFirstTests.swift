@@ -120,6 +120,37 @@ struct GalleryFirstRoutingTests {
         #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: "g101") == ["active-g303", "pending-g303"])
     }
 
+    /// An artwork without a numbered marker has a dot in the colours of its state: the artworks in the
+    /// hidden set and the skipped ones, or every artwork while the numbers are hidden. A detour and a
+    /// stop without a floor have none.
+    @MainActor @Test func artworksWithoutANumberedMarkerHaveADot() {
+        func stop(_ id: String, state: JourneyStop.State = .pending, kind: JourneyStop.Kind = .planned, level: Double? = 1) -> JourneyStop {
+            JourneyStop(id: id, title: id, coordinate: .init(latitude: 24.5, longitude: 54.4), floor: level.map { FloorKey(level: $0) },
+                        poiID: id, kind: kind, state: state)
+        }
+        let stops = [
+            stop("visited", state: .done),
+            stop("skipped", state: .skipped),
+            stop("reached", state: .reached),
+            stop("pending"),
+            stop("pending-here"),
+            stop("no-floor", level: nil),
+            stop("cafe", kind: .detour),
+        ]
+        let hidden: Set<String> = ["visited", "reached", "pending", "no-floor", "cafe"]
+        let dots = VisitView.stopDots(stops, hiddenStopIDs: hidden, showsNumbers: true)
+        #expect(dots.map(\.style) == [.visited, .skipped, .active, .pending])
+        #expect(dots.allSatisfy { $0.level == 1 })
+        // Numbers hidden: every artwork with a floor.
+        #expect(VisitView.stopDots(stops, hiddenStopIDs: [], showsNumbers: false).map(\.style) == [.visited, .skipped, .active, .pending, .pending])
+        // Numbers shown and nothing hidden: the skipped artwork only.
+        #expect(VisitView.stopDots(stops, hiddenStopIDs: [], showsNumbers: true).map(\.style) == [.skipped])
+        // One image per style, of the dot's size.
+        let images = JourneyMapLayers.StopDot.Style.allCases.map { JourneyMapLayers.stopDotImage(style: $0) }
+        #expect(images.allSatisfy { $0.size == CGSize(width: 14, height: 14) })
+        #expect(Set(JourneyMapLayers.StopDot.Style.allCases.map(JourneyMapLayers.StopDot.imageName)).count == 4)
+    }
+
     /// Every gallery is a 30 pt pill with its full name, the same size in each style; each style has
     /// its own image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
     @MainActor @Test func everyGalleryIsAPillWithItsName() {

@@ -407,7 +407,9 @@ struct ExploreMuseumView: View {
         let features = await venue.data.features()
         let geofences = await venue.data.geofences()
         let amenities = await venue.data.amenities()
-        let places = VenuePlace.all(in: features, amenities: amenities)
+        let allPlaces = VenuePlace.all(in: features, amenities: amenities)
+        let entranceAmenityID = venue.settings.galleryEntranceAmenityID
+        let places = VenuePlace.withoutGalleryEntrances(allPlaces, amenityID: entranceAmenityID)
         let scale = UIScreen.main.scale
         amenityIcons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
                                   uniquingKeysWith: { first, _ in first })
@@ -424,9 +426,10 @@ struct ExploreMuseumView: View {
         mapLayers.updateCones(VenueCone.all(in: features))
         // The artworks are not drawn: the galleries and the Highlights list show them. Nor are the
         // amenities: the Amenities list and the callout show them (PM, Monday "Explore museum view:
-        // default map view", 2026-10-26).
+        // default map view", 2026-10-26). Nor are the gallery entrances.
         let amenityPlaces = places.filter { place in !place.isArtwork && AmenityKind.allCases.contains { $0.matches(place) } }
         hiddenFeatureIDs = Set(levelChangers.map(\.id)).union(places.filter(\.isArtwork).map(\.id)).union(amenityPlaces.map(\.id))
+            .union(VenuePlace.galleryEntranceIDs(in: allPlaces, amenityID: entranceAmenityID))
         applyHiddenFeatures()
         if let current = selected {
             selected = catalog.all.first { $0.id == current.id }
