@@ -17,6 +17,22 @@ import ProximiioBlueiot
 
 enum WristbandCopy {
 
+    /// The wristband label as the visitor reads it on the band, or `nil` when it is not such a code:
+    /// digits in groups of three ("900 000 000 123"), another code of at most 20 characters as it
+    /// is, `nil` for a longer payload, a link or text with spaces. Pure; covered by tests.
+    static func displayLabel(_ label: String?) -> String? {
+        guard let code = label?.trimmingCharacters(in: .whitespacesAndNewlines), !code.isEmpty, code.count <= 20,
+              !code.contains(where: { $0.isWhitespace || $0 == "/" || $0 == ":" }) else { return nil }
+        guard code.allSatisfy({ $0.isASCII && $0.isNumber }) else { return code }
+        var groups: [Substring] = []
+        var rest = Substring(code)
+        while !rest.isEmpty {
+            groups.append(rest.prefix(3))
+            rest = rest.dropFirst(3)
+        }
+        return groups.joined(separator: " ")
+    }
+
     /// The message for a failed bind or end.
     static func message(for error: Error) -> String {
         guard let error = error as? BlueiotBindingError else {

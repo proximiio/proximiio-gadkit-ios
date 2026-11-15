@@ -53,10 +53,13 @@ enum MapStyle {
         position.trail = walkedTrail
             ? PositionTrailStyle(isVisible: true, color: location, widthPoints: 6, opacity: 0.3)
             : PositionTrailStyle()
-        // The dot disappears when the position does (PM, Monday "Privacy zone to have the same position
-        // marker as position disappearing", 2026-10-26). `hidingPosition(_:)` hides it in a privacy zone.
-        position.freshness.staleOpacity = 0
-        position.freshness.lostOpacity = 0
+        // Without new positions the dot turns grey and stays, and it does not fade further; the
+        // accuracy ring does not grow (user, 2026-11-15; before, the dot disappeared: PM, Monday
+        // "Privacy zone to have the same position marker as position disappearing", 2026-10-26).
+        // `heldPosition(_:opacity:)` draws the same dot in a privacy zone.
+        position.freshness.staleOpacity = settings.positionWithoutFixesOpacity
+        position.freshness.lostOpacity = settings.positionWithoutFixesOpacity
+        position.freshness.driftMetersPerSecond = 0
         var options = MapOptions(
             camera: .followWithHeading,
             floorSelector: .none,
@@ -106,14 +109,17 @@ enum MapStyle {
         return options
     }
 
-    /// `position` with nothing drawn while a privacy zone holds the dot. The map library draws a held
-    /// dot at full opacity; its fill, stroke, shadow and ring are made clear.
-    static func hidingPosition(_ position: PositionStyle) -> PositionStyle {
+    /// `position` while a privacy zone holds the dot: the dot without new positions, in the stale grey
+    /// at `opacity` (`GADSettings.positionWithoutFixesOpacity`), without the ring. The map library
+    /// draws a held dot at full opacity, so the fill, the stroke and the shadow take `opacity`. 0 draws
+    /// nothing. Pure; covered by tests.
+    static func heldPosition(_ position: PositionStyle, opacity: Double) -> PositionStyle {
         var position = position
-        let clear = MapColor(hex: 0xFFFFFF, alpha: 0)
-        position.dot.strokeColor = clear
-        position.dot.shadowOpacity = 0
-        position.privacy = PositionPrivacyStyle(color: clear, showsAccuracy: false)
+        var fill = position.dot.staleColor
+        fill.alpha *= opacity
+        position.dot.strokeColor.alpha *= opacity
+        position.dot.shadowOpacity *= opacity
+        position.privacy = PositionPrivacyStyle(color: fill, showsAccuracy: false)
         return position
     }
 

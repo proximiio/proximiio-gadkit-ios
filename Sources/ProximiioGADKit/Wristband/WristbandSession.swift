@@ -39,6 +39,14 @@ final class WristbandSession: ObservableObject {
     /// The latest binding state. `nil` until the first value arrives from `stateChanges()`.
     @Published private(set) var state: BlueiotBindingState?
 
+    /// The label of the last bind that succeeded, as scanned or typed; `nil` after the session ended.
+    /// The SDK's session holds no label. Stored in `UserDefaults` (`labelKey`), so a session the SDK
+    /// restores at the next launch keeps it.
+    @Published private(set) var label: String? = UserDefaults.standard.string(forKey: WristbandSession.labelKey) {
+        didSet { UserDefaults.standard.set(label, forKey: Self.labelKey) }
+    }
+    static let labelKey = "io.proximi.gadkit.wristbandLabel"
+
     private let location = LocationAccess()
     /// Called after every state change, for `ProximiMap`.
     var onStateChange: ((BlueiotBindingState) -> Void)?
@@ -93,6 +101,7 @@ final class WristbandSession: ObservableObject {
         defer { diagnosticsLog?.cancel() }
         for await state in binding.stateChanges() {
             self.state = state
+            if case .ended = state { label = nil }
             onStateChange?(state)
             await forwardPrivacy()
             if FieldLog.isEnabled {
@@ -164,6 +173,7 @@ extension WristbandSession: WristbandConnecting {
     func bind(_ label: String) async throws {
         do {
             let session = try await binding.bind(tagID: label)
+            self.label = label
             FieldLog.log("wristband bind: \(BindingLog.bind(label: label, bindingID: session.bindingID))")
         } catch {
             FieldLog.log("wristband bind: \(BindingLog.bind(label: label, error: error))")

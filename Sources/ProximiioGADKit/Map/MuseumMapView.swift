@@ -65,10 +65,10 @@ struct MuseumMapView: View {
         .animation(.easeInOut(duration: 0.2), value: floorGuide.phase)
         .task { await MapDiagnostics.follow(session, name: "museum") }
         .task {
-            // No dot in a privacy zone (`MapStyle.hidingPosition(_:)`).
+            // The grey dot in a privacy zone (`MapStyle.heldPosition(_:opacity:)`).
             let position = MapStyle.options(settings: venue.settings).position
             for await state in await venue.sdk.privacyZoneStateChanges() {
-                session.options.position = state.isPrivate ? MapStyle.hidingPosition(position) : position
+                session.options.position = state.isPrivate ? MapStyle.heldPosition(position, opacity: venue.settings.positionWithoutFixesOpacity) : position
             }
         }
         .task {

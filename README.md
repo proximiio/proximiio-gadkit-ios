@@ -859,6 +859,7 @@ let configuration = GADConfiguration(
 | `startZoom` | 17 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
 | `startZoomSeconds` | 2 | How long the journey map stays at `startZoom`. |
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
+| `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `true` in 1.43.0. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
 | `bearingDeadband` | 5° | Heading changes smaller than this do not turn the map (`MapOptions.bearingDeadband`, map default 0°). |
@@ -1075,6 +1076,18 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.45.0 (2026-11-15)
+
+No breaking change.
+
+Changed:
+
+- Without new positions the position dot turns grey and stays. Before, it disappeared some seconds after the
+  last position, which read as a lost position (Nagarro and GAD PM, 2026-11-15). The grey dot does not
+  fade further and its accuracy ring does not grow. In a privacy zone the dot is the same grey, without
+  the ring; before, the map drew none there.
+- `GADSettings.positionWithoutFixesOpacity` (0.45): the opacity of that dot. 0 hides it, as before.
 
 ### 1.44.0 (2026-11-15)
 

@@ -616,10 +616,10 @@ struct VisitView: View {
         withAnimation(.easeInOut(duration: 0.2)) { showsRerouting = true }
     }
 
-    /// No dot while a privacy zone holds it (`MapStyle.hidingPosition(_:)`).
+    /// The grey dot while a privacy zone holds it (`MapStyle.heldPosition(_:opacity:)`).
     private func applyPositionStyle(for health: TrackingHealth) {
         let position = MapStyle.options(routeMarkers: false, settings: settings).position
-        controller.session.options.position = health == TrackingHealth.privacyZone ? MapStyle.hidingPosition(position) : position
+        controller.session.options.position = health == TrackingHealth.privacyZone ? MapStyle.heldPosition(position, opacity: settings.positionWithoutFixesOpacity) : position
     }
 
     /// A drag down on the handle of the map card: Back, with the bottom bar and `onClose`.

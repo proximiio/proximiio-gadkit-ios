@@ -134,6 +134,10 @@ public struct GADSettings: Equatable, Sendable {
     /// `true` shows journey stop markers that would overlap as one marker with a badge holding the
     /// number of the others (PM, Monday "Clustering", 2026-10-29).
     public var groupsStopMarkers = true
+    /// The opacity of the position dot without new positions and in a privacy zone, 0 to 1. The dot
+    /// turns grey after the map library's stale time and stays at this opacity; its accuracy ring does
+    /// not grow. 0 hides the dot, as before 1.45.0 (user, 2026-11-15).
+    public var positionWithoutFixesOpacity: Double = 0.45
     /// `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork
     /// in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads
     /// to a gallery. `false`, the default since 1.44.0, shows nothing there (GAD PM, 2026-11-15: on hold).

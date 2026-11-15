@@ -682,6 +682,13 @@ extension ProximiMap {
         return WristbandPairing(connector: session)
     }
 
+    /// The code of the wristband the phone follows, as the visitor reads it on the band
+    /// (`WristbandCopy.displayLabel`), while `wristband` is `connected`; else `nil`. `nil` too when the
+    /// bind used a long payload such as a link. For the GAD app's Hub card.
+    @_spi(GADApp) public var wristbandLabel: String? {
+        wristband == .connected ? WristbandCopy.displayLabel(session.label) : nil
+    }
+
     /// The wristband binding's state now, then every change. The GAD app reads the relay signal from
     /// it for a test notification in Debug and Staging builds.
     @_spi(GADApp) public func wristbandBindingStates() -> AsyncStream<BlueiotBindingState> {

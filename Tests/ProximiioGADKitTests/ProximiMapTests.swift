@@ -38,6 +38,35 @@ struct ProximiMapTests {
         #expect(fresh?.remainingStopCount == 1)
     }
 
+    @Test func theWristbandLabelReadsAsOnTheBand() {
+        #expect(WristbandCopy.displayLabel("900000000123") == "900 000 000 123")
+        #expect(WristbandCopy.displayLabel(" 9000000002 ") == "900 000 000 2")
+        #expect(WristbandCopy.displayLabel("GAD-0042") == "GAD-0042")
+        #expect(WristbandCopy.displayLabel("https://example.com/b/900000000123") == nil)
+        #expect(WristbandCopy.displayLabel("123456789012345678901") == nil)
+        #expect(WristbandCopy.displayLabel("band 12") == nil)
+        #expect(WristbandCopy.displayLabel("") == nil)
+        #expect(WristbandCopy.displayLabel(nil) == nil)
+    }
+
+    /// Without new positions and in a privacy zone the dot is grey and stays (user, 2026-11-15).
+    @MainActor @Test func theDotWithoutPositionsIsGreyAndStays() {
+        let position = MapStyle.options(settings: .standard).position
+        #expect(GADSettings.standard.positionWithoutFixesOpacity == 0.45)
+        #expect(position.freshness.staleOpacity == 0.45)
+        #expect(position.freshness.lostOpacity == 0.45)
+        #expect(position.freshness.driftMetersPerSecond == 0)
+        let held = MapStyle.heldPosition(position, opacity: 0.45)
+        #expect(held.privacy.showsAccuracy == false)
+        #expect(held.privacy.color?.alpha == position.dot.staleColor.alpha * 0.45)
+        #expect(held.dot.shadowOpacity == position.dot.shadowOpacity * 0.45)
+        // 0 hides the dot, as before 1.45.0.
+        var hidden = GADSettings.standard
+        hidden.positionWithoutFixesOpacity = 0
+        #expect(MapStyle.options(settings: hidden).position.freshness.lostOpacity == 0)
+        #expect(MapStyle.heldPosition(position, opacity: 0).privacy.color?.alpha == 0)
+    }
+
     @Test func wristbandStatusFollowsTheBindingState() {
         #expect(ProximiMap.wristbandStatus(of: nil) == .notConnected(notice: nil))
         #expect(ProximiMap.wristbandStatus(of: .unbound) == .notConnected(notice: nil))
