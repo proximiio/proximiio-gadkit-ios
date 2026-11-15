@@ -861,6 +861,7 @@ let configuration = GADConfiguration(
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
 | `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `true` in 1.43.0. |
+| `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
 | `bearingDeadband` | 5° | Heading changes smaller than this do not turn the map (`MapOptions.bearingDeadband`, map default 0°). |
 | `minimumZoom`, `maximumZoom` | 15, 21 | The zoom levels the visitor cannot go beyond on every map of the package; `nil` for the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
@@ -1076,6 +1077,26 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.46.0 (2026-11-15)
+
+No breaking change.
+
+Changed:
+
+- A personalised journey orders the stops ahead again from the visitor when an artwork is marked visited
+  while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to
+  visit. The leg then leads to an artwork in the visitor's gallery. Before, the leg led back to the next
+  stop's gallery until the visitor entered an artwork geofence or was 12 m off the route (GAD PM, Monday
+  "Re-routing going from gallery 104 to 102", 2026-11-15). A curated tour keeps its order.
+- A resumed journey shows the visitor's floor and follows the visitor again: after "Resume your Journey" and
+  after the host app sets `isPaused` to `false`. Before, a camera moved or a floor picked during the pause
+  stayed, and the map stood still (GAD PM, Monday "after pause & resume not picking user's location",
+  2026-11-15). Without a position the camera stays.
+
+Added:
+
+- `GADSettings.ordersFromVisitorGallery` (`true`): `false` keeps the order, as before 1.46.0.
 
 ### 1.45.0 (2026-11-15)
 

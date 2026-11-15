@@ -58,6 +58,31 @@ struct GalleryFirstRoutingTests {
         return GalleryFirstRouting.State(isEnabled: isEnabled, galleries: [key: destination], reached: reached ? [key] : [])
     }
 
+    @Test func theVisitorInTheGalleryOfALaterArtworkIsFound() {
+        let other = MapCoordinate(latitude: 5.5, longitude: 5.5)
+        let otherGallery = GalleryDestination(
+            gallery: Gallery(id: "104", name: "104 Abstractions", level: 3, ring: [
+                ProximiioCoordinate(latitude: 5, longitude: 5), ProximiioCoordinate(latitude: 5, longitude: 6),
+                ProximiioCoordinate(latitude: 6, longitude: 6), ProximiioCoordinate(latitude: 6, longitude: 5),
+            ]),
+            entry: ProximiioCoordinate(latitude: 5.9, longitude: 5.9),
+            placeID: "poi-104"
+        )
+        let galleries = [GalleryFirstRouting.Key(artwork): destination, GalleryFirstRouting.Key(other): otherGallery]
+        func found(origin: ProximiioCoordinate, level: Double? = 3, next: MapCoordinate, later: [MapCoordinate]) -> Bool {
+            GalleryFirstRouting.isInGalleryOfLaterArtwork(origin: origin, originLevel: level, next: next, later: later, galleries: galleries)
+        }
+        // The next stop is in 104, the visitor stands in G303 with an artwork still to visit.
+        #expect(found(origin: inside, next: other, later: [artwork]))
+        // The visitor stands in the next stop's gallery.
+        #expect(!found(origin: inside, next: artwork, later: [other]))
+        // No artwork still to visit in the visitor's gallery.
+        #expect(!found(origin: inside, next: other, later: []))
+        // Outside every gallery, and on another floor.
+        #expect(!found(origin: outside, next: other, later: [artwork]))
+        #expect(!found(origin: inside, level: 1, next: other, later: [artwork]))
+    }
+
     @Test func aLegFromOutsideTheGalleryEndsAtTheGallery() {
         #expect(GalleryFirstRouting.gallery(origin: outside, originLevel: 3, destination: artwork, state: state()) == destination)
         // Another floor is outside the gallery too.

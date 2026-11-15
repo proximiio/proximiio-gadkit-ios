@@ -775,8 +775,29 @@ final class VisitController: ObservableObject {
                 let changed = await self.navigator.markDone(stopID: stopID)
                 self.persist(self.navigator.journey)
                 if changed, let stop = self.stop(stopID) { self.onArtworkVisited?(stop, cause) }
+                if changed { await self.orderFromTheVisitorsGallery() }
             }
         })
+    }
+
+    /// Called after an artwork is marked visited. A personalised journey whose next stop is in
+    /// another gallery than the one the visitor stands in, while that gallery has an artwork still
+    /// to visit: the stops ahead are ordered again from the visitor, so the leg leads to an artwork
+    /// in their gallery (GAD PM, Monday "Re-routing going from gallery 104 to 102", 2026-11-15).
+    /// The route from the visitor starts on the leg, so the off-route order never ran there.
+    private func orderFromTheVisitorsGallery() async {
+        guard settings.ordersFromVisitorGallery, !keepsOrder, navigator.detourStop == nil, !navigator.hasArrived,
+              let next = navigator.activeStop, let position = session.position
+        else { return }
+        let later = navigator.journey.stops.filter { $0.state == .pending && $0.id != next.id }.map(\.coordinate)
+        guard galleryRouting.isInGalleryOfLaterArtwork(
+            origin: position.coordinate.proximiio, originLevel: position.floor?.level, next: next.coordinate, later: later
+        ),
+              let proposal = await navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
+              proposal.isImprovement, let first = proposal.order.first, first != next.id
+        else { return }
+        FieldLog.log("visitor in another gallery: \(first) is nearer than \(next.title) · journey ordered again")
+        await rerouting { await self.apply(proposal) }
     }
 
     private func stop(_ id: String) -> JourneyStop? {

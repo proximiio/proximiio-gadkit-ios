@@ -88,6 +88,20 @@ final class GalleryFirstRouting: JourneyRouting {
         return gallery
     }
 
+    /// `true` when `origin` lies in the gallery of an artwork in `later` and outside the gallery of
+    /// `next`. `galleries` is the gallery of each artwork, as in `State`. Pure; covered by tests.
+    static func isInGalleryOfLaterArtwork(origin: ProximiioCoordinate, originLevel: Double?, next: MapCoordinate,
+                                          later: [MapCoordinate], galleries: [Key: GalleryDestination]) -> Bool {
+        if let gallery = galleries[Key(next)], gallery.gallery.contains(origin, level: originLevel) { return false }
+        return later.contains { galleries[Key($0)]?.gallery.contains(origin, level: originLevel) == true }
+    }
+
+    /// `isInGalleryOfLaterArtwork` with the galleries of this router.
+    func isInGalleryOfLaterArtwork(origin: ProximiioCoordinate, originLevel: Double?, next: MapCoordinate, later: [MapCoordinate]) -> Bool {
+        let galleries = state.withLock { $0.galleries }
+        return Self.isInGalleryOfLaterArtwork(origin: origin, originLevel: originLevel, next: next, later: later, galleries: galleries)
+    }
+
     /// `true` when `artwork` lies in the outline of its gallery on the same floor, or at most
     /// `marginMeters` outside it. Pure; covered by tests.
     static func isInGallery(_ artwork: VenuePlace, _ destination: GalleryDestination, marginMeters: Double) -> Bool {

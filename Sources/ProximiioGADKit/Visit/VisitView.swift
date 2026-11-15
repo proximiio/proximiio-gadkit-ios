@@ -1048,6 +1048,7 @@ struct VisitView: View {
         FieldLog.log("host app resumed the journey · detour \(controller.navigator.detourStop?.id ?? "-")")
         let wasPaused = controller.isPaused
         await controller.resumeFromPause()
+        followVisitorAfterResume()
         guard detourPausesJourney else { return }
         if wasPaused {
             // "Add a stop" during the host app's pause: the detour's card shows now, and the journey
@@ -1065,9 +1066,21 @@ struct VisitView: View {
         if case .onFloor = floorGuide.phase {
             returnOrigin = floorDestination?.coordinate
             floorGuide.returnFromFloor()
+        } else {
+            followVisitorAfterResume()
         }
         galleryNearby.reset()
         Task { await controller.resumeJourney() }
+    }
+
+    /// A resumed journey shows the visitor's floor and follows them again. A gesture or a floor
+    /// picked during the pause left the camera free, and the map stood still after the resume (GAD
+    /// PM, Monday "after pause & resume not picking user's location", 2026-11-15). Without a
+    /// position the camera stays.
+    private func followVisitorAfterResume() {
+        guard controller.session.position != nil else { return }
+        controller.session.followMyFloor()
+        recentre(reason: "journey resumed")
     }
 
     /// `recentre` with a field-log line naming the caller. Ends a pending `showVisitorThenFollow`.
@@ -1394,6 +1407,7 @@ struct VisitView: View {
                                 // A detour added during the pause keeps the journey paused.
                                 setPaused(detourPausesJourney)
                                 Task { await controller.resumeFromPause() }
+                                followVisitorAfterResume()
                                 emit(.journeyResumed)
                             },
                             onResume: {
