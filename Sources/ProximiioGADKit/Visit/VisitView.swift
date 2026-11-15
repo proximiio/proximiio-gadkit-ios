@@ -1433,7 +1433,8 @@ struct VisitView: View {
                 options: accessibility.routeOptions
             )
             guard routedAmenity?.id == place.id else { return }
-            controller.session.setRoute(route.extended(to: place.coordinate, maximumMeters: settings.routeToStopMaximumMeters))
+            controller.session.setRoute(route.extended(to: place.coordinate, maximumMeters: settings.routeToStopMaximumMeters)
+                .extended(from: here.coordinate.proximiio, maximumMeters: settings.routeFromOriginMaximumMeters))
             amenityRouteError = nil
         } catch {
             FieldLog.log("route to \(place.title) failed: \(error)")

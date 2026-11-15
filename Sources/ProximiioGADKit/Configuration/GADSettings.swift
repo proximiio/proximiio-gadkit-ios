@@ -101,6 +101,12 @@ public struct GADSettings: Equatable, Sendable {
     /// a path (`WayfindingRouter.defaultSnapThresholdMeters`), so 15 extends every route (user,
     /// 2026-11-09).
     public var routeToStopMaximumMeters: Double = 15
+    /// A route starts where its origin projects onto the path network. The line starts at the origin,
+    /// in a straight line to that point, when the origin is at most this many metres from it. The
+    /// origin is the visitor's position when the route is computed; the segment does not move with
+    /// later positions. The remaining distance and the walking time include it. 0: every route starts
+    /// on the path (GAD PM, 2026-11-15).
+    public var routeFromOriginMaximumMeters: Double = 15
 
     // MARK: Map
 
@@ -130,8 +136,8 @@ public struct GADSettings: Equatable, Sendable {
     public var groupsStopMarkers = true
     /// `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork
     /// in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads
-    /// to a gallery. `false` shows nothing there, as before 1.43.0.
-    public var showsStopDots = true
+    /// to a gallery. `false`, the default since 1.44.0, shows nothing there (GAD PM, 2026-11-15: on hold).
+    public var showsStopDots = false
     /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
     /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
     /// 15 since 1.34.0 (user, 2026-11-03).

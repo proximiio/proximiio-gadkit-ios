@@ -853,12 +853,13 @@ let configuration = GADConfiguration(
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `nil`: at any distance. The remaining distance and the instructions follow every position. |
 | `routeToStopMaximumMeters` | 15 m | A route ends where its stop projects onto the path network. The line goes on in a straight line to the stop when the stop is at most this far from that point; the remaining distance and the walking time include that segment. A leg to a gallery's POI (gallery first) ends on the path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from a path, so 15 m extends every route. |
+| `routeFromOriginMaximumMeters` | 15 m | A route starts where its origin projects onto the path network. The line starts at the origin, in a straight line to that point, when the origin is at most this far from it. The origin is the visitor's position when the route is computed; the segment does not move with later positions. 0: every route starts on the path. |
 | `followZoom` | 19.5 | Zoom of "Centre on me", of the first position and of the follow, in personalised and curated journeys. |
 | `galleryFollowZoom` | `nil` | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
 | `startZoom` | 17 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
 | `startZoomSeconds` | 2 | How long the journey map stays at `startZoom`. |
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
-| `showsStopDots` | `true` | A journey artwork without a numbered marker shows as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `false` shows nothing there. |
+| `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `true` in 1.43.0. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
 | `bearingDeadband` | 5° | Heading changes smaller than this do not turn the map (`MapOptions.bearingDeadband`, map default 0°). |
 | `minimumZoom`, `maximumZoom` | 15, 21 | The zoom levels the visitor cannot go beyond on every map of the package; `nil` for the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
@@ -1074,6 +1075,24 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.44.0 (2026-11-15)
+
+No breaking change.
+
+Added:
+
+- A route starts at its origin. The SDK's route starts where the origin projects onto the path network;
+  the line now has a first straight segment from the origin to that point when the origin is at most
+  `GADSettings.routeFromOriginMaximumMeters` (15 m) from it. For a journey leg and a "Go here" route the
+  origin is the visitor's position when the route is computed. The segment does not move with later
+  positions. The remaining distance and the walking time include it. 0 turns it off (GAD PM,
+  2026-11-15).
+
+Changed:
+
+- `GADSettings.showsStopDots` is `false` by default: the dots of 1.43.0 are on hold (GAD PM,
+  2026-11-15).
 
 ### 1.43.0 (2026-11-15)
 

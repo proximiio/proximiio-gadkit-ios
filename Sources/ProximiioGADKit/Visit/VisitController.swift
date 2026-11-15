@@ -248,7 +248,8 @@ final class VisitController: ObservableObject {
         self.persist = persist
         self.session = session
         let routing = GalleryFirstRouting(inner: ProximiioJourneyRouting(sdk: session.sdk),
-                                          routeToStopMaximumMeters: settings.routeToStopMaximumMeters)
+                                          routeToStopMaximumMeters: settings.routeToStopMaximumMeters,
+                                          routeFromOriginMaximumMeters: settings.routeFromOriginMaximumMeters)
         self.galleryRouting = routing
         self.navigator = JourneyNavigator(session: session, journey: journey, rules: rules,
                                           guidanceRules: Self.artworkGuidanceRules(settings),

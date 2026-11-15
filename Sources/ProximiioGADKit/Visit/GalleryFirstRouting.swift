@@ -52,11 +52,15 @@ final class GalleryFirstRouting: JourneyRouting {
     private let inner: any JourneyRouting
     /// `GADSettings.routeToStopMaximumMeters`.
     private let routeToStopMaximumMeters: Double
+    /// `GADSettings.routeFromOriginMaximumMeters`.
+    private let routeFromOriginMaximumMeters: Double
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    init(inner: any JourneyRouting, routeToStopMaximumMeters: Double = GADSettings.standard.routeToStopMaximumMeters) {
+    init(inner: any JourneyRouting, routeToStopMaximumMeters: Double = GADSettings.standard.routeToStopMaximumMeters,
+         routeFromOriginMaximumMeters: Double = GADSettings.standard.routeFromOriginMaximumMeters) {
         self.inner = inner
         self.routeToStopMaximumMeters = routeToStopMaximumMeters
+        self.routeFromOriginMaximumMeters = routeFromOriginMaximumMeters
     }
 
     /// Turns gallery first on or off and sets the gallery of each artwork. Keeps the reached artworks.
@@ -95,7 +99,7 @@ final class GalleryFirstRouting: JourneyRouting {
 
     func route(origin: MapCoordinate, originFloor: FloorKey, destination: MapCoordinate, destinationFloor: FloorKey) async -> ComputedRoute? {
         await inner.route(origin: origin, originFloor: originFloor, destination: destination, destinationFloor: destinationFloor)
-            .map { toStop($0, destination) }
+            .map { fromOrigin(toStop($0, destination), origin) }
     }
 
     func route(
@@ -114,13 +118,20 @@ final class GalleryFirstRouting: JourneyRouting {
                 destinationFloor: FloorKey(level: gallery.gallery.level),
                 options: options
             )
+            if case .route(let route) = result { return .route(fromOrigin(route, origin)) }
             guard case .noRoute(let reason) = result else { return result }
             _ = state.withLock { $0.withoutRoute.insert(Key(destination)) }
             FieldLog.log("gallery first: no route to \(gallery.gallery.name) (\(reason)) · route ends at the artwork")
         }
         let result = await inner.route(origin: origin, originFloor: originFloor, destination: destination, destinationFloor: destinationFloor, options: options)
         guard case .route(let route) = result else { return result }
-        return .route(toStop(route, destination))
+        return .route(fromOrigin(toStop(route, destination), origin))
+    }
+
+    /// `route` from `origin` on (`ComputedRoute.extended(from:maximumMeters:)`).
+    private func fromOrigin(_ route: ComputedRoute, _ origin: MapCoordinate) -> ComputedRoute {
+        route.extended(from: ProximiioCoordinate(latitude: origin.latitude, longitude: origin.longitude),
+                       maximumMeters: routeFromOriginMaximumMeters)
     }
 
     /// `route` up to the stop at `destination` (`ComputedRoute.extended(to:maximumMeters:)`).

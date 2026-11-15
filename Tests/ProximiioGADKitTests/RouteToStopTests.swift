@@ -50,6 +50,32 @@ struct RouteToStopTests {
         #expect(abs(extended.instructions.reduce(0) { $0 + $1.durationSeconds } - extended.durationSeconds) < 1e-9)
     }
 
+    /// PM, Monday "Routing Tongari-Kun -> Goroka man", 2026-11-15: the route started on the path, 9 m
+    /// from the visitor.
+    @Test func theRouteStartsAtTheOrigin() throws {
+        // About 2.2 m north of `start`.
+        let visitor = ProximiioCoordinate(latitude: 24.50002, longitude: 54.4)
+        let route = Self.route()
+        let extended = route.extended(from: visitor, maximumMeters: 15)
+        let added = GeoMath.haversineDistance(from: visitor, to: Self.start)
+        #expect(extended.coordinates == [visitor, Self.start, Self.end])
+        #expect(extended.segments.first == RouteSegment(start: visitor, end: Self.start, distanceMeters: added))
+        #expect(abs(extended.distanceMeters - (route.distanceMeters + added)) < 1e-9)
+        let first = try #require(extended.instructions.first)
+        #expect(first.kind == .start)
+        #expect(first.coordinate == visitor)
+        #expect(abs(extended.instructions[1].distanceMeters - extended.distanceMeters) < 1e-9)
+        #expect(abs(extended.instructions.reduce(0) { $0 + $1.durationSeconds } - extended.durationSeconds) < 1e-9)
+        // An origin on the path, or too far from it, leaves the route.
+        #expect(route.extended(from: Self.start, maximumMeters: 15) == route)
+        #expect(route.extended(from: visitor, maximumMeters: 2) == route)
+        #expect(route.extended(from: visitor, maximumMeters: 0) == route)
+        #expect(GADSettings.standard.routeFromOriginMaximumMeters == 15)
+        // Both ends.
+        let both = route.extended(to: Self.artwork, maximumMeters: 15).extended(from: visitor, maximumMeters: 15)
+        #expect(both.coordinates == [visitor, Self.start, Self.end, Self.artwork])
+    }
+
     @Test func aStopOnThePathOrTooFarFromItLeavesTheRoute() {
         let route = Self.route()
         #expect(route.extended(to: Self.end, maximumMeters: 15) == route)

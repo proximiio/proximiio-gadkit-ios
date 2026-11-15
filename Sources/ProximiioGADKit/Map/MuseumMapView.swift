@@ -340,6 +340,8 @@ struct MuseumMapView: View {
                 toLevel: place.level,
                 options: accessibility.routeOptions
             ).extended(to: place.coordinate, maximumMeters: venue.settings.routeToStopMaximumMeters)
+                .extended(from: ProximiioCoordinate(latitude: here.coordinate.latitude, longitude: here.coordinate.longitude),
+                          maximumMeters: venue.settings.routeFromOriginMaximumMeters)
             session.setRoute(route)
             routeError = nil
             #if DEBUG
