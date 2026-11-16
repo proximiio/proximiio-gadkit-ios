@@ -692,6 +692,10 @@ extension ProximiMap {
         wristband == .connected ? WristbandCopy.displayLabel(session.label) : nil
     }
 
+    /// The SDK's wristband binding of the package, for the app's network panel: its diagnostics and
+    /// its position samples.
+    @_spi(GADApp) public var wristbandBinding: BlueiotWristbandBinding { session.binding }
+
     /// The wristband binding's state now, then every change. The GAD app reads the relay signal from
     /// it for a test notification in Debug and Staging builds.
     @_spi(GADApp) public func wristbandBindingStates() -> AsyncStream<BlueiotBindingState> {
