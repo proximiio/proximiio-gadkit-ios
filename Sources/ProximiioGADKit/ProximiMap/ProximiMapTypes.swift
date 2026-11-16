@@ -210,7 +210,9 @@ public enum ProximiMapEvent: Equatable, Sendable {
     ///
     /// The active stop: the visitor entered its geofence, or the leg started inside it. An artwork
     /// further down a personalised journey: the visitor was inside its geofence for
-    /// `GADSettings.outOfOrderDwell`; `artworkVisited` follows at once. Not sent during a detour,
+    /// `GADSettings.outOfOrderDwell`. It becomes the active stop (`nextStop`), then this event
+    /// comes; `artworkVisited` follows when the visitor leaves it. With
+    /// `GADSettings.visitsOutOfOrderAtEntry`, `artworkVisited` follows at once. Not sent during a detour,
     /// while the journey is paused, or for an artwork the host app marked visited.
     case artworkArrived(ProximiStop)
     /// An artwork of the journey is visited: its stop is done. `cause` says why
@@ -314,7 +316,10 @@ public enum ArtworkVisitCause: String, Equatable, Sendable {
     case enteredAnotherArtwork
     /// `GADSettings.artworkAdvanceDelay` passed after the arrival (`advancesOnArtworkExit` `false`).
     case advanceDelay
-    /// A personalised journey: the visitor was at an artwork further down the journey.
+    /// A personalised journey: the visitor was at an artwork further down the journey, and the
+    /// artwork is visited at the entry. Sent only with `GADSettings.visitsOutOfOrderAtEntry`, or
+    /// with `advancesOnArtworkExit` `false`. Else such an artwork becomes the active stop and is
+    /// visited with `left` or `enteredAnotherArtwork`.
     case outOfOrder
     /// The journey moved past the artwork the visitor was at: a detour ended or the visitor chose
     /// another stop.

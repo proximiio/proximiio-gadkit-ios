@@ -28,8 +28,11 @@
 //  `GADSettings.artworkAdvanceDelay` after the arrival. There is no fallback by distance: an artwork
 //  the visitor walks past without entering its geofence stays unvisited until it is skipped.
 //  Out of order: a visitor inside the geofence of another open artwork for
-//  `GADSettings.outOfOrderDwell` (0 s while testing) marks it visited, and the stops still ahead are
-//  ordered again from the visitor (PM review 2026-10-12). A curated tour ignores such an artwork: it
+//  `GADSettings.outOfOrderDwell` (0 s while testing) makes it the current stop: it is reached, and
+//  visited by the rules of any reached artwork. The stops still ahead are ordered again from the
+//  visitor when it is visited (GAD PM, 2026-11-16). With `GADSettings.visitsOutOfOrderAtEntry`, or
+//  without `advancesOnArtworkExit`, it is visited at the entry and the stops are ordered at once (PM
+//  review 2026-10-12). A curated tour ignores such an artwork: it
 //  stays open (`countsOutOfOrder`; PM, Monday "Curated tours: ignore other artworks", 2026-10-23).
 //  An amenity has no geofence. A detour is reached within 5–10 m for 5 s (`GADSettings`)
 //  and the journey continues only after "Resume your Journey" (`JourneyRules.visit`).
@@ -207,8 +210,11 @@ final class VisitController: ObservableObject {
     private var outsideArrivedSince: Date?
     /// Time inside the geofence of each open artwork that is not the active stop.
     private var outOfOrderDwell = GeofenceDwell()
-    /// Out-of-order artworks being marked visited.
+    /// Out-of-order artworks being marked visited, or being made the current stop.
     private var markingOutOfOrder: Set<String> = []
+    /// The artwork that became the current stop because the visitor entered it out of order. The
+    /// stops ahead are ordered again from the visitor when it is visited.
+    private var outOfOrderArrivedID: String?
 
     /// A curated tour keeps the curators' order: no ordering at the start, after a detour or
     /// after an artwork visited out of order. So does a journey whose progress the host app
@@ -463,6 +469,7 @@ final class VisitController: ObservableObject {
                 // Skipped, reordered or visited otherwise.
                 arrivedStopID = nil
                 outsideArrivedSince = nil
+                if outOfOrderArrivedID == arrived { outOfOrderArrivedID = nil }
             } else if !inside.isEmpty || isInsideUpcoming {
                 // In another open artwork: the visitor has moved on. That artwork counts from the
                 // next fix, after the journey moved on.
@@ -481,8 +488,44 @@ final class VisitController: ObservableObject {
             }
         }
         for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: settings.outOfOrderDwell) {
-            markOutOfOrder(id)
+            if Self.arrivesOutOfOrder(settings: settings) { arriveOutOfOrder(id) } else { markOutOfOrder(id) }
         }
+    }
+
+    /// Whether an artwork entered out of order becomes the current stop and waits for the visit
+    /// rules, or is visited at the entry. Pure; covered by tests.
+    nonisolated static func arrivesOutOfOrder(settings: GADSettings) -> Bool {
+        settings.advancesOnArtworkExit && !settings.visitsOutOfOrderAtEntry
+    }
+
+    /// Makes a pending artwork the visitor entered out of order the current stop. The next check of
+    /// the fix finds the visitor inside the active artwork's geofence: the artwork is reached, and it
+    /// is visited as any reached artwork (GAD PM, 2026-11-16: an artwork entered out of order is not
+    /// visited at the entry). An artwork the visitor is still at is left first
+    /// (`leaveArrivedArtwork`, "in another artwork"); this runs after it.
+    private func arriveOutOfOrder(_ stopID: String) {
+        guard markingOutOfOrder.insert(stopID).inserted else { return }
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self else { return }
+                defer { self.markingOutOfOrder.remove(stopID) }
+                // `arrivedStopID`: another artwork entered at the same fix is already the current stop.
+                guard !Task.isCancelled, !self.isPaused, self.navigator.detourStop == nil, !self.navigator.hasArrived,
+                      self.arrivedStopID == nil,
+                      self.navigator.journey.stops.first(where: { $0.id == stopID })?.state == .pending
+                else { return }
+                FieldLog.log("artwork entered out of order: \(stopID) · it is the current stop")
+                self.reroutes += 1
+                defer { self.reroutes -= 1 }
+                // The artwork moves before the stops still to visit: the numbers follow the visit
+                // order, and the navigator leads to it.
+                await self.navigator.move(stopID: stopID, toIndex: 0)
+                guard self.navigator.activeStop?.id == stopID else { return }
+                self.outOfOrderArrivedID = stopID
+                self.persist(self.navigator.journey)
+                self.checkArtworkGeofences()
+            }
+        })
     }
 
     /// Sets the gallery of each artwork among `places` for gallery first, from `metadata.gallery_id`
@@ -775,7 +818,15 @@ final class VisitController: ObservableObject {
                 let changed = await self.navigator.markDone(stopID: stopID)
                 self.persist(self.navigator.journey)
                 if changed, let stop = self.stop(stopID) { self.onArtworkVisited?(stop, cause) }
-                if changed { await self.orderFromTheVisitorsGallery() }
+                guard changed else { return }
+                if self.outOfOrderArrivedID == stopID {
+                    // Entered out of order: the stops ahead are ordered from the visitor, as they
+                    // were at the entry before 1.48.0.
+                    self.outOfOrderArrivedID = nil
+                    await self.rerouting { await self.orderRemaining() }
+                } else {
+                    await self.orderFromTheVisitorsGallery()
+                }
             }
         })
     }

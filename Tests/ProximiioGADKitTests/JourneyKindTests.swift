@@ -31,6 +31,16 @@ struct JourneyKindTests {
         #expect(decoded == curated)
     }
 
+    @Test func anArtworkEnteredOutOfOrderWaitsForTheVisitRules() {
+        var settings = GADSettings()
+        #expect(VisitController.arrivesOutOfOrder(settings: settings))
+        settings.visitsOutOfOrderAtEntry = true
+        #expect(!VisitController.arrivesOutOfOrder(settings: settings))
+        settings.visitsOutOfOrderAtEntry = false
+        settings.advancesOnArtworkExit = false
+        #expect(!VisitController.arrivesOutOfOrder(settings: settings))
+    }
+
     #if DEBUG
     @Test func launchArgumentSetsTheKind() {
         #expect(DebugLaunch(arguments: ["app", "-visitKind", "curated"]).visitKind == .curated)

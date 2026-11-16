@@ -38,6 +38,11 @@ public struct GADSettings: Equatable, Sendable {
     /// Seconds inside the geofence of an artwork that is not the next stop before it counts as
     /// visited out of order. A longer time keeps a visitor who crosses it on the way from marking it.
     public var outOfOrderDwell: TimeInterval = 0
+    /// `false`: an artwork the visitor enters out of order becomes the current stop. It is visited by
+    /// the rules of any artwork the visitor arrived at (`artworkVisitedMeters`, the geofence of
+    /// another artwork, the host app). `true`: it is visited at the entry, as before 1.48.0. Without
+    /// `advancesOnArtworkExit` it is always visited at the entry (GAD PM, 2026-11-16).
+    public var visitsOutOfOrderAtEntry = false
     /// An amenity has no geofence. It is reached within 2.5 × the position accuracy, at least this
     /// many metres…
     public var amenityArrivalMinimumMeters: Double = 5
