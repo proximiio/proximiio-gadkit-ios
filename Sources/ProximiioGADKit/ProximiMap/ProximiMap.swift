@@ -184,6 +184,9 @@ public final class ProximiMap: ObservableObject {
             } else {
                 venue = try await VenueService.start(configuration: configuration, binding: session.binding)
                 self.venue = venue
+                FieldLog.startUploading(
+                    relayURL: configuration.relayAPI.baseURL, appToken: configuration.relayAPIAppToken,
+                    interval: configuration.settings.fieldLogUploadInterval)
                 await session.forwardPrivacy(to: venue.sdk)
             }
             await loadPlaces(from: venue)

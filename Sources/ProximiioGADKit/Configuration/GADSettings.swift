@@ -151,6 +151,10 @@ public struct GADSettings: Equatable, Sendable {
     /// is marked visited while the visitor stands in another gallery than the next stop's, and that
     /// gallery has an artwork still to visit. `false` keeps the order, as before 1.46.0.
     public var ordersFromVisitorGallery = true
+    /// Seconds between two uploads of the field log to the relay-api. `ProximiMap` starts the uploads
+    /// in `start()` with the relay base URL and app token of its `GADConfiguration`. 0 sends nothing.
+    /// A host app on `ProximiMapView` calls `FieldLog.startUploading(binding:interval:)` itself.
+    public var fieldLogUploadInterval: TimeInterval = 900
     /// The farthest the visitor can zoom out, or `nil` for the map library's limit. MapLibre zoom
     /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
     /// 15 since 1.34.0 (user, 2026-11-03).

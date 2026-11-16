@@ -839,6 +839,7 @@ let configuration = GADConfiguration(
 | `artworkVisitedMeters` | 5 m | With `advancesOnArtworkExit`: the artwork the visitor arrived at is visited when they are more than this far from the border of its geofence for `artworkVisitedSeconds` (GAD PM, 2026-11-15). A visitor on another level counts as beyond it. |
 | `artworkVisitedSeconds` | 2 s | The time beyond `artworkVisitedMeters`. One position beyond the distance does not end the visit. |
 | `outOfOrderDwell` | 0 s | Time inside another artwork's geofence before it counts as entered out of order (personalised journeys only). |
+| `fieldLogUploadInterval` | 900 s | `ProximiMap`: seconds between two uploads of the field log to the relay-api. 0 sends nothing. See "Log upload". |
 | `visitsOutOfOrderAtEntry` | `false` | `false`: an artwork entered out of order becomes the active stop and is visited by the rules of any artwork the visitor arrived at. `true`: it is visited at the entry, as before 1.48.0. With `advancesOnArtworkExit` `false` it is always visited at the entry. |
 | `amenityArrivalMinimumMeters`, `amenityArrivalMaximumMeters`, `amenityArrivalDwell` | 5 m, 10 m, 5 s | An amenity is reached within 2.5 × the position accuracy, within these bounds, for this time. |
 | `positionBarriers` | `BarrierConfiguration()` | How barrier features stop a position that jumps through a wall (`ProximiioConfiguration.positioning.barriers`, SDK 6.0.0-beta.71): `isEnabled` (`true`), `armingPositions` (10 positions on a floor before any is stopped), `maxWalkingSpeed` (2 m/s), `wallMargin` (0.4 m), `releasePositions` (10) and `releaseMinimumDuration` (5 s). No effect in a venue without barrier features. `ProximiMap` sets it when it starts the SDK; `ProximiMapView` uses the host app's SDK configuration. |
@@ -979,12 +980,38 @@ struct Widgets: WidgetBundle {
 binding and `ProximiMap` events, and the state of each map when it changes (venue features on the map,
 features left out, style source, floor, zoom, the style's fonts the glyph server does not have, last
 error), to `Documents/gad-debug.log`. It does not write the SDK's geofence
-events. It is off by default. Turn it on at launch, before `start()`, in test builds only:
+events. It is on by default since 1.49.0. To turn it off, set `FieldLog.isEnabled = false` at launch,
+before `start()` and before the first map view. `FieldLog.logLaunch()` writes the app version and build:
 
 ```swift
-FieldLog.isEnabled = true
 FieldLog.logLaunch()
 ```
+
+### Log upload
+
+The package sends the field log to the relay-api: `POST <relay base URL>/v1/app-logs` with the relay app
+token as `Authorization: Bearer`. It sends the lines written since the last accepted upload, 10 s after
+the start, every 15 minutes, and when the app goes to the background. The log goes only to the relay
+base URL the host app uses, so a production build sends it to the relay of its installation. The log
+holds positions, the wristband label and the binding id, and no token.
+
+- With `ProximiMap`, `start()` starts the uploads with the relay base URL and app token of its
+  `GADConfiguration`. `GADSettings.fieldLogUploadInterval` (900 s) is the interval; 0 sends nothing.
+- With `ProximiMapView`, the host app owns the wristband binding. Call this once, after the binding is
+  created:
+
+```swift
+FieldLog.startUploading(binding: binding)            // every 15 minutes
+FieldLog.startUploading(binding: binding, interval: 300)
+```
+
+- `FieldLog.startUploading(relayURL:appToken:interval:)` takes the two values directly.
+  `FieldLog.stopUploading()` stops the uploads.
+- With `FieldLog.isEnabled` `false` nothing is written and nothing is sent.
+- A chunk the relay did not accept is sent again unchanged, with the same sequence number
+  (`X-Log-Seq`). The other headers are `X-Log-Install` (a random id per install), `X-Log-Platform`,
+  `X-Log-App`, `X-Log-App-Build` and `X-Log-GADKit`. After `401` or `403` the uploads stop until the next
+  start. The file keeps the last 4 to 8 MB; older lines that were not sent are lost.
 
 `FieldLogShareButton()` opens the share sheet with the file. A line is `[GAD] <time stamp> <message>`;
 the time stamp is ISO 8601 in UTC with the date and milliseconds (`FieldLog.timeStamp`).
@@ -1078,6 +1105,30 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.49.0 (2026-11-16)
+
+No breaking change. The field log is on by default, and a host app on `ProximiMapView` adds one call
+for the upload.
+
+Changed:
+
+- `FieldLog.isEnabled` is `true` by default. It was `false`. A host app that does not want the log sets
+  it to `false` at launch. The log is written in every build configuration.
+
+Added:
+
+- The field log is sent to the relay-api every 15 minutes (operator, 2026-11-16: the logs of every tester
+  on site are collected). See "Log upload" in "Field log".
+- `FieldLog.startUploading(binding:interval:)`, `FieldLog.startUploading(relayURL:appToken:interval:)`
+  and `FieldLog.stopUploading()`. A host app on `ProximiMapView` calls `startUploading(binding:)` once.
+  `ProximiMap` starts the uploads itself in `start()`.
+- `GADSettings.fieldLogUploadInterval` (900 s) for `ProximiMap`; 0 sends nothing.
+- `FieldLog.packageVersion`.
+
+The endpoint `POST /v1/app-logs` is in relay-api 0.23.0. A relay without it, or with app logs switched off for
+the installation, answers `404`: the app keeps the lines and sends them later. The relay keeps the logs for
+14 days by default. Not verified against a relay or in the running app.
 
 ### 1.48.0 (2026-11-16)
 

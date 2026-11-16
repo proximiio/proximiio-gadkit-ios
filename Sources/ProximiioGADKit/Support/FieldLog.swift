@@ -2,10 +2,10 @@
 //  FieldLog.swift
 //  ProximiioGADKit
 //
-//  A text log of positions, tracking health and journey events for field tests. Off until the
-//  host app sets `FieldLog.isEnabled`; the Proximi GAD app turns it on in Debug and Staging
-//  (TestFlight) builds. The file is `Documents/gad-debug.log`; `FieldLogShareButton` hands it
-//  to the share sheet.
+//  A text log of positions, tracking health and journey events for field tests. On by default
+//  since 1.49.0; the host app turns it off with `FieldLog.isEnabled`. The file is
+//  `Documents/gad-debug.log`; `FieldLogShareButton` hands it to the share sheet, and
+//  `FieldLogUploader` sends it to the relay-api (`FieldLogUpload.swift`).
 //
 //  A line is `[GAD] <time stamp> <message>`. The time stamp is ISO 8601 in UTC with the date and
 //  milliseconds, for example `2026-10-19T12:52:10.123Z`. A message with line breaks continues on
@@ -29,11 +29,12 @@ public enum FieldLog {
     /// The time stamp of a line: ISO 8601 in UTC with the date and milliseconds.
     public static let timeStamp = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 
-    private static let queue = DispatchQueue(label: "io.proximi.gad.fieldlog")
-    private static let enabled = OSAllocatedUnfairLock(initialState: false)
+    static let queue = DispatchQueue(label: "io.proximi.gad.fieldlog")
+    private static let enabled = OSAllocatedUnfairLock(initialState: true)
 
-    /// Whether `log` writes. `false` by default. Set it once at launch, before the first
-    /// `VenueService.start`: the service starts its log tasks only when it is `true`.
+    /// Whether `log` writes. `true` by default since 1.49.0. To turn the log off, set it to `false`
+    /// once at launch, before the first `VenueService.start`: the service starts its log tasks only
+    /// when it is `true`.
     public static var isEnabled: Bool {
         get { enabled.withLock { $0 } }
         set { enabled.withLock { $0 = newValue } }
@@ -90,6 +91,8 @@ public enum FieldLog {
         var tail = data.suffix(keepBytes)
         if let newline = tail.firstIndex(of: UInt8(ascii: "\n")) { tail = tail[(newline + 1)...] }
         try? Data(tail).write(to: url)
+        // The upload counts its place from the start of the log, not of the file.
+        FieldLogUploadState.addRemoved(data.count - tail.count)
     }
 }
 
