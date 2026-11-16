@@ -3,6 +3,10 @@
 //  ProximiioGADKitTests
 //
 import Foundation
+import Proximiio
+#if canImport(ProximiioBlueiot)
+import ProximiioBlueiot
+#endif
 import Testing
 @testable import ProximiioGADKit
 
@@ -87,5 +91,38 @@ struct FieldLogUploadTests {
         #expect(headers["X-Log-Platform"] == "ios")
         #expect(headers["X-Log-GADKit"] == FieldLog.packageVersion)
         #expect(headers["X-Log-Install"]?.isEmpty == false)
+    }
+}
+
+struct BindingFieldLogTests {
+    private let session = BlueiotBindingSession(
+        bindingID: UUID(uuidString: "0B28C465-9DD1-4375-A148-4E192110E751")!,
+        endsAt: Date(timeIntervalSince1970: 2_000_000_000), tokenExpiresAt: Date(timeIntervalSince1970: 1_900_000_000))
+
+    @Test func theStreamOpensOnlineAndClosesWithTheNextState() {
+        var log = BindingFieldLog.StreamLog()
+        var diagnostics = BlueiotBindingDiagnostics()
+        #expect(log.lines(for: .active(session, link: .connecting, signal: .ok), diagnostics: diagnostics).isEmpty)
+        #expect(log.lines(for: .active(session, link: .online, signal: .ok), diagnostics: diagnostics)
+            == ["relay stream: open · binding 0b28c465-9dd1-4375-a148-4e192110e751 · sse"])
+        // A signal change keeps the stream.
+        #expect(log.lines(for: .active(session, link: .online, signal: .lost(since: .now)), diagnostics: diagnostics).isEmpty)
+        diagnostics.lastError = "timed out"
+        #expect(log.lines(for: .active(session, link: .reconnecting, signal: .ok), diagnostics: diagnostics)
+            == ["relay stream: closed · binding 0b28c465-9dd1-4375-a148-4e192110e751 · active, reconnecting · timed out"])
+        diagnostics.lastError = nil
+        _ = log.lines(for: .active(session, link: .online, signal: .ok), diagnostics: diagnostics)
+        #expect(log.lines(for: .ended(.superseded), diagnostics: diagnostics)
+            == ["relay stream: closed · binding 0b28c465-9dd1-4375-a148-4e192110e751 · ended, SUPERSEDED"])
+        #expect(log.lines(for: .unbound, diagnostics: diagnostics).isEmpty)
+    }
+
+    @Test func aPositionLineIsWrittenAtMostEveryFiveSeconds() {
+        #expect(BindingFieldLog.logsPosition(now: 100, last: nil))
+        #expect(!BindingFieldLog.logsPosition(now: 104.9, last: 100))
+        #expect(BindingFieldLog.logsPosition(now: 105, last: 100))
+        let line = BindingFieldLog.positionLine(
+            timestamp: Date(timeIntervalSince1970: 1_794_822_000.5), now: Date(timeIntervalSince1970: 1_794_822_000.82))
+        #expect(line == "relay position: ts 1794822000500 · age 320")
     }
 }

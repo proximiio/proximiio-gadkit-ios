@@ -18,14 +18,19 @@ import UIKit
 
 public extension FieldLog {
     /// The version of the package, sent with each upload.
-    static let packageVersion = "1.49.1"
+    static let packageVersion = "1.49.2"
 
     /// Starts sending the field log to the relay-api of `binding`, with its app token. Call it once,
     /// after the host app created its `BlueiotWristbandBinding`. A second call replaces the first.
     /// Does nothing while `isEnabled` is `false`.
     ///
     /// - Parameter interval: Seconds between uploads. 0 or less sends nothing.
+    ///
+    /// It also writes the lines of `binding` to the log: its states, sessions, diagnostics, the
+    /// relay stream and one relay position every 5 s. The relay-api links the log to the wristband
+    /// through them.
     static func startUploading(binding: BlueiotWristbandBinding, interval: TimeInterval = 900) {
+        BindingFieldLog.follow(binding, logsStates: true)
         startUploading(
             relayURL: binding.configuration.relayURL.baseURL, appToken: binding.configuration.appToken, interval: interval)
     }
@@ -136,6 +141,7 @@ actor FieldLogUploader {
         guard FieldLog.isEnabled, interval > 0, !appToken.isEmpty else { return }
         self.relayURL = relayURL
         self.appToken = appToken
+        FieldLog.log("install \(FieldLogUploadState.install())")
         FieldLog.log("log upload: on · every \(Int(interval)) s · \(relayURL.host ?? "-")")
         loop = Task { [weak self] in
             // The first upload sends what a run that was killed left behind.
@@ -167,7 +173,13 @@ actor FieldLogUploader {
     func send() async {
         guard !isSending, let relayURL else { return }
         isSending = true
-        defer { isSending = false }
+        // One line per run, written after the last chunk: a line per chunk would be the next chunk.
+        var stored = 0
+        var storedBytes = 0
+        defer {
+            isSending = false
+            if stored > 0 { FieldLog.log("log upload: \(stored) chunks stored · \(storedBytes) bytes") }
+        }
         for _ in 0..<8 {
             let limit = chunkBytes
             let chunk: (sequence: Int, data: Data)? = await withCheckedContinuation { continuation in
@@ -193,6 +205,8 @@ actor FieldLogUploader {
             switch Self.outcome(of: status) {
             case .stored:
                 await onQueue { FieldLogUploadState.accepted(chunk.data.count) }
+                stored += 1
+                storedBytes += chunk.data.count
             case .tooLarge:
                 chunkBytes = max(16_000, chunkBytes / 2)
                 await onQueue { FieldLogUploadState.forgetPending() }

@@ -1106,6 +1106,22 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.49.2 (2026-11-16)
+
+No change for the code of a host app. The field log gets the lines the relay-api needs for its wristband
+timeline.
+
+Added:
+
+- `FieldLog.startUploading(binding:)` also writes the lines of the binding to the log: `wristband:` (state),
+  `wristband session:` (binding id, end, token expiry) and `binding diagnostics:`. Before, a host app on
+  `ProximiMapView` had none of them in its log, so the relay could not link the log to a wristband.
+- `relay stream: open · binding <id> · <sse|ws|poll>` and `relay stream: closed · binding <id> · <cause>`
+  when the binding's link goes online and when it leaves it.
+- `relay position: ts <engine time, epoch ms> · age <ms>` for the first position, then at most every 5 s.
+- `install <id>` when the uploads start, and `log upload: <n> chunks stored · <bytes> bytes` after an upload
+  that stored chunks.
+
 ### 1.49.1 (2026-11-16)
 
 No change for a host app. `@_spi(GADApp)` `ProximiMap.wristbandBinding` gives the Proximi GAD app the SDK's wristband
