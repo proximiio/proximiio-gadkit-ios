@@ -71,13 +71,14 @@ struct OffRouteTests {
         #expect(shows(false, ahead: true, inGallery: false))
     }
 
-    /// The markers are hidden with an invisible style, never `nil`: the detour keeps its marker.
+    /// The markers are hidden with an invisible style, never `nil`: the detour and the visited artworks
+    /// keep their markers.
     @Test @MainActor func theHiddenStyleKeepsTheDetour() {
         let hidden = MapStyle.journeyStopsHidden
         #expect(hidden.pending.opacity == 0)
         #expect(hidden.active.opacity == 0)
-        #expect(hidden.done.opacity == 0)
-        #expect(hidden.passed.opacity == 0)
+        #expect(hidden.done.opacity == 1)
+        #expect(hidden.passed.opacity == 1)
         #expect(hidden.detour.opacity == 1)
         #expect(hidden != MapStyle.journeyStops)
     }

@@ -126,9 +126,9 @@ struct GalleryFirstRoutingTests {
         #expect(VisitView.fillStyle(of: "g303", destination: "g303", visited: visited, visitorGallery: "g303") == nil)
     }
 
-    /// The marker of an artwork in a gallery shows only while the visitor is in that gallery, in every
-    /// state; artworks outside every gallery and detours stay (PM, Monday "Gallery numbers in gallery
-    /// navigation", 2026-10-29 and 2026-10-30).
+    /// The marker of an artwork still to visit in a gallery shows only while the visitor is in that
+    /// gallery; visited artworks, artworks outside every gallery and detours stay (PM, Monday "Gallery
+    /// numbers in gallery navigation", 2026-10-29 and 2026-10-30; visited: operator, 2026-11-17).
     @MainActor @Test func artworkMarkersShowOnlyInTheVisitorsGallery() {
         func stop(_ id: String, gallery: String?, state: JourneyStop.State = .pending, kind: JourneyStop.Kind = .planned) -> JourneyStop {
             JourneyStop(id: id, title: id, coordinate: .init(latitude: 24.5, longitude: 54.4), poiID: id, group: gallery, kind: kind, state: state)
@@ -140,8 +140,8 @@ struct GalleryFirstRoutingTests {
             stop("pending-g303", gallery: "g303"),
             stop("cafe", gallery: "g101", kind: .detour),
         ]
-        #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: nil) == ["visited-g101", "active-g303", "pending-g303"])
-        #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: "g303") == ["visited-g101"])
+        #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: nil) == ["active-g303", "pending-g303"])
+        #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: "g303").isEmpty)
         #expect(VisitView.stopsOutsideTheVisitorsGallery(stops, visitorGallery: "g101") == ["active-g303", "pending-g303"])
     }
 
@@ -164,10 +164,10 @@ struct GalleryFirstRoutingTests {
         ]
         let hidden: Set<String> = ["visited", "reached", "pending", "no-floor", "cafe"]
         let dots = VisitView.stopDots(stops, hiddenStopIDs: hidden, showsNumbers: true)
-        #expect(dots.map(\.style) == [.visited, .skipped, .active, .pending])
+        #expect(dots.map(\.style) == [.skipped, .active, .pending])
         #expect(dots.allSatisfy { $0.level == 1 })
-        // Numbers hidden: every artwork with a floor.
-        #expect(VisitView.stopDots(stops, hiddenStopIDs: [], showsNumbers: false).map(\.style) == [.visited, .skipped, .active, .pending, .pending])
+        // Numbers hidden: every artwork with a floor but the visited one, whose marker shows.
+        #expect(VisitView.stopDots(stops, hiddenStopIDs: [], showsNumbers: false).map(\.style) == [.skipped, .active, .pending, .pending])
         // Numbers shown and nothing hidden: the skipped artwork only.
         #expect(VisitView.stopDots(stops, hiddenStopIDs: [], showsNumbers: true).map(\.style) == [.skipped])
         // One image per style, of the dot's size.
@@ -333,24 +333,5 @@ struct GalleryDestinationTests {
     @Test func aGeofenceWithoutAnOutlineIsLeftOut() {
         let poi = VenuePlace(id: "poi", title: "G303 Language", coordinate: ProximiioCoordinate(latitude: 24, longitude: 54), level: 3, remoteID: "e1d2cd21")
         #expect(Gallery.destinations(geofences: [geofence(remoteID: "e1d2cd21", polygon: nil)], places: [poi]).isEmpty)
-    }
-
-    @Test func aVisitedGalleryStaysVisitedWhenTheVisitorEntersItAgain() {
-        // The last artwork is visited while the visitor is in the gallery: not kept yet.
-        var kept = VisitView.keptVisitedGalleries([], complete: ["g101"], visitorGallery: "g101")
-        #expect(kept.isEmpty)
-        #expect(VisitView.shownVisitorGallery("g101", keptVisited: kept) == "g101")
-        // The visitor is out of it: kept.
-        kept = VisitView.keptVisitedGalleries(kept, complete: ["g101"], visitorGallery: nil)
-        #expect(kept == ["g101"])
-        // The visitor enters it again: it stays visited, and the map has no visitor's gallery.
-        kept = VisitView.keptVisitedGalleries(kept, complete: ["g101"], visitorGallery: "g101")
-        #expect(kept == ["g101"])
-        #expect(VisitView.shownVisitorGallery("g101", keptVisited: kept) == nil)
-        #expect(VisitView.fillStyle(of: "g101", destination: nil, visited: ["g101"], visitorGallery: nil) == .visited)
-        // Another gallery is the visitor's as before.
-        #expect(VisitView.shownVisitorGallery("g104", keptVisited: kept) == "g104")
-        // A gallery that is not complete any more is not kept.
-        #expect(VisitView.keptVisitedGalleries(kept, complete: [], visitorGallery: nil).isEmpty)
     }
 }

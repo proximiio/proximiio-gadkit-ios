@@ -69,9 +69,6 @@ struct VisitView: View {
     /// The gallery of `galleries` the visitor is in. Its artworks and furniture show; every other
     /// gallery has a fill (PM, Monday "Artwork + furniture polygons", 2026-10-29).
     @State private var visitorGalleryID: String?
-    /// The visited galleries the visitor has left. Each stays visited when the visitor enters it
-    /// again (`keptVisitedGalleries`).
-    @State private var keptVisitedGalleryIDs: Set<String> = []
     /// The follow that starts after `GADSettings.startZoomSeconds` at `startZoom`.
     @State private var startZoomFollow: Task<Void, Never>?
     /// The camera shows the active stop because the position is not live (`showStopWithoutPosition`).
@@ -737,45 +734,10 @@ struct VisitView: View {
     /// (the customer, Monday "Visited gallery visualization", 2026-10-28), once the visitor is out of
     /// them (PM, 2026-10-29).
     private var visitedGalleryIDs: Set<String> {
-        visitedGalleryIDs(visitorGallery: shownVisitorGalleryID)
-    }
-
-    private func visitedGalleryIDs(visitorGallery: String?) -> Set<String> {
         let stops = controller.navigator.journey.stops.filter { $0.kind != .detour }.map { stop in
             (gallery: Gallery.containing(stop.coordinate.proximiio, level: stop.floor?.level, in: galleries)?.id, state: stop.state)
         }
-        return Self.visitedGalleries(stops.compactMap { stop in stop.gallery.map { ($0, stop.state) } }, visitorGallery: visitorGallery)
-    }
-
-    /// The gallery the map shows as the visitor's: `visitorGalleryID`, but not a visited gallery the
-    /// visitor entered again. Such a gallery keeps its visited fill and name, and its artworks stay
-    /// hidden (operator, 2026-11-17: "visited" has priority over "visitor in").
-    private var shownVisitorGalleryID: String? {
-        Self.shownVisitorGallery(visitorGalleryID, keptVisited: keptVisitedGalleryIDs)
-    }
-
-    /// The POI of `shownVisitorGalleryID`, which the map does not draw.
-    private var shownVisitorGalleryPlaceID: String? {
-        shownVisitorGalleryID == nil ? nil : visitorGalleryPlaceID
-    }
-
-    /// Keeps `keptVisitedGalleryIDs` up to date; called before the map layers and the stop markers.
-    private func updateKeptVisitedGalleries() {
-        let kept = Self.keptVisitedGalleries(keptVisitedGalleryIDs, complete: visitedGalleryIDs(visitorGallery: nil), visitorGallery: visitorGalleryID)
-        if kept != keptVisitedGalleryIDs { keptVisitedGalleryIDs = kept }
-    }
-
-    /// The visited galleries that stay visited when the visitor enters them again: a gallery of
-    /// `complete` (all its artworks visited or skipped) joins once the visitor is out of it, and
-    /// stays while it is complete. Pure; covered by tests.
-    nonisolated static func keptVisitedGalleries(_ kept: Set<String>, complete: Set<String>, visitorGallery: String?) -> Set<String> {
-        complete.filter { kept.contains($0) || $0 != visitorGallery }
-    }
-
-    /// `visitorGallery`, or `nil` when it is a visited gallery the visitor entered again. Pure;
-    /// covered by tests.
-    nonisolated static func shownVisitorGallery(_ visitorGallery: String?, keptVisited: Set<String>) -> String? {
-        visitorGallery.flatMap { keptVisited.contains($0) ? nil : $0 }
+        return Self.visitedGalleries(stops.compactMap { stop in stop.gallery.map { ($0, stop.state) } }, visitorGallery: visitorGalleryID)
     }
 
     /// The galleries of `stops` whose stops are all done or skipped, at least one done, except
@@ -791,7 +753,7 @@ struct VisitView: View {
     /// The gallery of the active stop, unless the visitor is in it.
     private var activeStopGallery: Gallery? {
         let gallery = controller.navigator.activeStop.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries) }
-        return gallery?.id == shownVisitorGalleryID ? nil : gallery
+        return gallery?.id == visitorGalleryID ? nil : gallery
     }
 
     /// The fill of a gallery on the journey map: none for the gallery the visitor is in, so its
@@ -811,7 +773,7 @@ struct VisitView: View {
         let visited = galleries.filter { visitedGalleryIDs.contains($0.id) }
         let ahead = controller.galleryAhead?.placeID
         let destinationGallery = ahead == nil ? activeStopGallery : nil
-        return galleryDestinations.filter { $0.placeID != shownVisitorGalleryPlaceID }.map { destination in
+        return galleryDestinations.filter { $0.placeID != visitorGalleryPlaceID }.map { destination in
             let isGallery = { (gallery: Gallery) in
                 gallery.id == destination.shown.id || gallery.contains(destination.entry, level: destination.gallery.level)
             }
@@ -825,8 +787,10 @@ struct VisitView: View {
     /// The numbered stop markers. With gallery first they are hidden while the leg ends at a
     /// gallery, and while the visitor is outside every gallery and the active artwork is in one
     /// (PM, Monday "Navigation to a gallery", 2026-10-26 and 2026-10-27). The marker of an artwork in
-    /// a gallery shows only while the visitor is in that gallery, in every state (PM, Monday "Gallery
-    /// numbers in gallery navigation", 2026-10-29 and 2026-10-30).
+    /// a gallery that is still to visit shows only while the visitor is in that gallery (PM, Monday
+    /// "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30). The marker of a visited
+    /// artwork always shows (Figma "In-Gallery Map": "stop 1 dimmed as completed", "Gallery 2
+    /// finished"; operator, 2026-11-17, after the PM's "visited artworks disappear").
     ///
     /// An artwork without a numbered marker shows as a dot (`stopDots`, `GADSettings.showsStopDots`).
     private func applyStopMarkers() {
@@ -840,21 +804,21 @@ struct VisitView: View {
         if !settings.groupsStopMarkers { style.groupsOverlapping = false }
         if !settings.showsStopNumbers { style = MapStyle.withoutNumbers(style) }
         let stops = controller.navigator.journey.stops
-        updateKeptVisitedGalleries()
-        style.hiddenStopIDs = Self.stopsOutsideTheVisitorsGallery(stops, visitorGallery: shownVisitorGalleryID)
+        style.hiddenStopIDs = Self.stopsOutsideTheVisitorsGallery(stops, visitorGallery: visitorGalleryID)
         if controller.session.journeyStopMarkerStyle != style { controller.session.journeyStopMarkerStyle = style }
         mapLayers.updateStopDots(settings.showsStopDots
             ? Self.stopDots(stops, hiddenStopIDs: style.hiddenStopIDs, showsNumbers: showsNumbers) : [])
     }
 
     /// The dots of the artworks that have no numbered marker: every artwork while the numbers are
-    /// hidden (`showsNumbers` false), else the artworks in `hiddenStopIDs` and the skipped ones.
+    /// hidden (`showsNumbers` false), else the artworks in `hiddenStopIDs` and the skipped ones. A
+    /// visited artwork has none: its marker always shows.
     /// A detour and a stop without a floor have none. Nagarro reported the artworks as disappearing
     /// from the map (PM, Monday "Artwork icons disappearing from the map" and "Numbers diappearing",
     /// 2026-11-15). Pure; covered by tests.
     static func stopDots(_ stops: [JourneyStop], hiddenStopIDs: Set<String>, showsNumbers: Bool) -> [JourneyMapLayers.StopDot] {
         stops.compactMap { stop in
-            guard stop.kind != .detour, let level = stop.floor?.level,
+            guard stop.kind != .detour, stop.state != .done, let level = stop.floor?.level,
                   !showsNumbers || hiddenStopIDs.contains(stop.id) || stop.state == .skipped else { return nil }
             let style: JourneyMapLayers.StopDot.Style = switch stop.state {
             case .pending: .pending
@@ -867,11 +831,12 @@ struct VisitView: View {
         }
     }
 
-    /// The artwork stops in a gallery (`JourneyStop.group`) other than `visitorGallery`. Artworks
-    /// outside every gallery and detours stay. Pure; covered by tests.
+    /// The artwork stops not visited yet in a gallery (`JourneyStop.group`) other than
+    /// `visitorGallery`. Visited artworks, artworks outside every gallery and detours stay. Pure;
+    /// covered by tests.
     static func stopsOutsideTheVisitorsGallery(_ stops: [JourneyStop], visitorGallery: String?) -> Set<String> {
         Set(stops.compactMap { stop in
-            guard stop.kind != .detour, let gallery = stop.group, gallery != visitorGallery else { return nil }
+            guard stop.kind != .detour, stop.state != .done, let gallery = stop.group, gallery != visitorGallery else { return nil }
             return stop.id
         })
     }
@@ -970,7 +935,6 @@ struct VisitView: View {
 
     /// Stop markers and gallery fills for the current journey and floor.
     private func refreshMapLayers() {
-        updateKeptVisitedGalleries()
         let visited = visitedGalleryIDs
         // Gallery first: the outline of the gallery geofence the leg ends at, in place of the
         // outline that holds the artwork. The gallery the visitor is in has no fill: the venue's own
@@ -979,13 +943,13 @@ struct VisitView: View {
         let galleryAhead = controller.galleryAhead
         let destination = galleryAhead?.shown.id ?? activeStopGallery?.id
         var fills = galleries.compactMap { gallery in
-            Self.fillStyle(of: gallery.id, destination: destination, visited: visited, visitorGallery: shownVisitorGalleryID)
+            Self.fillStyle(of: gallery.id, destination: destination, visited: visited, visitorGallery: visitorGalleryID)
                 .map { JourneyMapLayers.GalleryFill(gallery: gallery, style: $0) }
         }
         if let galleryAhead, !galleries.contains(where: { $0.id == galleryAhead.shown.id }) {
             fills.append(.init(gallery: galleryAhead.shown, style: .destination))
         }
-        let line = "gallery fills: visitor in \(galleries.first { $0.id == visitorGalleryID }?.name ?? "none")\(visitorGalleryID != nil && shownVisitorGalleryID == nil ? " (stays visited)" : "") · destination "
+        let line = "gallery fills: visitor in \(galleries.first { $0.id == visitorGalleryID }?.name ?? "none") · destination "
             + "\(fills.first { $0.style == .destination }?.gallery.name ?? "none") · \(fills.filter { $0.style == .visited }.count) visited · "
             + "\(fills.filter { $0.style == .standard }.count) standard"
         if line != galleryFillLine {
