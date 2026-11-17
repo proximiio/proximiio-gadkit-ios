@@ -101,4 +101,11 @@ struct OffRouteTests {
         // An episode of the whole journey ends with the navigator's `returnedToRoute`, not here.
         #expect(VisitController.legDeviation(isOffRoute: false, meters: 2, threshold: 12, isEpisode: true, isLegEpisode: false) == .none)
     }
+
+    @Test func offTheLegWithoutTheWarningEveryJourneyIsRoutedAgain() {
+        #expect(VisitController.reroutesOffTheLeg(asksApp: false, keepsOrder: false))
+        #expect(VisitController.reroutesOffTheLeg(asksApp: false, keepsOrder: true))
+        #expect(VisitController.reroutesOffTheLeg(asksApp: true, keepsOrder: true))
+        #expect(!VisitController.reroutesOffTheLeg(asksApp: true, keepsOrder: false))
+    }
 }

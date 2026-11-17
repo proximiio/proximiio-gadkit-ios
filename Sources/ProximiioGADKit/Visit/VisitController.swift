@@ -60,8 +60,11 @@
 //  (`JourneyDeviationPolicy.askApp`). After the warning a personalised journey keeps the leg where the
 //  visitor left it; when another open artwork is now the nearest stop, the stops ahead are ordered
 //  again from the visitor and the leg leads to it (`checkCloserArtwork`). A curated tour is routed
-//  again from the visitor after the warning (`reroutesAfterWarning`). A journey without the prompt is
-//  routed again by the navigator (`.automatic`).
+//  again from the visitor after the warning (`reroutesAfterWarning`). A journey without the prompt
+//  (`.automatic`) shows no warning: its leg is drawn again from the visitor once they are off the leg
+//  (`checkLegDeviation`, since 1.50.2), and the navigator routes again off the whole journey. Before
+//  1.50.2 only the navigator routed, so a visitor near a later leg of the journey kept the old leg
+//  (Nagarro, "Rerouting not working at all", 2026-11-17).
 //
 //  The warning stays open for `GADSettings.offRouteWarningSeconds`, unless the visitor closes it; the
 //  routing after it does not close it (PM, Monday "Personalized tour: off-route and re-route behaviour",
@@ -199,6 +202,8 @@ final class VisitController: ObservableObject {
     var enteredGeofenceIDs: Set<String> = []
     /// Geofences of `enteredGeofenceIDs` whose "not counted" line is written (`isInside`).
     private var ignoredEnteredIDs: Set<String> = []
+    /// The last time `checkLegDeviation` drew the leg again from the visitor.
+    private var lastLegReroute = Date.distantPast
     /// The last of the journey changes that run one after another (`serially`).
     private var journeyEdit: Task<Void, Never>?
     /// Stops whose move to the next artwork is scheduled.
@@ -624,10 +629,11 @@ final class VisitController: ObservableObject {
     /// current destination (`RouteGuidance.isOffRoute`) gets the warning, as for the navigator's
     /// `leftRoute`, also where a later leg of the journey passes (PM, Monday "Personalized tour:
     /// off-route and re-route behaviour", 2026-10-28). Back within two thirds of that distance the
-    /// episode ends. Only with the warning (`.askApp`); not while paused, during a detour, on a
-    /// floor without positioning or at a reached artwork, whose guidance is the leg to the next stop.
+    /// episode ends. Without the warning (`.automatic`) the leg is drawn again from the visitor
+    /// instead. Not while paused, during a detour, on a floor without positioning or at a reached
+    /// artwork, whose guidance is the leg to the next stop.
     func checkLegDeviation(_ guidance: RouteGuidance?, isFloorGuideActive: Bool) {
-        guard deviationPolicy == .askApp, isNavigating, !isPaused, !isFloorGuideActive, navigator.detourStop == nil,
+        guard isNavigating, !isPaused, !isFloorGuideActive, navigator.detourStop == nil,
               !navigator.hasArrived, let guidance, !guidance.hasArrived
         else { return }
         switch Self.legDeviation(isOffRoute: guidance.isOffRoute, meters: guidance.offRouteMeters, threshold: settings.offRouteMeters,
@@ -641,8 +647,21 @@ final class VisitController: ObservableObject {
             isOffRouteEpisode = true
             isLegOffRouteEpisode = true
             showOffRouteWarning()
-            if reroutesAfterWarning { rerouteFromVisitor() }
+            // At most every 5 s: a leg that cannot start at the visitor stays off the route after it
+            // is drawn again.
+            if Self.reroutesOffTheLeg(asksApp: deviationPolicy == .askApp, keepsOrder: keepsOrder),
+               Date.now.timeIntervalSince(lastLegReroute) >= 5 {
+                lastLegReroute = .now
+                rerouteFromVisitor()
+            }
         }
+    }
+
+    /// Whether the leg is drawn again from a visitor who is off it. With the warning (`asksApp`) only
+    /// a journey that keeps its order; a personalised journey keeps its leg. Without the warning
+    /// every journey. Pure; covered by tests.
+    nonisolated static func reroutesOffTheLeg(asksApp: Bool, keepsOrder: Bool) -> Bool {
+        !asksApp || keepsOrder
     }
 
     enum LegDeviation: Equatable {
@@ -715,9 +734,9 @@ final class VisitController: ObservableObject {
         deviationPolicy == .askApp && keepsOrder
     }
 
-    /// Draws the leg again from the visitor, after the warning.
+    /// Draws the leg again from the visitor: after the warning, or without one (`.automatic`).
     private func rerouteFromVisitor() {
-        FieldLog.log("off route: warning shown · leg drawn again from the visitor")
+        FieldLog.log("off route: leg drawn again from the visitor\(deviationPolicy == .askApp ? " after the warning" : "")")
         tasks.append(Task { [weak self] in
             await self?.serially { [weak self] in
                 guard let self, self.isOffRouteEpisode else { return }
