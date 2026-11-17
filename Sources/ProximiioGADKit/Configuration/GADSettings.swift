@@ -147,6 +147,10 @@ public struct GADSettings: Equatable, Sendable {
     /// in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads
     /// to a gallery. `false`, the default since 1.44.0, shows nothing there (GAD PM, 2026-11-15: on hold).
     public var showsStopDots = false
+    /// `true` shows the number of a journey artwork in its marker on the map, on the stop card and
+    /// in the list. `false`, the default since 1.50.0, shows the same circles without the number
+    /// (operator, 2026-11-17). The badge of grouped markers keeps its count (`groupsStopMarkers`).
+    public var showsStopNumbers = false
     /// `true` orders the stops ahead of a personalised journey again from the visitor when an artwork
     /// is marked visited while the visitor stands in another gallery than the next stop's, and that
     /// gallery has an artwork still to visit. `false` keeps the order, as before 1.46.0.

@@ -239,7 +239,7 @@ struct VisitView: View {
                 // "List view transparency", 2026-11-02; Figma 03.P.03D). The map stays loaded.
                 .opacity(showsList ? 0 : 1)
             if showsList {
-                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, onSkip: requestSkip)
+                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, showsNumbers: settings.showsStopNumbers, onSkip: requestSkip)
                     .background(Palette.white.opacity(Self.listBackgroundOpacity))
                     .transition(.opacity)
             }
@@ -800,6 +800,7 @@ struct VisitView: View {
         )
         var style = showsNumbers ? MapStyle.journeyStops : MapStyle.journeyStopsHidden
         if !settings.groupsStopMarkers { style.groupsOverlapping = false }
+        if !settings.showsStopNumbers { style = MapStyle.withoutNumbers(style) }
         let stops = controller.navigator.journey.stops
         style.hiddenStopIDs = Self.stopsOutsideTheVisitorsGallery(stops, visitorGallery: visitorGalleryID)
         if controller.session.journeyStopMarkerStyle != style { controller.session.journeyStopMarkerStyle = style }
@@ -1397,6 +1398,7 @@ struct VisitView: View {
                             session: controller.session,
                             galleries: galleries,
                             galleryAhead: controller.galleryAhead?.gallery,
+                            showsNumbers: settings.showsStopNumbers,
                             galleryIcon: controller.galleryAhead
                                 .flatMap { ahead in places.first { $0.id == ahead.placeID }?.amenityID }
                                 .flatMap { amenityIcons[$0] },
@@ -1592,6 +1594,8 @@ private struct VisitCard: View {
     let galleries: [Gallery]
     /// The gallery the card names instead of the artwork.
     let galleryAhead: Gallery?
+    /// `GADSettings.showsStopNumbers`: off, the circle holds the arrow or the gallery icon.
+    var showsNumbers = false
     /// The icon of the gallery's amenity in the venue data (PM, Monday "Gallery icons missing from
     /// instructions", 2026-10-28).
     var galleryIcon: UIImage?
@@ -1781,7 +1785,7 @@ private struct VisitCard: View {
     @ViewBuilder private var stateIcon: some View {
         switch state {
         case .walking, .atStop, .nextStopOnOtherLevel:
-            if let stopNumber, showsStopNumber {
+            if showsNumbers, let stopNumber, showsStopNumber {
                 Text("\(stopNumber)", bundle: .localized).textStyle(.bodyMedium)
             } else if galleryAhead != nil {
                 if let galleryIcon {

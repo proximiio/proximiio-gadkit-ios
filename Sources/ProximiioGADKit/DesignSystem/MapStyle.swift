@@ -168,6 +168,19 @@ enum MapStyle {
         return style
     }()
 
+    /// `style` with the numbers of the artworks' markers transparent: the circles stay
+    /// (`GADSettings.showsStopNumbers`). The detour's marker and the group badge are not changed.
+    /// The map library has no switch for the label.
+    static func withoutNumbers(_ style: JourneyStopMarkerStyle) -> JourneyStopMarkerStyle {
+        var style = style
+        style.done.labelColor = style.done.labelColor.withAlpha(0)
+        style.active.labelColor = style.active.labelColor.withAlpha(0)
+        style.pending.labelColor = style.pending.labelColor.withAlpha(0)
+        style.passed.labelColor = style.passed.labelColor.withAlpha(0)
+        style.skipped.labelColor = style.skipped.labelColor.withAlpha(0)
+        return style
+    }
+
     /// Route line. It replaces the organisation style's route line layers on any style.
     static let route = RouteLineStyle(
         remaining: .gradient(from: location, to: marker),

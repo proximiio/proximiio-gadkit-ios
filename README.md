@@ -784,7 +784,7 @@ position, search and routes.
 | `galleryNearby(ProximiGallery, stop: ProximiStop)` | The gallery of the active stop is nearby: one of its entrances is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. An entrance is a POI with the amenity `galleryEntranceAmenityID` and the gallery's id in `metadata.gallery_id`; a gallery without an entrance POI uses its own POI. Since 1.42.0 it is also sent when the visitor enters another gallery that has an artwork of the journey still to visit, once per entry, with the first such artwork as `stop`. Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
 | `positionUncertain(ProximiStop)` | `ProximiMapView` without `.uncertainPositionPrompt`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.uncertainPositionPrompt` the view asks "Probably at …" instead. |
 | `artworkArrived(ProximiStop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence it becomes the active stop (`nextStop`), then `artworkArrived` comes; with `visitsOutOfOrderAtEntry` it comes just before its `artworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
-| `artworkVisited(ProximiStop, cause: ArtworkVisitCause)` | An artwork of the journey is visited: its stop is done. Sent for every cause: `.left` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `.enteredAnotherArtwork` (a fix in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `.advanceDelay` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `.outOfOrder` (personalised journeys with `visitsOutOfOrderAtEntry`, or with `advancesOnArtworkExit` `false`: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `.journeyMovedOn` (a detour ended or the visitor chose another stop while at the artwork) and `.app` (the host app set the stop to `.visited` through the `journey` binding of `ProximiMapView`). The host app does not set the stop to `.visited` again for this event. For one artwork the order is `artworkArrived`, `artworkVisited`, then `nextStop`, `stopOrderChanged` or `journeyFinished`. The SDK's `geofenceExited` of the artwork does not move the journey. |
+| `artworkVisited(ProximiStop, cause: ArtworkVisitCause)` | An artwork of the journey is visited: its stop is done. Sent for every cause: `.left` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `.enteredAnotherArtwork` (a fix outside the artwork's geofence and in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `.advanceDelay` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `.outOfOrder` (personalised journeys with `visitsOutOfOrderAtEntry`, or with `advancesOnArtworkExit` `false`: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `.journeyMovedOn` (a detour ended or the visitor chose another stop while at the artwork) and `.app` (the host app set the stop to `.visited` through the `journey` binding of `ProximiMapView`). The host app does not set the stop to `.visited` again for this event. For one artwork the order is `artworkArrived`, `artworkVisited`, then `nextStop`, `stopOrderChanged` or `journeyFinished`. The SDK's `geofenceExited` of the artwork does not move the journey. |
 | `artworkReached(ProximiStop)` | Use `artworkVisited`. Sent after `artworkVisited` for every cause but `.outOfOrder` and `.app`. Removed in a later release. |
 | `artworkVisitedOutOfOrder(ProximiStop)` | Use `artworkVisited` with the cause `.outOfOrder`. Sent after it. Removed in a later release. |
 | `stopOrderChanged(ProximiJourney)` | `ProximiMapView` with `.progress`: the view ordered the stops again, from the visitor's first position, after an artwork visited out of order or after a detour. The journey in the host app's ids and its new order; the `journey` binding already holds it. A change of the states alone does not send it. |
@@ -863,6 +863,7 @@ let configuration = GADConfiguration(
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
 | `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `true` in 1.43.0. |
+| `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
 | `bearingDeadband` | 5° | Heading changes smaller than this do not turn the map (`MapOptions.bearingDeadband`, map default 0°). |
@@ -1105,6 +1106,33 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.50.0 (2026-11-17)
+
+No change for the code of a host app. The journey shows no artwork numbers by default (operator,
+2026-11-17).
+
+Fixed:
+
+- An artwork whose geofence overlaps the geofence of another open journey artwork was marked visited at
+  the arrival, cause `.enteredAnotherArtwork`, and the journey moved to the next stop. The same happened
+  while the SDK still counted the visitor inside the geofence of another open journey artwork
+  (`geofenceExitDelay`). The geofence of another artwork now ends the visit only when the
+  visitor is outside the geofence of the artwork they arrived at. 180 pairs of artwork geofences overlap
+  in the GAD data of 2026-11-17. The limit named in 1.48.0 is gone.
+
+Changed:
+
+- `GADSettings.showsStopNumbers` (`false`): the stop markers on the map, the icon of the stop card and
+  the badges in the list are the same circles without the number. The circle of the stop card holds the
+  arrow, or the gallery icon while the route leads to a gallery. `true` shows the numbers, as before
+  1.50.0.
+
+Not changed:
+
+- The badge of grouped markers keeps its count (`groupsStopMarkers`).
+- The Live Activity keeps "Stop 3 of 10".
+- The order of the stops and the `VisitEvent`s.
 
 ### 1.49.2 (2026-11-16)
 

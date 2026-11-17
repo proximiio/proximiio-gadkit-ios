@@ -118,6 +118,25 @@ struct GADSettingsTests {
         #expect(!MapStyle.journeyStopsHidden.groupsOverlapping)
     }
 
+    /// Without stop numbers the markers keep their circles and the group badge its count (operator,
+    /// 2026-11-17).
+    @Test @MainActor func stopNumbersAreOffAndTheCirclesStay() {
+        #expect(!GADSettings.standard.showsStopNumbers)
+        let numbered = MapStyle.journeyStops
+        let plain = MapStyle.withoutNumbers(numbered)
+        #expect(plain.pending.labelColor.alpha == 0)
+        #expect(plain.active.labelColor.alpha == 0)
+        #expect(plain.done.labelColor.alpha == 0)
+        #expect(plain.passed.labelColor.alpha == 0)
+        #expect(plain.pending.fillColor == numbered.pending.fillColor)
+        #expect(plain.pending.strokeColor == numbered.pending.strokeColor)
+        #expect(plain.active.opacity == 1)
+        #expect(plain.diameterPoints == numbered.diameterPoints)
+        #expect(plain.detour == numbered.detour)
+        #expect(plain.groupBadge == numbered.groupBadge)
+        #expect(plain.groupsOverlapping)
+    }
+
     /// One zoom in every situation and both journey kinds (PM, Monday "Zoom level at start +
     /// navigation", 2026-10-30). A host's `galleryFollowZoom` still applies in a gallery of a
     /// personalised journey.

@@ -470,9 +470,9 @@ final class VisitController: ObservableObject {
                 arrivedStopID = nil
                 outsideArrivedSince = nil
                 if outOfOrderArrivedID == arrived { outOfOrderArrivedID = nil }
-            } else if !inside.isEmpty || isInsideUpcoming {
-                // In another open artwork: the visitor has moved on. That artwork counts from the
-                // next fix, after the journey moved on.
+            } else if Self.leavesForAnotherArtwork(isInsideAnother: !inside.isEmpty || isInsideUpcoming, activeDistance: activeDistance) {
+                // In another open artwork and outside this one: the visitor has moved on. That
+                // artwork counts from the next fix, after the journey moved on.
                 leaveArrivedArtwork(reason: "in another artwork", cause: .enteredAnotherArtwork)
                 inside = []
             } else if Self.isBeyondVisit(distance: activeDistance, settings: settings) {
@@ -490,6 +490,15 @@ final class VisitController: ObservableObject {
         for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: settings.outOfOrderDwell) {
             if Self.arrivesOutOfOrder(settings: settings) { arriveOutOfOrder(id) } else { markOutOfOrder(id) }
         }
+    }
+
+    /// Whether the geofence of another open artwork ends the visit of the artwork the visitor arrived
+    /// at. Not while the visitor is still inside the geofence of that artwork (`activeDistance` 0):
+    /// 180 pairs of artwork geofences overlap in the GAD data of 2026-11-17, and an artwork whose
+    /// geofence overlaps the geofence of another open journey artwork was visited at the arrival.
+    /// Pure; covered by tests.
+    nonisolated static func leavesForAnotherArtwork(isInsideAnother: Bool, activeDistance: Double) -> Bool {
+        isInsideAnother && activeDistance > 0
     }
 
     /// Whether an artwork entered out of order becomes the current stop and waits for the visit

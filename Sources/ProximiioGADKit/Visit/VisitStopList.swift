@@ -27,6 +27,8 @@ struct VisitStopList: View {
     var groupsByGallery = true
     var places: [VenuePlace] = []
     var allowsSkip = true
+    /// `GADSettings.showsStopNumbers`: off, the badges are circles without a number.
+    var showsNumbers = false
     let onSkip: (JourneyStop) -> Void
 
     var body: some View {
@@ -37,6 +39,7 @@ struct VisitStopList: View {
             groupsByGallery: groupsByGallery,
             places: Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
             allowsSkip: allowsSkip,
+            showsNumbers: showsNumbers,
             onSkip: onSkip
         )
     }
@@ -50,6 +53,7 @@ private struct StopList: View {
     /// Places by id, for the artist and the badges of a stop.
     let places: [String: VenuePlace]
     let allowsSkip: Bool
+    let showsNumbers: Bool
     let onSkip: (JourneyStop) -> Void
 
     private var visibleStops: [JourneyStop] {
@@ -135,7 +139,7 @@ private struct StopList: View {
         let isActive = stop.state == .active || stop.state == .reached
         return HStack(spacing: 16) {
             StopNumberBadge(
-                number: number,
+                number: showsNumbers ? number : nil,
                 emphasis: isRevealed || isActive ? .filled : isVisited ? .visited : .normal
             )
             VStack(alignment: .leading, spacing: 5) {

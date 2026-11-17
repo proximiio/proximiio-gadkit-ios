@@ -41,6 +41,15 @@ struct JourneyKindTests {
         #expect(!VisitController.arrivesOutOfOrder(settings: settings))
     }
 
+    /// Overlapping artwork geofences: the artwork the visitor arrived at stays the current one while
+    /// they are inside its geofence (operator, 2026-11-17).
+    @Test func anotherArtworkEndsTheVisitOnlyOutsideTheArrivedOne() {
+        #expect(!VisitController.leavesForAnotherArtwork(isInsideAnother: true, activeDistance: 0))
+        #expect(VisitController.leavesForAnotherArtwork(isInsideAnother: true, activeDistance: 0.5))
+        #expect(VisitController.leavesForAnotherArtwork(isInsideAnother: true, activeDistance: .infinity))
+        #expect(!VisitController.leavesForAnotherArtwork(isInsideAnother: false, activeDistance: 3))
+    }
+
     #if DEBUG
     @Test func launchArgumentSetsTheKind() {
         #expect(DebugLaunch(arguments: ["app", "-visitKind", "curated"]).visitKind == .curated)

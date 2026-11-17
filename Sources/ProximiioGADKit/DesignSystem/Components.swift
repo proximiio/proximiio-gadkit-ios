@@ -15,11 +15,12 @@ import SwiftUI
 struct StopNumberBadge: View {
     enum Emphasis { case normal, filled, visited }
 
-    let number: Int
+    /// `nil` draws the circle without a number (`GADSettings.showsStopNumbers`).
+    let number: Int?
     var emphasis: Emphasis = .normal
 
     var body: some View {
-        Text("\(number)", bundle: .localized)
+        Text(number.map { "\($0)" } ?? "")
             .textStyle(.bodyMedium)
             .foregroundStyle(emphasis == .filled ? Palette.white : Palette.ink)
             .frame(width: 34, height: 34)
