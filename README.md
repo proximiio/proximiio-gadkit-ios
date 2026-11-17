@@ -1107,6 +1107,19 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.50.5 (2026-11-17)
+
+No change for the code of a host app.
+
+Changed:
+
+- The marker of a visited artwork in a gallery shows only while the visitor is in that gallery, as the
+  markers of the other artworks do (operator's field test of 1.50.4, 2026-11-17). In 1.50.4 it showed
+  everywhere. Inside the gallery it still shows while the leg ends at a gallery, which 1.50.4 added. A
+  visited artwork outside every gallery keeps its marker.
+
+Not verified on a device.
+
 ### 1.50.4 (2026-11-17)
 
 No change for the code of a host app.

@@ -156,7 +156,7 @@ enum MapStyle {
 
     /// `journeyStops` with the markers of the artworks still to visit and of the skipped ones
     /// invisible. A visited artwork keeps its marker (Figma "In-Gallery Map", "Gallery 2 finished";
-    /// operator, 2026-11-17), and the detour keeps its marker. A stop marker style of `nil` would take
+    /// operator, 2026-11-17) unless `hiddenStopIDs` holds it, and the detour keeps its marker. A stop marker style of `nil` would take
     /// the detour's marker off too.
     static let journeyStopsHidden: JourneyStopMarkerStyle = {
         var style = journeyStops

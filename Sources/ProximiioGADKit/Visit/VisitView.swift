@@ -787,10 +787,10 @@ struct VisitView: View {
     /// The numbered stop markers. With gallery first they are hidden while the leg ends at a
     /// gallery, and while the visitor is outside every gallery and the active artwork is in one
     /// (PM, Monday "Navigation to a gallery", 2026-10-26 and 2026-10-27). The marker of an artwork in
-    /// a gallery that is still to visit shows only while the visitor is in that gallery (PM, Monday
-    /// "Gallery numbers in gallery navigation", 2026-10-29 and 2026-10-30). The marker of a visited
-    /// artwork always shows (Figma "In-Gallery Map": "stop 1 dimmed as completed", "Gallery 2
-    /// finished"; operator, 2026-11-17, after the PM's "visited artworks disappear").
+    /// a gallery shows only while the visitor is in that gallery, in every state (PM, Monday "Gallery
+    /// numbers in gallery navigation", 2026-10-29 and 2026-10-30). In the visitor's gallery the marker
+    /// of a visited artwork also shows while the leg ends at a gallery (Figma "In-Gallery Map":
+    /// "Gallery 2 finished"; operator, 2026-11-17, after the PM's "visited artworks disappear").
     ///
     /// An artwork without a numbered marker shows as a dot (`stopDots`, `GADSettings.showsStopDots`).
     private func applyStopMarkers() {
@@ -831,12 +831,11 @@ struct VisitView: View {
         }
     }
 
-    /// The artwork stops not visited yet in a gallery (`JourneyStop.group`) other than
-    /// `visitorGallery`. Visited artworks, artworks outside every gallery and detours stay. Pure;
-    /// covered by tests.
+    /// The artwork stops in a gallery (`JourneyStop.group`) other than `visitorGallery`, in every
+    /// state. Artworks outside every gallery and detours stay. Pure; covered by tests.
     static func stopsOutsideTheVisitorsGallery(_ stops: [JourneyStop], visitorGallery: String?) -> Set<String> {
         Set(stops.compactMap { stop in
-            guard stop.kind != .detour, stop.state != .done, let gallery = stop.group, gallery != visitorGallery else { return nil }
+            guard stop.kind != .detour, let gallery = stop.group, gallery != visitorGallery else { return nil }
             return stop.id
         })
     }
