@@ -1107,6 +1107,27 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.50.3 (2026-11-17)
+
+No change for the code of a host app.
+
+Changed:
+
+- A visited gallery stays visited when the visitor enters it again (operator, 2026-11-17: "visited"
+  has priority over "visitor in"). A gallery is visited when all its artworks of the journey are
+  visited or skipped, at least one visited, once the visitor is out of it. Before, a visitor who
+  entered it again got the gallery of the visitor: no fill, no name, and the artworks' markers. Now it
+  keeps the visited fill and name, and its artworks' markers stay hidden. The field log line
+  "gallery fills: visitor in <name> (stays visited)" marks it.
+- Not changed: the gallery the visitor is in is found by its outline on the map, not by the gallery
+  geofence. A visitor at the border of the outline is out of the gallery for the map (PM's log of
+  2026-11-17: 0.2 s to 9 s after the last artwork of a gallery was visited, 5 s to 13 s before the
+  geofence exit), and the markers of its artworks hide then.
+- The kept state is per open journey screen: a screen opened inside a visited gallery shows it as
+  the visitor's gallery.
+
+Not verified on a device or in the simulator.
+
 ### 1.50.2 (2026-11-17)
 
 No change for the code of a host app. The route of a host without `.offRoutePrompt` changes more often.

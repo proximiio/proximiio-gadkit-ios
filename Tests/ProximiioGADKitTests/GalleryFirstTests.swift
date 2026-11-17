@@ -334,4 +334,23 @@ struct GalleryDestinationTests {
         let poi = VenuePlace(id: "poi", title: "G303 Language", coordinate: ProximiioCoordinate(latitude: 24, longitude: 54), level: 3, remoteID: "e1d2cd21")
         #expect(Gallery.destinations(geofences: [geofence(remoteID: "e1d2cd21", polygon: nil)], places: [poi]).isEmpty)
     }
+
+    @Test func aVisitedGalleryStaysVisitedWhenTheVisitorEntersItAgain() {
+        // The last artwork is visited while the visitor is in the gallery: not kept yet.
+        var kept = VisitView.keptVisitedGalleries([], complete: ["g101"], visitorGallery: "g101")
+        #expect(kept.isEmpty)
+        #expect(VisitView.shownVisitorGallery("g101", keptVisited: kept) == "g101")
+        // The visitor is out of it: kept.
+        kept = VisitView.keptVisitedGalleries(kept, complete: ["g101"], visitorGallery: nil)
+        #expect(kept == ["g101"])
+        // The visitor enters it again: it stays visited, and the map has no visitor's gallery.
+        kept = VisitView.keptVisitedGalleries(kept, complete: ["g101"], visitorGallery: "g101")
+        #expect(kept == ["g101"])
+        #expect(VisitView.shownVisitorGallery("g101", keptVisited: kept) == nil)
+        #expect(VisitView.fillStyle(of: "g101", destination: nil, visited: ["g101"], visitorGallery: nil) == .visited)
+        // Another gallery is the visitor's as before.
+        #expect(VisitView.shownVisitorGallery("g104", keptVisited: kept) == "g104")
+        // A gallery that is not complete any more is not kept.
+        #expect(VisitView.keptVisitedGalleries(kept, complete: [], visitorGallery: nil).isEmpty)
+    }
 }
