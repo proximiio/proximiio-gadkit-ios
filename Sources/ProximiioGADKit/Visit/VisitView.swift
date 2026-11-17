@@ -768,13 +768,13 @@ struct VisitView: View {
     /// The visited galleries that stay visited when the visitor enters them again: a gallery of
     /// `complete` (all its artworks visited or skipped) joins once the visitor is out of it, and
     /// stays while it is complete. Pure; covered by tests.
-    static func keptVisitedGalleries(_ kept: Set<String>, complete: Set<String>, visitorGallery: String?) -> Set<String> {
+    nonisolated static func keptVisitedGalleries(_ kept: Set<String>, complete: Set<String>, visitorGallery: String?) -> Set<String> {
         complete.filter { kept.contains($0) || $0 != visitorGallery }
     }
 
     /// `visitorGallery`, or `nil` when it is a visited gallery the visitor entered again. Pure;
     /// covered by tests.
-    static func shownVisitorGallery(_ visitorGallery: String?, keptVisited: Set<String>) -> String? {
+    nonisolated static func shownVisitorGallery(_ visitorGallery: String?, keptVisited: Set<String>) -> String? {
         visitorGallery.flatMap { keptVisited.contains($0) ? nil : $0 }
     }
 
