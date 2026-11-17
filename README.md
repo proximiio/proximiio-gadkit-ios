@@ -1107,6 +1107,25 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.50.1 (2026-11-17)
+
+No change for the code of a host app.
+
+Fixed:
+
+- A journey moved to the next stop at the arrival at an artwork (operator, 2026-11-17, at four artworks
+  whose geofences overlap no other journey artwork). The cause is not confirmed by a log. An artwork
+  geofence the SDK counts the visitor inside counted as "inside" at any distance: for
+  `geofenceExitDelay` after the exit, and without an end when an exit event did not arrive. Such an
+  artwork ended the visit of the artwork the visitor arrived at (`.enteredAnotherArtwork`), or became
+  the current stop. It now counts only while the fix is within `GADSettings.artworkVisitedMeters` (5 m)
+  of the border of its geofence.
+
+Added:
+
+- Field log line `artwork geofence of <title>: entered for the SDK, fix <n> m outside · not counted`,
+  once per geofence until the fix is inside it again.
+
 ### 1.50.0 (2026-11-17)
 
 No change for the code of a host app. The journey shows no artwork numbers by default (operator,

@@ -15,7 +15,8 @@
 //  2026-10-19). Since SDK 6.0.0-beta.63 the SDK also exits a geofence only
 //  `ProximiioConfiguration.geofenceExitDelay` after the position left it (`ProximiMap`:
 //  `GADSettings.geofenceExitDelay`, 5 s; the SDK default is 3 s), so an artwork counts as inside up
-//  to that long after the visitor left it. The journey moves to the next stop when the visitor
+//  to that long after the visitor left it. Since 1.50.1 such a geofence counts only while the fix is
+//  within `GADSettings.artworkVisitedMeters` of its border (`isInside`). The journey moves to the next stop when the visitor
 //  leaves the artwork (`GADSettings.advancesOnArtworkExit`; Nagarro, 2026-10-30): more than
 //  `GADSettings.artworkVisitedMeters` from the border of its geofence for
 //  `GADSettings.artworkVisitedSeconds`, or at once when the visitor is in another open artwork's
@@ -196,6 +197,8 @@ final class VisitController: ObservableObject {
     /// The geofences the SDK counts the visitor inside (`Proximiio.enteredGeofenceIds`), kept up
     /// to date from the geofence events.
     var enteredGeofenceIDs: Set<String> = []
+    /// Geofences of `enteredGeofenceIDs` whose "not counted" line is written (`isInside`).
+    private var ignoredEnteredIDs: Set<String> = []
     /// The last of the journey changes that run one after another (`serially`).
     private var journeyEdit: Task<Void, Never>?
     /// Stops whose move to the next artwork is scheduled.
@@ -455,7 +458,15 @@ final class VisitController: ObservableObject {
             if stop.id == activeID {
                 activeDistance = areas.map { $0.distance(to: point) }.min() ?? .infinity
             }
-            guard areas.contains(where: { enteredGeofenceIDs.contains($0.id) || $0.contains(point) }) else { continue }
+            let tolerance = settings.artworkVisitedMeters
+            guard areas.contains(where: { Self.isInside($0, point: point, entered: enteredGeofenceIDs, toleranceMeters: tolerance) }) else {
+                // The SDK counts the visitor inside, and the fix is further than the visit distance.
+                if let area = areas.first(where: { enteredGeofenceIDs.contains($0.id) }), ignoredEnteredIDs.insert(area.id).inserted {
+                    FieldLog.log("artwork geofence of \(stop.title): entered for the SDK, fix \(String(format: "%.1f", area.distance(to: point))) m outside · not counted")
+                }
+                continue
+            }
+            for area in areas { ignoredEnteredIDs.remove(area.id) }
             if stop.id == activeID {
                 artworkGeofenceEntered(remoteID: remoteID)
             } else if countsOutOfOrder {
@@ -490,6 +501,18 @@ final class VisitController: ObservableObject {
         for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: settings.outOfOrderDwell) {
             if Self.arrivesOutOfOrder(settings: settings) { arriveOutOfOrder(id) } else { markOutOfOrder(id) }
         }
+    }
+
+    /// Whether the visitor at `point` counts as inside `area`: the fix is in it, or the SDK counts the
+    /// visitor inside (`entered`) and the fix is within `toleranceMeters` of its border
+    /// (`GADSettings.artworkVisitedMeters`). The SDK exits a geofence only beyond 1.2 × its radius and
+    /// after `geofenceExitDelay`, and an exit event that did not arrive leaves the geofence in
+    /// `entered`: without the distance, an artwork the visitor left counted as "another artwork" at
+    /// the next arrival, and the journey moved on at once (operator, 2026-11-17). Pure; covered by
+    /// tests.
+    nonisolated static func isInside(_ area: ArtworkArea, point: ProximiioCoordinate, entered: Set<String>, toleranceMeters: Double) -> Bool {
+        if area.contains(point) { return true }
+        return entered.contains(area.id) && area.distance(to: point) <= toleranceMeters
     }
 
     /// Whether the geofence of another open artwork ends the visit of the artwork the visitor arrived

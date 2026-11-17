@@ -43,6 +43,23 @@ struct VisitPlanTests {
         #expect(!square.contains(ProximiioCoordinate(latitude: 24.502, longitude: 54.4005)))
     }
 
+    /// A geofence the SDK counts the visitor inside counts only within the visit distance of its
+    /// border: an exit that did not arrive must not make a far artwork "another artwork" (operator,
+    /// 2026-11-17).
+    @Test func aGeofenceEnteredForTheSDKCountsOnlyNearIt() {
+        let area = ArtworkArea(id: "g", center: ProximiioCoordinate(latitude: 24.5, longitude: 54.4), radius: 3)
+        let inside = ProximiioCoordinate(latitude: 24.50002, longitude: 54.4)
+        // About 4.4 m from the centre: 1.4 m outside the border.
+        let near = ProximiioCoordinate(latitude: 24.50004, longitude: 54.4)
+        // About 44 m from the centre.
+        let far = ProximiioCoordinate(latitude: 24.5004, longitude: 54.4)
+        #expect(VisitController.isInside(area, point: inside, entered: [], toleranceMeters: 5))
+        #expect(!VisitController.isInside(area, point: near, entered: [], toleranceMeters: 5))
+        #expect(VisitController.isInside(area, point: near, entered: ["g"], toleranceMeters: 5))
+        #expect(!VisitController.isInside(area, point: far, entered: ["g"], toleranceMeters: 5))
+        #expect(!VisitController.isInside(area, point: near, entered: ["other"], toleranceMeters: 5))
+    }
+
     /// GAD data 2026-10-15: "DCT Mother/Earth" shares `remote_id` with the Guggenheim artwork.
     /// Only the first geofence was kept, so the visitor inside the DCT one did not reach it.
     @Test func everyGeofenceOfAnArtworkIsKept() {
