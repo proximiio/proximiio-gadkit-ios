@@ -855,7 +855,7 @@ let configuration = GADConfiguration(
 | `ordersAtGalleryEntry`, `galleryEntryOrderSeconds` | `true`, 3 s | Personalised journeys: when the visitor has been this long in a gallery that holds an artwork still to visit, and the current artwork is in another gallery, the stops ahead are ordered again from the visitor. Once per entry, no warning. An entry while paused, during a detour or at a reached artwork is checked when that state ends. |
 | `ordersVisitorGalleryFirst` | `true` | Personalised journeys: every order from the visitor puts the artworks of the gallery the visitor is in (for `galleryEntryOrderSeconds`) first, also when an artwork of another gallery is nearer by the route. `false`: the nearest artwork by the route goes first, as in 1.51.0. |
 | `orderSwitchMinimumMeters` | 3 m | Personalised journeys, the checks that run while the visitor walks (the route refresh in the gallery, the order off the route): another artwork becomes the current stop only when it is this many metres nearer to the visitor than the current stop, in a straight line. An artwork of the visitor's gallery takes the place of one outside it at any distance. 0: every other order changes the stop, as in 1.52.0. |
-| `artworkArrivalMarginMeters`, `artworkArrivalMarginSeconds` | 2.5 m, 3 s | The visitor has arrived at the current artwork after this time within this distance of its geofence, outside it and inside no geofence of another open artwork of the journey. 0 m: only a fix inside the geofence is the arrival. Keep it below `artworkVisitedMeters`. |
+| `artworkArrivalMarginMeters`, `artworkArrivalMarginSeconds` | 0 m (off), 3 s | With a distance above 0: the visitor has arrived at the current artwork after this time within this distance of its geofence, outside it and inside no geofence of another open artwork of the journey. 0 m: only a fix inside the geofence is the arrival. Keep it below `artworkVisitedMeters`. |
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the visitor, in a straight line, also for a visitor on the leg. Checked at most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg. |
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor has arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
@@ -1115,6 +1115,14 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.55.1 (2026-11-18)
+
+No change is needed in the code of a host app.
+
+- `GADSettings.artworkArrivalMarginMeters` is 0 by default: an arrival needs a fix inside the
+  geofence of the artwork, as in 1.54.0. The venue data gets larger artwork geofences instead. A
+  host app that wants the arrival near the geofence sets a distance.
 
 ### 1.55.0 (2026-11-18)
 

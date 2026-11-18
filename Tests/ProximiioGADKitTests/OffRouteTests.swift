@@ -177,7 +177,10 @@ struct OffRouteTests {
     /// (Nagarro's field test, 2026-11-18 16:38 UTC).
     @Test func aVisitorNearTheGeofenceArrivesAfterTheDwell() {
         var settings = GADSettings()
-        #expect(settings.artworkArrivalMarginMeters == 2.5)
+        // Off by default (GAD PM, 2026-11-18).
+        #expect(settings.artworkArrivalMarginMeters == 0)
+        #expect(!VisitController.arrivesNearGeofence(distance: 0.5, seconds: 60, settings: settings))
+        settings.artworkArrivalMarginMeters = 2.5
         #expect(settings.artworkArrivalMarginMeters < settings.artworkVisitedMeters)
         #expect(VisitController.arrivesNearGeofence(distance: 2.1, seconds: 3, settings: settings))
         #expect(!VisitController.arrivesNearGeofence(distance: 2.1, seconds: 2, settings: settings))

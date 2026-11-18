@@ -130,9 +130,10 @@ public struct GADSettings: Equatable, Sendable {
     public var orderSwitchMinimumMeters: Double = 3
     /// The visitor has arrived at the current artwork after `artworkArrivalMarginSeconds` within
     /// this many metres of its geofence, outside it and inside no geofence of another open artwork
-    /// of the journey. 0: only a fix inside the geofence is the arrival, as before 1.55.0. The
-    /// visit ends beyond `artworkVisitedMeters`, which must be larger.
-    public var artworkArrivalMarginMeters: Double = 2.5
+    /// of the journey. 0 (default since 1.55.1, GAD PM 2026-11-18: larger geofences in the venue
+    /// data instead): only a fix inside the geofence is the arrival. The visit ends beyond
+    /// `artworkVisitedMeters`, which must be larger.
+    public var artworkArrivalMarginMeters: Double = 0
     /// How long the visitor stays within `artworkArrivalMarginMeters` before the arrival, in seconds.
     public var artworkArrivalMarginSeconds: TimeInterval = 3
     /// Personalised journeys: in the gallery of the current artwork, the nearest open artwork of
