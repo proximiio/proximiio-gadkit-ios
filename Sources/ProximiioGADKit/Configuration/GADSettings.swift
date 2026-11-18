@@ -122,6 +122,12 @@ public struct GADSettings: Equatable, Sendable {
     /// of another artwork of the journey and is outside its own. `false`: only
     /// `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited.
     public var visitsArtworkAtAnotherArtwork = true
+    /// Personalised journeys, the checks that run while the visitor walks (`refreshesRouteInGallery`
+    /// and the order off the route): another artwork becomes the current stop only when it is this
+    /// many metres nearer to the visitor than the current stop, in a straight line. An artwork of
+    /// the visitor's gallery takes the place of one outside it at any distance. 0 takes every other
+    /// order, as before 1.53.0, also between two artworks at the same distance.
+    public var orderSwitchMinimumMeters: Double = 3
     /// Gallery first: an artwork that led to the artwork because the visitor was in its gallery
     /// leads to the gallery again when the visitor is more than this many metres outside the
     /// gallery's outline, or on another floor.

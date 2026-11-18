@@ -143,6 +143,19 @@ struct OffRouteTests {
         #expect(VisitController.galleryFirst(kept, inVisitorGallery: ["a104", "b104"]) == nil)
     }
 
+    /// Between two artworks at about the same distance the current stop stays.
+    @Test func anotherArtworkTakesTheStopOnlyWhenItIsClearlyNearer() {
+        var settings = GADSettings()
+        #expect(settings.orderSwitchMinimumMeters == 3)
+        #expect(!VisitController.switchesStop(nearerMeters: 0.4, entersVisitorGallery: false, settings: settings))
+        #expect(!VisitController.switchesStop(nearerMeters: -2, entersVisitorGallery: false, settings: settings))
+        #expect(VisitController.switchesStop(nearerMeters: 3, entersVisitorGallery: false, settings: settings))
+        // An artwork of the visitor's gallery takes the place of one outside it at any distance.
+        #expect(VisitController.switchesStop(nearerMeters: -20, entersVisitorGallery: true, settings: settings))
+        settings.orderSwitchMinimumMeters = 0
+        #expect(VisitController.switchesStop(nearerMeters: 0, entersVisitorGallery: false, settings: settings))
+    }
+
     /// An improvement of the map keeps its order inside and outside the visitor's gallery.
     @Test func anImprovedOrderKeepsItsOrderBehindTheVisitorsGallery() throws {
         let improved = proposal(order: ["b104", "d101", "a104", "c101"], current: ["a104", "b104", "c101", "d101"], currentMeters: 100, proposedMeters: 60)

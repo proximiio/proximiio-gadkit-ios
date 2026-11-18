@@ -640,9 +640,10 @@ final class VisitController: ObservableObject {
         tasks.append(Task { [weak self] in
             await self?.serially { [weak self] in
                 guard let self, self.isOffRouteEpisode, self.navigator.activeStop?.id == active.id,
-                      let proposal = await self.visitorOrder(), let first = proposal.order.first, first != active.id
+                      let proposal = await self.visitorOrder(), let first = proposal.order.first, first != active.id,
+                      let nearer = self.nearerMeters(of: first, than: active)
                 else { return }
-                FieldLog.log("off route: \(first) is nearer than \(active.title) · journey ordered again")
+                FieldLog.log(String(format: "off route: \(first) is %.1f m nearer than \(active.title) · journey ordered again", nearer))
                 self.isOffRouteEpisode = false
                 await self.rerouting { await self.apply(proposal) }
             }
@@ -737,6 +738,28 @@ final class VisitController: ObservableObject {
         return Self.galleryFirst(base, inVisitorGallery: visitorGalleryStopIDs())
     }
 
+    /// For the checks that run while the visitor walks (`checkCloserArtwork`, `checkGalleryRoute`):
+    /// how many metres nearer to the visitor `first` is than the current stop `active`, in a
+    /// straight line, or `nil` when `first` does not take the place of `active`. `first` takes it
+    /// when it is `GADSettings.orderSwitchMinimumMeters` nearer, or when it is in the visitor's
+    /// gallery and `active` is not. The map's floor-then-gallery orders count every other order as
+    /// an improvement, so two artworks at about the same distance changed places at every check.
+    private func nearerMeters(of first: String, than active: JourneyStop) -> Double? {
+        guard let position = session.position, let candidate = stop(first) else { return 0 }
+        let origin = position.coordinate.proximiio
+        let nearer = GeoMath.haversineDistance(from: active.coordinate.proximiio, to: origin)
+            - GeoMath.haversineDistance(from: candidate.coordinate.proximiio, to: origin)
+        let ids = visitorGalleryStopIDs()
+        return Self.switchesStop(nearerMeters: nearer, entersVisitorGallery: ids.contains(first) && !ids.contains(active.id),
+                                 settings: settings) ? nearer : nil
+    }
+
+    /// Whether another artwork takes the place of the current stop in the checks that run while
+    /// the visitor walks. Pure; covered by tests.
+    nonisolated static func switchesStop(nearerMeters: Double, entersVisitorGallery: Bool, settings: GADSettings) -> Bool {
+        entersVisitorGallery || nearerMeters >= settings.orderSwitchMinimumMeters
+    }
+
     /// The open artworks of the gallery the visitor has been in for `galleryEntryOrderSeconds`
     /// (`checkGalleryEntry` keeps the gallery). Empty with `ordersVisitorGalleryFirst` off.
     private func visitorGalleryStopIDs() -> Set<String> {
@@ -781,8 +804,9 @@ final class VisitController: ObservableObject {
                 guard let self, self.navigator.activeStop?.id == active.id, !self.navigator.hasArrived, self.navigator.detourStop == nil
                 else { return }
                 await self.rerouting {
-                    if reorders, let proposal = await self.visitorOrder(), let first = proposal.order.first, first != active.id {
-                        FieldLog.log("gallery route: \(first) is nearer than \(active.title) · journey ordered again")
+                    if reorders, let proposal = await self.visitorOrder(), let first = proposal.order.first, first != active.id,
+                       let nearer = self.nearerMeters(of: first, than: active) {
+                        FieldLog.log(String(format: "gallery route: \(first) is %.1f m nearer than \(active.title) · journey ordered again", nearer))
                         await self.apply(proposal)
                     }
                     FieldLog.log(String(format: "gallery route: %.1f m off the leg in %@ · leg drawn again from the visitor", meters, gallery.gallery.name))

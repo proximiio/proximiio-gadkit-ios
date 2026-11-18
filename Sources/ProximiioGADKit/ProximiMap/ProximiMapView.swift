@@ -268,7 +268,9 @@ final class HostedMapModel: ObservableObject {
         current = journey
         guard let venue else { return }
         let matched = HostedJourney(journey, places: places, galleries: galleries)
-        FieldLog.log("hosted map: start · \(journey.kind.rawValue) · \(matched.journey.stops.count) of \(journey.stops.count) stops on the map")
+        let visited = journey.stops.filter { $0.state == .visited }.count
+        let skipped = journey.stops.filter { $0.state == .skipped }.count
+        FieldLog.log("hosted map: start · \(journey.kind.rawValue) · \(matched.journey.stops.count) of \(journey.stops.count) stops on the map · from the host app: \(visited) visited, \(skipped) skipped")
         hosted = matched
         incoming = nil
         generation += 1
@@ -301,7 +303,9 @@ final class HostedMapModel: ObservableObject {
             show(journey)
             return
         }
-        FieldLog.log("hosted map: journey applied in place · \(matched.journey.stops.count) stops")
+        let visited = journey.stops.filter { $0.state == .visited }.count
+        let skipped = journey.stops.filter { $0.state == .skipped }.count
+        FieldLog.log("hosted map: journey applied in place · \(matched.journey.stops.count) stops · from the host app: \(visited) visited, \(skipped) skipped")
         self.hosted = matched
         revision += 1
         incoming = IncomingJourney(journey: matched.journey, revision: revision)
@@ -319,6 +323,7 @@ final class HostedMapModel: ObservableObject {
         guard updated != previous else { return }
         current = updated
         binding.wrappedValue = updated
+        FieldLog.log("hosted map: journey written to the host app · \(updated.stops.filter { $0.state == .visited }.count) visited, \(updated.stops.filter { $0.state == .skipped }.count) skipped of \(updated.stops.count)")
         if Self.isReordered(previous, to: updated) {
             onEvent?(.stopOrderChanged(updated))
         }
