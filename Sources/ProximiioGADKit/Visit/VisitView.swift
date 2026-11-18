@@ -239,7 +239,7 @@ struct VisitView: View {
                 // "List view transparency", 2026-11-02; Figma 03.P.03D). The map stays loaded.
                 .opacity(showsList ? 0 : 1)
             if showsList {
-                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, showsNumbers: settings.showsStopNumbers, onSkip: requestSkip)
+                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, showsNumbers: settings.showsStopNumbers, skipsAtSwipe: settings.skipsAtSwipe, onSkip: requestSkip)
                     .background(Palette.white.opacity(Self.listBackgroundOpacity))
                     .transition(.opacity)
             }
@@ -531,6 +531,7 @@ struct VisitView: View {
                 Task { @MainActor in
                     checkArrival()
                     controller.checkCloserArtwork()
+                    controller.checkGalleryEntry()
                     controller.checkWrongFloor(isFloorGuideActive: floorGuide.isActive)
                     updateVisitorGallery(controller.session.position)
                     releaseRideFloor(controller.session.position)
@@ -540,6 +541,7 @@ struct VisitView: View {
             }
             .onReceive(controller.navigator.$guidance) { guidance in
                 checkStopNearby(position: controller.session.position, guidance: guidance)
+                controller.checkGalleryRoute(guidance, isFloorGuideActive: floorGuide.isActive)
                 controller.checkLegDeviation(guidance, isFloorGuideActive: floorGuide.isActive)
             }
             .onValueChange(of: controller.navigator.activeStop?.id) { _, _ in

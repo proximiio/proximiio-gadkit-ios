@@ -81,6 +81,32 @@ final class GalleryFirstRouting: JourneyRouting {
         _ = state.withLock { $0.reached.insert(Key(artwork)) }
     }
 
+    /// The gallery of `artwork` in the venue data, also for a reached artwork and with gallery first off.
+    func galleryHolding(_ artwork: MapCoordinate) -> GalleryDestination? {
+        state.withLock { $0.galleries[Key(artwork)] }
+    }
+
+    /// The reached artworks whose gallery the visitor at `origin` has left: the gallery is on
+    /// another level, or `origin` is more than `meters` outside its outline. Without `originLevel`
+    /// only the distance counts. Pure; covered by tests.
+    static func left(origin: ProximiioCoordinate, originLevel: Double?, meters: Double, state: State) -> Set<Key> {
+        state.reached.filter { key in
+            guard let gallery = state.galleries[key]?.gallery else { return false }
+            if let originLevel, !VenueLevel.same(originLevel, gallery.level) { return true }
+            return gallery.distance(to: origin) > meters
+        }
+    }
+
+    /// Takes the artworks of `left` out of the reached artworks and returns them: a leg to one of
+    /// them ends at its gallery again.
+    func releaseLeft(origin: ProximiioCoordinate, originLevel: Double?, meters: Double) -> Set<Key> {
+        state.withLock { state in
+            let left = Self.left(origin: origin, originLevel: originLevel, meters: meters, state: state)
+            state.reached.subtract(left)
+            return left
+        }
+    }
+
     /// The gallery where a leg from `origin` to `destination` ends instead of the artwork, or `nil`.
     /// Pure; covered by tests.
     static func gallery(origin: ProximiioCoordinate, originLevel: Double, destination: MapCoordinate, state: State) -> GalleryDestination? {

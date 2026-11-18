@@ -47,4 +47,13 @@ struct SkipSwipeTests {
         journey = VisitPlan.setting(.done, forStop: "b", in: journey)
         #expect(!journey.stops.contains(where: SkipSwipe.canSkip))
     }
+
+    @Test func aSwipeAsksForTheSkipAtOnceWhenSet() {
+        let revealing = SkipSwipe.end(isRevealed: false, projected: -60, skipsAtSwipe: true)
+        #expect(!revealing.revealed && revealing.skips)
+        let short = SkipSwipe.end(isRevealed: false, projected: -20, skipsAtSwipe: true)
+        #expect(!short.revealed && !short.skips)
+        let button = SkipSwipe.end(isRevealed: false, projected: -60, skipsAtSwipe: false)
+        #expect(button.revealed && !button.skips)
+    }
 }

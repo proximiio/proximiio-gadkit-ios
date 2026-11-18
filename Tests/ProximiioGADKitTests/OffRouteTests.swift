@@ -92,6 +92,38 @@ struct OffRouteTests {
         #expect(!VisitView.isRouteDeviation(.journeyFinished))
     }
 
+    /// Inside the gallery of the current artwork the route is refreshed beyond 3 m off the leg, at
+    /// most every 3 s (PM's field test, 2026-11-17).
+    @Test func theRouteInTheGalleryIsRefreshedOffTheLeg() {
+        var settings = GADSettings.standard
+        #expect(settings.refreshesRouteInGallery)
+        #expect(settings.galleryRouteRefreshMeters == 3)
+        #expect(settings.galleryRouteRefreshSeconds == 3)
+        #expect(VisitController.refreshesGalleryRoute(meters: 3.5, sinceLast: 10, settings: settings))
+        #expect(!VisitController.refreshesGalleryRoute(meters: 3, sinceLast: 10, settings: settings))
+        #expect(!VisitController.refreshesGalleryRoute(meters: 8, sinceLast: 2, settings: settings))
+        settings.galleryRouteRefreshMeters = 6
+        settings.galleryRouteRefreshSeconds = 1
+        #expect(!VisitController.refreshesGalleryRoute(meters: 5, sinceLast: 10, settings: settings))
+        #expect(VisitController.refreshesGalleryRoute(meters: 7, sinceLast: 1, settings: settings))
+        settings.refreshesRouteInGallery = false
+        #expect(!VisitController.refreshesGalleryRoute(meters: 30, sinceLast: 60, settings: settings))
+    }
+
+    /// Entering a gallery with an open journey artwork orders the stops once, unless the current
+    /// artwork is in that gallery (PM's field test, 2026-11-17).
+    @Test func theStopsAreOrderedAtTheEntryOfAJourneyGallery() {
+        var settings = GADSettings.standard
+        #expect(settings.ordersAtGalleryEntry)
+        #expect(VisitController.ordersAtGalleryEntry(previous: nil, current: "g104", active: "g102", settings: settings))
+        #expect(VisitController.ordersAtGalleryEntry(previous: "g103", current: "g104", active: nil, settings: settings))
+        #expect(!VisitController.ordersAtGalleryEntry(previous: "g104", current: "g104", active: "g102", settings: settings))
+        #expect(!VisitController.ordersAtGalleryEntry(previous: nil, current: "g102", active: "g102", settings: settings))
+        #expect(!VisitController.ordersAtGalleryEntry(previous: "g104", current: nil, active: "g102", settings: settings))
+        settings.ordersAtGalleryEntry = false
+        #expect(!VisitController.ordersAtGalleryEntry(previous: nil, current: "g104", active: "g102", settings: settings))
+    }
+
     /// The warning follows the leg to the current destination: 13 m off it warns also where a later
     /// leg passes, once per episode; back within 8 m the episode ends (PM's log of 2026-10-28, 22:39 UTC).
     @Test func theLegOffRouteWarnsOncePerEpisode() {

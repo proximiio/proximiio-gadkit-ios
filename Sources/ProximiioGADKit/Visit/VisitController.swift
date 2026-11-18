@@ -204,6 +204,9 @@ final class VisitController: ObservableObject {
     private var ignoredEnteredIDs: Set<String> = []
     /// The last time `checkLegDeviation` drew the leg again from the visitor.
     private var lastLegReroute = Date.distantPast
+    private var lastGalleryRouteRefresh = Date.distantPast
+    /// The gallery of an open journey artwork the visitor was in at the last fix (`checkGalleryEntry`).
+    private var visitorJourneyGalleryID: String?
     /// The last of the journey changes that run one after another (`serially`).
     private var journeyEdit: Task<Void, Never>?
     /// Stops whose move to the next artwork is scheduled.
@@ -587,9 +590,27 @@ final class VisitController: ObservableObject {
     }
 
     /// Called on every fix. A fix in the gallery that the leg to the active artwork ends at: the leg
-    /// is drawn again from the visitor, to the artwork.
+    /// is drawn again from the visitor, to the artwork. Before that, an artwork whose gallery the
+    /// visitor has left (`GADSettings.galleryLeftMeters`) leads to its gallery again; when it is the
+    /// active stop, the leg is drawn again from the visitor (PM's test of Android build 2026111706,
+    /// 2026-11-17: the leg to an artwork missed in a gallery ended at the artwork).
     func checkGalleryFirst() {
         defer { refreshGalleryAhead() }
+        if let position = session.position {
+            let left = galleryRouting.releaseLeft(origin: position.coordinate.proximiio, originLevel: position.floor?.level,
+                                                  meters: settings.galleryLeftMeters)
+            if isNavigating, !isPaused, navigator.detourStop == nil, !navigator.hasArrived, let stop = navigator.activeStop,
+               left.contains(GalleryFirstRouting.Key(stop.coordinate)), let gallery = galleryRouting.gallery(of: stop.coordinate) {
+                FieldLog.log("gallery first: left \(gallery.gallery.name) · leg to the gallery of \(stop.title)")
+                tasks.append(Task { [weak self] in
+                    await self?.serially { [weak self] in
+                        guard let self else { return }
+                        await self.rerouting { await self.navigator.resumeJourney() }
+                    }
+                })
+                return
+            }
+        }
         guard isNavigating, !isPaused, navigator.detourStop == nil, !navigator.hasArrived, let stop = navigator.activeStop,
               let gallery = galleryRouting.gallery(of: stop.coordinate), let position = session.position,
               gallery.gallery.contains(position.coordinate.proximiio, level: position.floor?.level)
@@ -655,6 +676,84 @@ final class VisitController: ObservableObject {
                 rerouteFromVisitor()
             }
         }
+    }
+
+    /// Called on every fix. A personalised journey whose visitor enters a gallery that holds an
+    /// artwork still to visit, while the current artwork is in another gallery: the stops ahead are
+    /// ordered again from the visitor (`GADSettings.ordersAtGalleryEntry`; PM's field test,
+    /// 2026-11-17). Once per entry. No warning shows. Not while paused, during a detour or at a
+    /// reached artwork; an entry in those states orders nothing later.
+    func checkGalleryEntry() {
+        guard let position = session.position else { return }
+        let open = navigator.journey.stops.filter { $0.state == .pending || $0.id == navigator.activeStop?.id }
+        let current = open.lazy.compactMap { self.galleryRouting.galleryHolding($0.coordinate) }
+            .first { $0.gallery.contains(position.coordinate.proximiio, level: position.floor?.level) }
+        let previous = visitorJourneyGalleryID
+        visitorJourneyGalleryID = current?.placeID
+        guard managesProgress, !keepsOrder, isNavigating, !isPaused, navigator.detourStop == nil, !navigator.hasArrived,
+              let active = navigator.activeStop, let current,
+              Self.ordersAtGalleryEntry(previous: previous, current: current.placeID,
+                                        active: galleryRouting.galleryHolding(active.coordinate)?.placeID, settings: settings)
+        else { return }
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self, self.navigator.activeStop?.id == active.id, !self.navigator.hasArrived, self.navigator.detourStop == nil,
+                      let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: self.orderStrategy),
+                      proposal.isImprovement, let first = proposal.order.first, first != active.id
+                else { return }
+                FieldLog.log("gallery entered: \(current.gallery.name) · \(first) is nearer than \(active.title) · journey ordered again")
+                await self.rerouting { await self.apply(proposal) }
+            }
+        })
+    }
+
+    /// Whether `checkGalleryEntry` orders the stops: the setting is on, the visitor is in a gallery
+    /// of an open journey artwork they were not in at the last fix, and the current artwork is not
+    /// in it. Pure; covered by tests.
+    nonisolated static func ordersAtGalleryEntry(previous: String?, current: String?, active: String?, settings: GADSettings) -> Bool {
+        guard settings.ordersAtGalleryEntry, let current else { return false }
+        return current != previous && current != active
+    }
+
+    /// Called on every guidance update. A personalised journey, the visitor in the gallery of the
+    /// current artwork and more than `GADSettings.galleryRouteRefreshMeters` off the leg to it: the
+    /// stops ahead are ordered again from the visitor, and the leg is drawn again from the visitor
+    /// (`GADSettings.refreshesRouteInGallery`; PM's field test, 2026-11-17). No warning shows. At
+    /// most every `galleryRouteRefreshSeconds`. Not while paused, during a detour, on a floor without
+    /// positioning or at a reached artwork.
+    func checkGalleryRoute(_ guidance: RouteGuidance?, isFloorGuideActive: Bool) {
+        guard !keepsOrder, isNavigating, !isPaused, !isFloorGuideActive, navigator.detourStop == nil, !navigator.hasArrived,
+              let guidance, !guidance.hasArrived, let active = navigator.activeStop, let position = session.position,
+              let gallery = galleryRouting.galleryHolding(active.coordinate),
+              gallery.gallery.contains(position.coordinate.proximiio, level: position.floor?.level),
+              Self.refreshesGalleryRoute(meters: guidance.offRouteMeters, sinceLast: Date.now.timeIntervalSince(lastGalleryRouteRefresh), settings: settings)
+        else { return }
+        lastGalleryRouteRefresh = .now
+        let meters = guidance.offRouteMeters
+        let reorders = managesProgress
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self, self.navigator.activeStop?.id == active.id, !self.navigator.hasArrived, self.navigator.detourStop == nil
+                else { return }
+                await self.rerouting {
+                    if reorders, let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: self.orderStrategy),
+                       proposal.isImprovement, let first = proposal.order.first, first != active.id {
+                        FieldLog.log("gallery route: \(first) is nearer than \(active.title) · journey ordered again")
+                        await self.apply(proposal)
+                    }
+                    FieldLog.log(String(format: "gallery route: %.1f m off the leg in %@ · leg drawn again from the visitor", meters, gallery.gallery.name))
+                    await self.navigator.resumeJourney()
+                }
+                self.persist(self.navigator.journey)
+            }
+        })
+    }
+
+    /// Whether `checkGalleryRoute` refreshes the route: the setting is on, the visitor is more than
+    /// `galleryRouteRefreshMeters` off the leg, and the last refresh is `galleryRouteRefreshSeconds`
+    /// old. Pure; covered by tests.
+    nonisolated static func refreshesGalleryRoute(meters: Double, sinceLast: TimeInterval, settings: GADSettings) -> Bool {
+        settings.refreshesRouteInGallery && meters > settings.galleryRouteRefreshMeters && sinceLast >= settings.galleryRouteRefreshSeconds
     }
 
     /// Whether the leg is drawn again from a visitor who is off it. With the warning (`asksApp`) only

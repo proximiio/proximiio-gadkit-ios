@@ -91,6 +91,31 @@ public struct GADSettings: Equatable, Sendable {
     public var offRouteWarningSeconds: TimeInterval = 10
     /// Seconds on a floor the route does not take before the visitor counts as off the route.
     public var wrongFloorSeconds: TimeInterval = 10
+    /// `true` keeps the route of a personalised journey at the visitor inside the gallery of the
+    /// current artwork: more than `galleryRouteRefreshMeters` off the leg, the stops ahead are
+    /// ordered again from the visitor, so the nearest open artwork becomes the current stop, and the
+    /// leg is drawn again from the visitor. No warning shows. `false` keeps the leg until
+    /// `offRouteMeters`, as before 1.51.0 (PM's field test, 2026-11-17).
+    public var refreshesRouteInGallery = true
+    /// Metres off the leg, inside the gallery of the current artwork, before
+    /// `refreshesRouteInGallery` orders the stops and draws the leg again.
+    public var galleryRouteRefreshMeters: Double = 3
+    /// The shortest time between two refreshes of `refreshesRouteInGallery`, in seconds.
+    public var galleryRouteRefreshSeconds: TimeInterval = 3
+    /// Personalised journeys: when the visitor enters a gallery that holds an artwork still to
+    /// visit, and the current artwork is in another gallery, the stops ahead are ordered again from
+    /// the visitor, so the leg leads to the nearest open artwork. Once per entry; no warning shows.
+    /// `false`: the order changes there only off the route or after an artwork is visited, as
+    /// before 1.51.0 (PM's field test, 2026-11-17).
+    public var ordersAtGalleryEntry = true
+    /// Gallery first: an artwork that led to the artwork because the visitor was in its gallery
+    /// leads to the gallery again when the visitor is more than this many metres outside the
+    /// gallery's outline, or on another floor.
+    public var galleryLeftMeters: Double = 5
+    /// The journey list: a swipe on an artwork asks for the skip at once (`skipRequested`, and
+    /// "Skip it?" with `ProximiMapView.Options.skipPrompt`). `false`: the swipe reveals the skip
+    /// button, and a tap on it asks for the skip.
+    public var skipsAtSwipe = false
     /// The position dot is drawn on the route while it is within this many metres of it. Display
     /// only; guidance and arrival use the real position.
     public var routeSnapMeters: Double = 0.5

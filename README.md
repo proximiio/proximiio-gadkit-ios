@@ -851,6 +851,10 @@ let configuration = GADConfiguration(
 | `mapTopFadeHeight`, `mapBottomFadeHeight` | 110 pt, 170 pt | The heights over which the journey map fades out at the top and the bottom of its card. The faded part, and the whole card in List mode, show what the host app draws behind `ProximiMapView`. 0: no fade. |
 | `offRouteMeters`, `offRouteSeconds` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, or off the journey this long. Back within two thirds of the distance the visitor is on the leg again. |
 | `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
+| `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | Personalised journeys, the visitor in the gallery of the current artwork: this far off the leg, the stops ahead are ordered again from the visitor and the leg is drawn again from the visitor, at most this often. No warning shows. `false`: the leg stays until `offRouteMeters`. |
+| `ordersAtGalleryEntry` | `true` | Personalised journeys: when the visitor enters a gallery that holds an artwork still to visit, and the current artwork is in another gallery, the stops ahead are ordered again from the visitor. Once per entry, no warning. |
+| `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
+| `skipsAtSwipe` | `false` | Journey list: a swipe on an artwork asks for the skip at once (`skipRequested`, and the dialog with `.skipPrompt`). `false`: the swipe reveals the skip button, and a tap on it asks for the skip. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `nil`: at any distance. The remaining distance and the instructions follow every position. |
@@ -1106,6 +1110,42 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.51.0 (2026-11-18)
+
+No change is needed in the code of a host app. The route of a personalised journey changes more
+often inside a gallery.
+
+Added:
+
+- `GADSettings.refreshesRouteInGallery` (`true`), `galleryRouteRefreshMeters` (3 m) and
+  `galleryRouteRefreshSeconds` (3 s). Personalised journeys, while the visitor is in the gallery of
+  the current artwork and more than 3 m off the leg to it: the stops ahead are ordered again from
+  the visitor, so the nearest open artwork becomes the current stop, and the leg is drawn again
+  from the visitor (PM's field test, 2026-11-17: the route stayed where it was drawn at the last
+  stop change). No warning shows. At most every 3 s. Before, the leg stayed up to
+  `offRouteMeters` (12 m), and with `.offRoutePrompt` also after the warning.
+- `GADSettings.ordersAtGalleryEntry` (`true`). Personalised journeys with `.progress`: when the
+  visitor enters a gallery that holds an artwork still to visit, and the current artwork is in
+  another gallery, the stops ahead are ordered again from the visitor, so the leg leads to the
+  nearest open artwork. Once per entry; no warning shows. Before, the order changed there only
+  `offRouteMeters` (12 m) off the leg, at an artwork geofence, or after an artwork was visited.
+  Field log line `gallery entered: <gallery> · <id> is nearer than <stop> · journey ordered again`.
+- `GADSettings.skipsAtSwipe` (`false`). Journey list: `true` makes the swipe on an artwork ask for
+  the skip at once, without the tap on the skip button (Nagarro, 2026-11-18).
+- `GADSettings.galleryLeftMeters` (5 m). Gallery first: an artwork that was the current stop while
+  the visitor was in its gallery led to the artwork for the rest of the visit. It now leads to its
+  gallery again when the visitor is more than 5 m outside the gallery's outline or on another
+  floor. When it is the current stop, the leg is drawn again from the visitor, and the card names
+  the gallery. Field log line `gallery first: left <gallery> · leg to the gallery of <stop>`.
+- With `.progress`, a new order reports `stopOrderChanged` and `nextStop`, as every new order does.
+  Without `.progress` the order is kept and only the leg is drawn again.
+- Field log lines `gallery route: <id> is nearer than <stop> · journey ordered again` and
+  `gallery route: <n> m off the leg in <gallery> · leg drawn again from the visitor`.
+
+Not changed: curated tours, the route outside the gallery of the current artwork, a detour, a
+paused journey and a reached artwork. `refreshesRouteInGallery = false` and
+`ordersAtGalleryEntry = false` turn the first two rules off.
 
 ### 1.50.5 (2026-11-17)
 

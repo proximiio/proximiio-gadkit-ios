@@ -334,4 +334,30 @@ struct GalleryDestinationTests {
         let poi = VenuePlace(id: "poi", title: "G303 Language", coordinate: ProximiioCoordinate(latitude: 24, longitude: 54), level: 3, remoteID: "e1d2cd21")
         #expect(Gallery.destinations(geofences: [geofence(remoteID: "e1d2cd21", polygon: nil)], places: [poi]).isEmpty)
     }
+
+    /// A reached artwork whose gallery the visitor left leads to the gallery again (PM's test of
+    /// Android build 2026111706, 2026-11-17).
+    @Test func aReachedArtworkOfAGalleryTheVisitorLeftIsFound() {
+        let stop = MapCoordinate(latitude: 0.5, longitude: 0.5)
+        let key = GalleryFirstRouting.Key(stop)
+        let outline = Gallery(id: "106", name: "Gallery 106", level: 1, ring: [
+            ProximiioCoordinate(latitude: 0, longitude: 0), ProximiioCoordinate(latitude: 0, longitude: 1),
+            ProximiioCoordinate(latitude: 1, longitude: 1), ProximiioCoordinate(latitude: 1, longitude: 0),
+        ])
+        let gallery = GalleryDestination(gallery: outline, entry: ProximiioCoordinate(latitude: 0.5, longitude: 0.5), placeID: "poi-106")
+        let reached = GalleryFirstRouting.State(isEnabled: true, galleries: [key: gallery], reached: [key])
+        func left(_ origin: ProximiioCoordinate, level: Double? = 1, state: GalleryFirstRouting.State = reached) -> Set<GalleryFirstRouting.Key> {
+            GalleryFirstRouting.left(origin: origin, originLevel: level, meters: 5, state: state)
+        }
+        let inside = ProximiioCoordinate(latitude: 0.5, longitude: 0.5)
+        #expect(left(inside).isEmpty)
+        #expect(left(ProximiioCoordinate(latitude: 0.5, longitude: 1.01)) == [key])
+        #expect(left(inside, level: 2) == [key])
+        // About 2 m outside the outline.
+        #expect(left(ProximiioCoordinate(latitude: 0.5, longitude: 1.000018)).isEmpty)
+        #expect(left(inside, level: nil).isEmpty)
+        var open = reached
+        open.reached = []
+        #expect(left(ProximiioCoordinate(latitude: 0.5, longitude: 1.01), state: open).isEmpty)
+    }
 }

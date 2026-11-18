@@ -29,6 +29,8 @@ struct VisitStopList: View {
     var allowsSkip = true
     /// `GADSettings.showsStopNumbers`: off, the badges are circles without a number.
     var showsNumbers = false
+    /// `GADSettings.skipsAtSwipe`: the swipe itself asks for the skip.
+    var skipsAtSwipe = false
     let onSkip: (JourneyStop) -> Void
 
     var body: some View {
@@ -40,6 +42,7 @@ struct VisitStopList: View {
             places: Dictionary(places.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
             allowsSkip: allowsSkip,
             showsNumbers: showsNumbers,
+            skipsAtSwipe: skipsAtSwipe,
             onSkip: onSkip
         )
     }
@@ -54,6 +57,7 @@ private struct StopList: View {
     let places: [String: VenuePlace]
     let allowsSkip: Bool
     let showsNumbers: Bool
+    let skipsAtSwipe: Bool
     let onSkip: (JourneyStop) -> Void
 
     private var visibleStops: [JourneyStop] {
@@ -91,6 +95,7 @@ private struct StopList: View {
                             ),
                             isEnabled: canSkip,
                             isSwiping: $isSwiping,
+                            skipsAtSwipe: skipsAtSwipe,
                             onSkip: {
                                 revealedStopID = nil
                                 onSkip(stop)
@@ -210,6 +215,14 @@ enum SkipSwipe {
     static func reveals(isRevealed: Bool, projected: CGFloat) -> Bool {
         (isRevealed ? -revealWidth : 0) + projected < -revealWidth / 2
     }
+
+    /// The end of a drag: whether the skip panel stays revealed, and whether the skip is asked for
+    /// now. With `skipsAtSwipe` a drag that would reveal the panel asks for the skip and the row
+    /// slides back.
+    static func end(isRevealed: Bool, projected: CGFloat, skipsAtSwipe: Bool) -> (revealed: Bool, skips: Bool) {
+        let revealed = reveals(isRevealed: isRevealed, projected: projected)
+        return skipsAtSwipe && revealed ? (false, true) : (revealed, false)
+    }
 }
 
 /// Swipe a row towards the leading edge to reveal the skip action (Figma journey list, node
@@ -221,6 +234,7 @@ private struct SwipeToSkipRow<Content: View>: View {
     @Binding var isRevealed: Bool
     let isEnabled: Bool
     @Binding var isSwiping: Bool
+    var skipsAtSwipe = false
     let onSkip: () -> Void
     @ViewBuilder let content: Content
 
@@ -292,10 +306,7 @@ private struct SwipeToSkipRow<Content: View>: View {
                 onChanged: { dragX = $0 },
                 onEnded: { translation, velocity in
                     let projected = (translation + velocity * 0.2) * sign
-                    withAnimation(.snappy(duration: 0.25)) {
-                        dragX = 0
-                        isRevealed = SkipSwipe.reveals(isRevealed: isRevealed, projected: projected)
-                    }
+                    end(projected: projected)
                 },
                 onCancelled: {
                     withAnimation(.snappy(duration: 0.25)) { dragX = 0 }
@@ -304,6 +315,16 @@ private struct SwipeToSkipRow<Content: View>: View {
         } else {
             row.simultaneousGesture(drag)
         }
+    }
+
+    /// Ends a horizontal drag that would stop `projected` logical points from its start.
+    private func end(projected: CGFloat) {
+        let end = SkipSwipe.end(isRevealed: isRevealed, projected: projected, skipsAtSwipe: skipsAtSwipe)
+        withAnimation(.snappy(duration: 0.25)) {
+            dragX = 0
+            isRevealed = end.revealed
+        }
+        if end.skips { onSkip() }
     }
 
     private var drag: some Gesture {
@@ -326,10 +347,7 @@ private struct SwipeToSkipRow<Content: View>: View {
                 }
                 guard axis == .horizontal else { return }
                 let projected = value.predictedEndTranslation.width * sign
-                withAnimation(.snappy(duration: 0.25)) {
-                    dragX = 0
-                    isRevealed = SkipSwipe.reveals(isRevealed: isRevealed, projected: projected)
-                }
+                end(projected: projected)
             }
     }
 }
