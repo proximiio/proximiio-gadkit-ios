@@ -333,6 +333,7 @@ final class HostedMapModel: ObservableObject {
     func handle(_ event: VisitEvent) {
         FieldLog.log("hosted map event: \(event)")
         guard let mapped = ProximiMap.event(for: event, places: places) else { return }
+        if case .nextStop(let stop) = mapped { FieldLog.log("host event: nextStop \(stop.title)") }
         onEvent?(mapped)
     }
 }

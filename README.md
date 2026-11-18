@@ -852,7 +852,9 @@ let configuration = GADConfiguration(
 | `offRouteMeters`, `offRouteSeconds` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, or off the journey this long. Back within two thirds of the distance the visitor is on the leg again. |
 | `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | Personalised journeys, the visitor in the gallery of the current artwork: this far off the leg, the stops ahead are ordered again from the visitor and the leg is drawn again from the visitor, at most this often. No warning shows. `false`: the leg stays until `offRouteMeters`. |
-| `ordersAtGalleryEntry` | `true` | Personalised journeys: when the visitor enters a gallery that holds an artwork still to visit, and the current artwork is in another gallery, the stops ahead are ordered again from the visitor. Once per entry, no warning. |
+| `ordersAtGalleryEntry`, `galleryEntryOrderSeconds` | `true`, 3 s | Personalised journeys: when the visitor has been this long in a gallery that holds an artwork still to visit, and the current artwork is in another gallery, the stops ahead are ordered again from the visitor. Once per entry, no warning. An entry while paused, during a detour or at a reached artwork is checked when that state ends. |
+| `ordersVisitorGalleryFirst` | `true` | Personalised journeys: every order from the visitor puts the artworks of the gallery the visitor is in (for `galleryEntryOrderSeconds`) first, also when an artwork of another gallery is nearer by the route. `false`: the nearest artwork by the route goes first, as in 1.51.0. |
+| `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor has arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
 | `skipsAtSwipe` | `false` | Journey list: a swipe on an artwork asks for the skip at once (`skipRequested`, and the dialog with `.skipPrompt`). `false`: the swipe reveals the skip button, and a tap on it asks for the skip. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
@@ -1110,6 +1112,38 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.52.0 (2026-11-18)
+
+No change is needed in the code of a host app. A personalised journey leads to the artworks of the
+gallery the visitor is in before an artwork of another gallery.
+
+Added:
+
+- `GADSettings.ordersVisitorGalleryFirst` (`true`). Personalised journeys: every order from the
+  visitor puts the artworks of the gallery the visitor is in first, also when an artwork of another
+  gallery is nearer by the route. This holds at a gallery entry, after a resume, off the route,
+  after a visited artwork and at the route refresh in a gallery. In 1.51.0 the order changed only
+  when it saved walking time: a visitor who entered a gallery kept the leg to a nearer artwork of
+  another gallery (PM's field test and Nagarro's bug list, 2026-11-18). `false` gives the order of
+  1.51.0.
+- `GADSettings.galleryEntryOrderSeconds` (3 s). The visitor counts as in a gallery once the position
+  has been in it this long. A position that crosses a border for a shorter time changes no order.
+- `GADSettings.visitsArtworkAtAnotherArtwork` (`true`). `false`: an artwork the visitor has arrived
+  at is not marked visited at the entry of another artwork of the journey; only
+  `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. For venues whose artwork
+  geofences overlap.
+
+Changed:
+
+- `ordersAtGalleryEntry` checks the order after `galleryEntryOrderSeconds` in the gallery, not at
+  the first fix in it. An entry while the journey is paused, during a detour or at a reached artwork
+  is checked when that state ends; 1.51.0 dropped it.
+- Field log: `gallery entered: …` also says when the order stays and why. `host event: nextStop
+  <title>` is written when `ProximiMapView` reports `nextStop`.
+- Field log: a `device <model> · <system version>` line follows every `launch` line, and
+  `journey gallery: <name>` is written when the gallery of an open artwork the visitor is in
+  changes.
 
 ### 1.51.0 (2026-11-18)
 

@@ -108,6 +108,20 @@ public struct GADSettings: Equatable, Sendable {
     /// `false`: the order changes there only off the route or after an artwork is visited, as
     /// before 1.51.0 (PM's field test, 2026-11-17).
     public var ordersAtGalleryEntry = true
+    /// Seconds the visitor's position lies in a gallery before `ordersAtGalleryEntry` and
+    /// `ordersVisitorGalleryFirst` count the visitor in it. A position that crosses a border for a
+    /// shorter time changes no order. 0 counts the first fix.
+    public var galleryEntryOrderSeconds: TimeInterval = 3
+    /// Personalised journeys: every order from the visitor puts the artworks of the gallery the
+    /// visitor is in first, also when an artwork of another gallery is nearer by the route. So the
+    /// entry of a gallery (`ordersAtGalleryEntry`), a resume and an order off the route lead to an
+    /// artwork of that gallery. `false`: the nearest artwork by the route goes first, as in 1.51.0
+    /// (PM's field test and Nagarro's bug list, 2026-11-18).
+    public var ordersVisitorGalleryFirst = true
+    /// An artwork the visitor has arrived at is marked visited when the visitor enters the geofence
+    /// of another artwork of the journey and is outside its own. `false`: only
+    /// `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited.
+    public var visitsArtworkAtAnotherArtwork = true
     /// Gallery first: an artwork that led to the artwork because the visitor was in its gallery
     /// leads to the gallery again when the visitor is more than this many metres outside the
     /// gallery's outline, or on another floor.

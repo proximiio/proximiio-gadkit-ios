@@ -5,6 +5,7 @@
 //  The wrong floor counts as off the route, the off-route warning's time, and the stop markers with
 //  gallery first (PM, Monday 2026-10-27).
 //
+import Foundation
 import ProximiioMap
 import Testing
 @testable import ProximiioGADKit
@@ -110,18 +111,79 @@ struct OffRouteTests {
         #expect(!VisitController.refreshesGalleryRoute(meters: 30, sinceLast: 60, settings: settings))
     }
 
-    /// Entering a gallery with an open journey artwork orders the stops once, unless the current
-    /// artwork is in that gallery (PM's field test, 2026-11-17).
-    @Test func theStopsAreOrderedAtTheEntryOfAJourneyGallery() {
+    /// The order at a gallery entry is checked once the visitor has been in the gallery for
+    /// `galleryEntryOrderSeconds` (PM's field tests, 2026-11-17 and 2026-11-18).
+    @Test func theOrderIsCheckedAfterTheVisitorStayedInTheGallery() {
         var settings = GADSettings.standard
         #expect(settings.ordersAtGalleryEntry)
-        #expect(VisitController.ordersAtGalleryEntry(previous: nil, current: "g104", active: "g102", settings: settings))
-        #expect(VisitController.ordersAtGalleryEntry(previous: "g103", current: "g104", active: nil, settings: settings))
-        #expect(!VisitController.ordersAtGalleryEntry(previous: "g104", current: "g104", active: "g102", settings: settings))
-        #expect(!VisitController.ordersAtGalleryEntry(previous: nil, current: "g102", active: "g102", settings: settings))
-        #expect(!VisitController.ordersAtGalleryEntry(previous: "g104", current: nil, active: "g102", settings: settings))
+        #expect(settings.galleryEntryOrderSeconds == 3)
+        #expect(!VisitController.checksGalleryEntry(seconds: 0, settings: settings))
+        #expect(!VisitController.checksGalleryEntry(seconds: 2.9, settings: settings))
+        #expect(VisitController.checksGalleryEntry(seconds: 3, settings: settings))
+        settings.galleryEntryOrderSeconds = 0
+        #expect(VisitController.checksGalleryEntry(seconds: 0, settings: settings))
         settings.ordersAtGalleryEntry = false
-        #expect(!VisitController.ordersAtGalleryEntry(previous: nil, current: "g104", active: "g102", settings: settings))
+        #expect(!VisitController.checksGalleryEntry(seconds: 60, settings: settings))
+    }
+
+    private func proposal(order: [String], current: [String], currentMeters: Double, proposedMeters: Double, pinned: [String] = []) -> JourneyOrderProposal {
+        JourneyOrderProposal(order: order, currentOrder: current, pinnedStopIDs: pinned, currentMeters: currentMeters, proposedMeters: proposedMeters)
+    }
+
+    /// The artworks of the visitor's gallery go first, also when the map's order is no improvement:
+    /// the current artwork in gallery 104 was 12.5 m away, the open artwork of the entered gallery
+    /// 101 was 49 m away, and the order stayed (PM's log, 2026-11-18 05:38 UTC).
+    @Test func theArtworksOfTheVisitorsGalleryGoFirst() throws {
+        let kept = proposal(order: ["a104", "b104", "c101", "d101"], current: ["a104", "b104", "c101", "d101"], currentMeters: 100, proposedMeters: 100)
+        #expect(!kept.isImprovement)
+        #expect(VisitController.galleryFirst(kept, inVisitorGallery: []) == nil)
+        let first = try #require(VisitController.galleryFirst(kept, inVisitorGallery: ["c101", "d101"]))
+        #expect(first.order == ["c101", "d101", "a104", "b104"])
+        // The current artwork is in the visitor's gallery already: the order stays.
+        #expect(VisitController.galleryFirst(kept, inVisitorGallery: ["a104", "b104"]) == nil)
+    }
+
+    /// An improvement of the map keeps its order inside and outside the visitor's gallery.
+    @Test func anImprovedOrderKeepsItsOrderBehindTheVisitorsGallery() throws {
+        let improved = proposal(order: ["b104", "d101", "a104", "c101"], current: ["a104", "b104", "c101", "d101"], currentMeters: 100, proposedMeters: 60)
+        #expect(improved.isImprovement)
+        #expect(VisitController.galleryFirst(improved, inVisitorGallery: []) == improved)
+        let first = try #require(VisitController.galleryFirst(improved, inVisitorGallery: ["c101", "d101"]))
+        #expect(first.order == ["d101", "c101", "b104", "a104"])
+        // An improvement that gives the journey's own order after the gallery goes first changes nothing.
+        let back = proposal(order: ["c101", "a104", "b104", "d101"], current: ["a104", "b104", "c101", "d101"], currentMeters: 100, proposedMeters: 60)
+        #expect(VisitController.galleryFirst(back, inVisitorGallery: ["a104", "b104"]) == nil)
+        // Pinned stops keep the map's order.
+        let pinned = proposal(order: ["b104", "d101", "a104", "c101"], current: ["a104", "b104", "c101", "d101"], currentMeters: 100, proposedMeters: 60, pinned: ["b104"])
+        #expect(VisitController.galleryFirst(pinned, inVisitorGallery: ["c101"]) == pinned)
+    }
+
+    /// The map applies an order that is no improvement by walking time.
+    @Test func theMapAppliesAGalleryFirstOrder() throws {
+        func stop(_ id: String, _ state: JourneyStop.State = .pending) -> JourneyStop {
+            JourneyStop(id: id, title: id, coordinate: .init(latitude: 24.54, longitude: 54.39), floor: FloorKey(level: 1), poiID: id, kind: .planned, state: state)
+        }
+        var plan = ProximiioMap.JourneyPlan(journey: Journey(stops: [stop("x", .done), stop("a104"), stop("b104"), stop("c101"), stop("d101")]))
+        _ = plan.start()
+        _ = plan.positionChanged(to: .init(latitude: 24.54, longitude: 54.39), floor: FloorKey(level: 1))
+        let ids = ["a104", "b104", "c101", "d101"]
+        var durations: [JourneyEdge: TimeInterval] = [:]
+        for (i, from) in ids.enumerated() {
+            durations[JourneyEdge(from: nil, to: from)] = Double(i + 1) * 10
+            for (j, to) in ids.enumerated() where i != j { durations[JourneyEdge(from: from, to: to)] = Double(abs(i - j)) * 10 }
+        }
+        let base = try #require(plan.proposeOrder(durations: durations, from: .visitor))
+        #expect(!base.isImprovement)
+        let first = try #require(VisitController.galleryFirst(base, inVisitorGallery: ["c101", "d101"]))
+        #expect(plan.canApply(first))
+        plan.apply(first)
+        #expect(plan.activeStop?.id == "c101")
+        #expect(plan.journey.stops.map(\.id) == ["x", "c101", "d101", "a104", "b104"])
+    }
+
+    @Test func anArtworkIsVisitedAtAnotherArtworkByDefault() {
+        #expect(GADSettings.standard.visitsArtworkAtAnotherArtwork)
+        #expect(GADSettings.standard.ordersVisitorGalleryFirst)
     }
 
     /// The warning follows the leg to the current destination: 13 m off it warns also where a later

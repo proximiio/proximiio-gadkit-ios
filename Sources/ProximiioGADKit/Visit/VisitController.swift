@@ -207,6 +207,10 @@ final class VisitController: ObservableObject {
     private var lastGalleryRouteRefresh = Date.distantPast
     /// The gallery of an open journey artwork the visitor was in at the last fix (`checkGalleryEntry`).
     private var visitorJourneyGalleryID: String?
+    /// When the visitor's fix first lay in `visitorJourneyGalleryID`.
+    private var visitorJourneyGallerySince = Date.distantPast
+    /// `false` from the entry of `visitorJourneyGalleryID` until `checkGalleryEntry` checked the order.
+    private var isGalleryEntryChecked = true
     /// The last of the journey changes that run one after another (`serially`).
     private var journeyEdit: Task<Void, Never>?
     /// Stops whose move to the next artwork is scheduled.
@@ -328,8 +332,7 @@ final class VisitController: ObservableObject {
         await waitForFix(upTo: .seconds(settings.lateOrderWindow))
         guard session.position != nil, !navigator.hasArrived,
               navigator.journey.stops.allSatisfy({ $0.state == .pending || $0.state == .active }),
-              let proposal = await navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
-              proposal.isImprovement
+              let proposal = await visitorOrder()
         else { return }
         await apply(proposal)
     }
@@ -489,7 +492,8 @@ final class VisitController: ObservableObject {
                 arrivedStopID = nil
                 outsideArrivedSince = nil
                 if outOfOrderArrivedID == arrived { outOfOrderArrivedID = nil }
-            } else if Self.leavesForAnotherArtwork(isInsideAnother: !inside.isEmpty || isInsideUpcoming, activeDistance: activeDistance) {
+            } else if settings.visitsArtworkAtAnotherArtwork,
+                      Self.leavesForAnotherArtwork(isInsideAnother: !inside.isEmpty || isInsideUpcoming, activeDistance: activeDistance) {
                 // In another open artwork and outside this one: the visitor has moved on. That
                 // artwork counts from the next fix, after the journey moved on.
                 leaveArrivedArtwork(reason: "in another artwork", cause: .enteredAnotherArtwork)
@@ -636,8 +640,7 @@ final class VisitController: ObservableObject {
         tasks.append(Task { [weak self] in
             await self?.serially { [weak self] in
                 guard let self, self.isOffRouteEpisode, self.navigator.activeStop?.id == active.id,
-                      let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
-                      proposal.isImprovement, let first = proposal.order.first, first != active.id
+                      let proposal = await self.visitorOrder(), let first = proposal.order.first, first != active.id
                 else { return }
                 FieldLog.log("off route: \(first) is nearer than \(active.title) · journey ordered again")
                 self.isOffRouteEpisode = false
@@ -678,41 +681,83 @@ final class VisitController: ObservableObject {
         }
     }
 
-    /// Called on every fix. A personalised journey whose visitor enters a gallery that holds an
-    /// artwork still to visit, while the current artwork is in another gallery: the stops ahead are
-    /// ordered again from the visitor (`GADSettings.ordersAtGalleryEntry`; PM's field test,
-    /// 2026-11-17). Once per entry. No warning shows. Not while paused, during a detour or at a
-    /// reached artwork; an entry in those states orders nothing later.
+    /// Called on every fix. A personalised journey whose visitor is in a gallery that holds an
+    /// artwork still to visit, for `GADSettings.galleryEntryOrderSeconds`, while the current artwork
+    /// is in another gallery: the stops ahead are ordered again from the visitor, the artworks of
+    /// that gallery first (`GADSettings.ordersAtGalleryEntry`, `ordersVisitorGalleryFirst`; PM's
+    /// field tests, 2026-11-17 and 2026-11-18). Once per entry. No warning shows. An entry while
+    /// paused, during a detour or at a reached artwork is checked when that state ends.
     func checkGalleryEntry() {
         guard let position = session.position else { return }
         let open = navigator.journey.stops.filter { $0.state == .pending || $0.id == navigator.activeStop?.id }
         let current = open.lazy.compactMap { self.galleryRouting.galleryHolding($0.coordinate) }
             .first { $0.gallery.contains(position.coordinate.proximiio, level: position.floor?.level) }
-        let previous = visitorJourneyGalleryID
-        visitorJourneyGalleryID = current?.placeID
-        guard managesProgress, !keepsOrder, isNavigating, !isPaused, navigator.detourStop == nil, !navigator.hasArrived,
-              let active = navigator.activeStop, let current,
-              Self.ordersAtGalleryEntry(previous: previous, current: current.placeID,
-                                        active: galleryRouting.galleryHolding(active.coordinate)?.placeID, settings: settings)
+        if current?.placeID != visitorJourneyGalleryID {
+            visitorJourneyGalleryID = current?.placeID
+            visitorJourneyGallerySince = .now
+            isGalleryEntryChecked = current == nil
+            FieldLog.log("journey gallery: \(current?.gallery.name ?? "-")")
+        }
+        guard !isGalleryEntryChecked, let current,
+              managesProgress, !keepsOrder, isNavigating, !isPaused, navigator.detourStop == nil, !navigator.hasArrived,
+              let active = navigator.activeStop,
+              Self.checksGalleryEntry(seconds: Date.now.timeIntervalSince(visitorJourneyGallerySince), settings: settings)
         else { return }
+        isGalleryEntryChecked = true
+        guard galleryRouting.galleryHolding(active.coordinate)?.placeID != current.placeID else {
+            FieldLog.log("gallery entered: \(current.gallery.name) · the current artwork \(active.title) is in it · order kept")
+            return
+        }
         tasks.append(Task { [weak self] in
             await self?.serially { [weak self] in
-                guard let self, self.navigator.activeStop?.id == active.id, !self.navigator.hasArrived, self.navigator.detourStop == nil,
-                      let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: self.orderStrategy),
-                      proposal.isImprovement, let first = proposal.order.first, first != active.id
+                guard let self, self.navigator.activeStop?.id == active.id, !self.navigator.hasArrived, self.navigator.detourStop == nil
                 else { return }
-                FieldLog.log("gallery entered: \(current.gallery.name) · \(first) is nearer than \(active.title) · journey ordered again")
+                guard let proposal = await self.visitorOrder(), let first = proposal.order.first, first != active.id else {
+                    FieldLog.log("gallery entered: \(current.gallery.name) · no other order from the visitor · \(active.title) stays the current artwork")
+                    return
+                }
+                FieldLog.log("gallery entered: \(current.gallery.name) · \(first) goes before \(active.title) · journey ordered again")
                 await self.rerouting { await self.apply(proposal) }
             }
         })
     }
 
-    /// Whether `checkGalleryEntry` orders the stops: the setting is on, the visitor is in a gallery
-    /// of an open journey artwork they were not in at the last fix, and the current artwork is not
-    /// in it. Pure; covered by tests.
-    nonisolated static func ordersAtGalleryEntry(previous: String?, current: String?, active: String?, settings: GADSettings) -> Bool {
-        guard settings.ordersAtGalleryEntry, let current else { return false }
-        return current != previous && current != active
+    /// Whether `checkGalleryEntry` checks the order: the setting is on and the visitor has been in
+    /// the gallery for `galleryEntryOrderSeconds`. Pure; covered by tests.
+    nonisolated static func checksGalleryEntry(seconds: TimeInterval, settings: GADSettings) -> Bool {
+        settings.ordersAtGalleryEntry && seconds >= settings.galleryEntryOrderSeconds
+    }
+
+    /// The order of the stops ahead from the visitor, or `nil` when the order stays. The map
+    /// orders them by walking time (`orderStrategy`). With `GADSettings.ordersVisitorGalleryFirst`,
+    /// the artworks of the gallery the visitor has been in for `galleryEntryOrderSeconds` go first,
+    /// also when an artwork of another gallery is nearer by the route.
+    private func visitorOrder() async -> JourneyOrderProposal? {
+        guard let base = await navigator.proposeOrder(from: .visitor, strategy: orderStrategy) else { return nil }
+        return Self.galleryFirst(base, inVisitorGallery: visitorGalleryStopIDs())
+    }
+
+    /// The open artworks of the gallery the visitor has been in for `galleryEntryOrderSeconds`
+    /// (`checkGalleryEntry` keeps the gallery). Empty with `ordersVisitorGalleryFirst` off.
+    private func visitorGalleryStopIDs() -> Set<String> {
+        guard settings.ordersVisitorGalleryFirst, let galleryID = visitorJourneyGalleryID,
+              Date.now.timeIntervalSince(visitorJourneyGallerySince) >= settings.galleryEntryOrderSeconds
+        else { return [] }
+        let open = navigator.journey.stops.filter { $0.state == .pending || $0.id == navigator.activeStop?.id }
+        return Set(open.filter { galleryRouting.galleryHolding($0.coordinate)?.placeID == galleryID }.map(\.id))
+    }
+
+    /// `base` with the stops of `ids` first, in the order `base` gives them, or `nil` when that is
+    /// the order the journey has. Without `ids`: `base` when it is an improvement. A proposal with
+    /// pinned stops keeps its order. Pure; covered by tests.
+    nonisolated static func galleryFirst(_ base: JourneyOrderProposal, inVisitorGallery ids: Set<String>) -> JourneyOrderProposal? {
+        guard !ids.isEmpty, base.pinnedStopIDs.isEmpty else { return base.isImprovement ? base : nil }
+        let from = base.isImprovement ? base.order : base.currentOrder
+        let order = from.filter(ids.contains) + from.filter { !ids.contains($0) }
+        guard order != base.currentOrder else { return nil }
+        var proposal = base
+        proposal.order = order
+        return proposal
     }
 
     /// Called on every guidance update. A personalised journey, the visitor in the gallery of the
@@ -736,8 +781,7 @@ final class VisitController: ObservableObject {
                 guard let self, self.navigator.activeStop?.id == active.id, !self.navigator.hasArrived, self.navigator.detourStop == nil
                 else { return }
                 await self.rerouting {
-                    if reorders, let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: self.orderStrategy),
-                       proposal.isImprovement, let first = proposal.order.first, first != active.id {
+                    if reorders, let proposal = await self.visitorOrder(), let first = proposal.order.first, first != active.id {
                         FieldLog.log("gallery route: \(first) is nearer than \(active.title) · journey ordered again")
                         await self.apply(proposal)
                     }
@@ -809,8 +853,7 @@ final class VisitController: ObservableObject {
             await self?.serially { [weak self] in
                 guard let self else { return }
                 await self.rerouting {
-                    if reorders, let proposal = await self.navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
-                       proposal.isImprovement {
+                    if reorders, let proposal = await self.visitorOrder() {
                         await self.apply(proposal)
                     }
                     await self.navigator.resumeJourney()
@@ -994,8 +1037,7 @@ final class VisitController: ObservableObject {
         guard galleryRouting.isInGalleryOfLaterArtwork(
             origin: position.coordinate.proximiio, originLevel: position.floor?.level, next: next.coordinate, later: later
         ),
-              let proposal = await navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
-              proposal.isImprovement, let first = proposal.order.first, first != next.id
+              let proposal = await visitorOrder(), let first = proposal.order.first, first != next.id
         else { return }
         FieldLog.log("visitor in another gallery: \(first) is nearer than \(next.title) · journey ordered again")
         await rerouting { await self.apply(proposal) }
@@ -1007,8 +1049,7 @@ final class VisitController: ObservableObject {
 
     /// Orders the stops still ahead from the visitor, floor by floor and gallery by gallery.
     private func orderRemaining() async {
-        guard !keepsOrder, let proposal = await navigator.proposeOrder(from: .visitor, strategy: orderStrategy),
-              proposal.isImprovement
+        guard !keepsOrder, let proposal = await visitorOrder()
         else { return }
         await apply(proposal)
     }

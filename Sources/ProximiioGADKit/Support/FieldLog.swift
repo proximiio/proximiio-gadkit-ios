@@ -49,12 +49,22 @@ public enum FieldLog {
         queue.async { append(Data(line.utf8)) }
     }
 
-    /// Writes the header of a new session: app version, build and date.
+    /// Writes the header of a new session: app version, build and date, then the device model and
+    /// the system version.
     public static func logLaunch() {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
         log("launch \(version) (\(build)) \(Date().formatted(.iso8601))")
+        log("device \(deviceModel()) · \(ProcessInfo.processInfo.operatingSystemVersionString)")
+    }
+
+    /// The hardware model, such as `iPhone18,1`; in the simulator the model it stands for.
+    static func deviceModel() -> String {
+        if let simulated = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] { return simulated }
+        var system = utsname()
+        uname(&system)
+        return withUnsafeBytes(of: &system.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
     }
 
     /// Copies this process's unified-log entries of `subsystem` and `category` to the field log
