@@ -206,6 +206,8 @@ final class VisitController: ObservableObject {
     private var lastLegReroute = Date.distantPast
     private var lastGalleryRouteRefresh = Date.distantPast
     private var lastNearestArtworkCheck = Date.distantPast
+    /// Since when the visitor is near the geofence of the active artwork and outside it.
+    private var nearActiveSince: Date?
     /// The gallery of an open journey artwork the visitor was in at the last fix (`checkGalleryEntry`).
     private var visitorJourneyGalleryID: String?
     /// When the visitor's fix first lay in `visitorJourneyGalleryID`.
@@ -461,6 +463,7 @@ final class VisitController: ObservableObject {
         // the visit of the active one (GAD PM, 2026-11-15).
         let upcomingID = navigator.hasArrived ? navigator.upcomingStop?.id : nil
         var isInsideUpcoming = false
+        var activeRemoteID: String?
         for stop in navigator.journey.stops
         where stop.kind != .detour && (stop.state == .pending || stop.state == .active || stop.state == .reached) {
             guard let remoteID = artworkRemoteIDs[stop.poiID ?? stop.id],
@@ -469,6 +472,7 @@ final class VisitController: ObservableObject {
             if !VenueLevel.matches(stop.floor?.level, level) { continue }
             if stop.id == activeID {
                 activeDistance = areas.map { $0.distance(to: point) }.min() ?? .infinity
+                activeRemoteID = remoteID
             }
             let tolerance = settings.artworkVisitedMeters
             guard areas.contains(where: { Self.isInside($0, point: point, entered: enteredGeofenceIDs, toleranceMeters: tolerance) }) else {
@@ -486,6 +490,20 @@ final class VisitController: ObservableObject {
             } else if stop.id == upcomingID {
                 isInsideUpcoming = true
             }
+        }
+        // Near the geofence of the active artwork, outside it and in no other open artwork: the
+        // arrival after `artworkArrivalMarginSeconds` (`GADSettings.artworkArrivalMarginMeters`).
+        if arrivedStopID == nil, !navigator.hasArrived, let activeRemoteID, activeDistance > 0, inside.isEmpty, !isInsideUpcoming,
+           activeDistance <= settings.artworkArrivalMarginMeters {
+            let since = nearActiveSince ?? .now
+            nearActiveSince = since
+            if Self.arrivesNearGeofence(distance: activeDistance, seconds: Date.now.timeIntervalSince(since), settings: settings) {
+                nearActiveSince = nil
+                FieldLog.log(String(format: "artwork arrival near its geofence: \(navigator.activeStop?.title ?? "-") · %.1f m outside for %.0f s", activeDistance, settings.artworkArrivalMarginSeconds))
+                artworkGeofenceEntered(remoteID: activeRemoteID)
+            }
+        } else {
+            nearActiveSince = nil
         }
         if let arrived = arrivedStopID {
             if arrived != activeID {
@@ -514,6 +532,15 @@ final class VisitController: ObservableObject {
         for id in outOfOrderDwell.update(inside: inside, now: .now, dwell: settings.outOfOrderDwell) {
             if Self.arrivesOutOfOrder(settings: settings) { arriveOutOfOrder(id) } else { markOutOfOrder(id) }
         }
+    }
+
+    /// Whether a visitor `distance` metres outside the geofence of the current artwork for `seconds`
+    /// has arrived. Artwork geofences of 1.5 m to 3 m around the artwork left a visitor 2 m to 3.6 m
+    /// from the artwork for a minute without the arrival (Nagarro's field test, 2026-11-18 16:38 UTC).
+    /// Pure; covered by tests.
+    nonisolated static func arrivesNearGeofence(distance: Double, seconds: TimeInterval, settings: GADSettings) -> Bool {
+        settings.artworkArrivalMarginMeters > 0 && distance <= settings.artworkArrivalMarginMeters
+            && seconds >= settings.artworkArrivalMarginSeconds
     }
 
     /// Whether the visitor at `point` counts as inside `area`: the fix is in it, or the SDK counts the

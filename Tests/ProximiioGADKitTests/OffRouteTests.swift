@@ -173,6 +173,19 @@ struct OffRouteTests {
         #expect(VisitController.nearestStop([("watan", 6), ("jand", 6)], active: "watan", settings: settings) == nil)
     }
 
+    /// A visitor 2 m to 3.6 m from an artwork with a geofence of 1.5 m got no arrival for a minute
+    /// (Nagarro's field test, 2026-11-18 16:38 UTC).
+    @Test func aVisitorNearTheGeofenceArrivesAfterTheDwell() {
+        var settings = GADSettings()
+        #expect(settings.artworkArrivalMarginMeters == 2.5)
+        #expect(settings.artworkArrivalMarginMeters < settings.artworkVisitedMeters)
+        #expect(VisitController.arrivesNearGeofence(distance: 2.1, seconds: 3, settings: settings))
+        #expect(!VisitController.arrivesNearGeofence(distance: 2.1, seconds: 2, settings: settings))
+        #expect(!VisitController.arrivesNearGeofence(distance: 2.6, seconds: 60, settings: settings))
+        settings.artworkArrivalMarginMeters = 0
+        #expect(!VisitController.arrivesNearGeofence(distance: 0, seconds: 60, settings: settings))
+    }
+
     /// An improvement of the map keeps its order inside and outside the visitor's gallery.
     @Test func anImprovedOrderKeepsItsOrderBehindTheVisitorsGallery() throws {
         let improved = proposal(order: ["b104", "d101", "a104", "c101"], current: ["a104", "b104", "c101", "d101"], currentMeters: 100, proposedMeters: 60)

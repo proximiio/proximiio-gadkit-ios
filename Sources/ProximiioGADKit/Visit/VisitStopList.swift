@@ -302,13 +302,14 @@ private struct SwipeToSkipRow<Content: View>: View {
         } else if #available(iOS 18.0, *) {
             // No `isSwiping`: the list's pan already waits for this one (`HorizontalPan`).
             row.gesture(HorizontalPan(
-                onBegan: {},
+                onBegan: { FieldLog.log("list swipe: began · revealed \(isRevealed)") },
                 onChanged: { dragX = $0 },
                 onEnded: { translation, velocity in
                     let projected = (translation + velocity * 0.2) * sign
                     end(projected: projected)
                 },
                 onCancelled: {
+                    FieldLog.log("list swipe: cancelled")
                     withAnimation(.snappy(duration: 0.25)) { dragX = 0 }
                 }
             ))
@@ -320,6 +321,7 @@ private struct SwipeToSkipRow<Content: View>: View {
     /// Ends a horizontal drag that would stop `projected` logical points from its start.
     private func end(projected: CGFloat) {
         let end = SkipSwipe.end(isRevealed: isRevealed, projected: projected, skipsAtSwipe: skipsAtSwipe)
+        FieldLog.log(String(format: "list swipe: ended · %.0f pt · skip %@", projected, end.skips ? "asked" : end.revealed ? "shown" : "hidden"))
         withAnimation(.snappy(duration: 0.25)) {
             dragX = 0
             isRevealed = end.revealed
@@ -392,7 +394,11 @@ private struct HorizontalPan: UIGestureRecognizerRepresentable {
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
             guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
             let velocity = pan.velocity(in: pan.view)
-            return abs(velocity.x) > abs(velocity.y)
+            let begins = abs(velocity.x) > abs(velocity.y)
+            if !begins, abs(velocity.x) > 50 {
+                FieldLog.log(String(format: "list swipe: not begun · velocity %.0f, %.0f pt/s", velocity.x, velocity.y))
+            }
+            return begins
         }
 
         /// The list's pan waits for this one. A vertical drag fails it at once, so scrolling
