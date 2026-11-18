@@ -231,6 +231,20 @@ final class VenueService {
         await sdk.attachPositionProvider(provider)
     }
 
+    /// Debug builds only. Replaces the attached provider with the positions of the field log at
+    /// `path`, between `from` and `to` (`HH:mm:ss`, UTC) on `day` (`yyyy-MM-dd`). Returns the
+    /// number of positions.
+    func playLog(path: String, day: String?, from: String?, to: String?, speed: Double) async throws -> Int {
+        let text = try String(contentsOfFile: path, encoding: .utf8)
+        let samples = LogPlayback.samples(in: text, day: day, from: from, to: to)
+        let floorIDs = Dictionary(await sdk.floors().map { (Int($0.level), $0.id) }) { first, _ in first }
+        await detachProvider()
+        let provider = LogPlaybackProvider(samples: samples, speed: speed, floorIDs: floorIDs)
+        attachedProvider = provider.name
+        await sdk.attachPositionProvider(provider)
+        return samples.count
+    }
+
     struct JourneyNotPlayable: LocalizedError {
         let reason: String
         var errorDescription: String? { "Journey cannot be played: \(reason)" }

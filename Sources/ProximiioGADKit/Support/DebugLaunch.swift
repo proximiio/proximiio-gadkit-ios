@@ -11,6 +11,10 @@
 //    -journeySpeed <x>                    playback speed, default 1
 //    -journeyLoop                         restart after the last waypoint
 //    -listJourneys                        print the organisation's journeys
+//    -logPlayback <path>                  play the positions of a field log instead of the wristband
+//    -logDay <yyyy-MM-dd>                 with -logPlayback: the day to play, default every day
+//    -logFrom <HH:mm:ss>, -logTo <HH:mm:ss>   with -logPlayback: the part to play, UTC
+//                                         (-journeySpeed sets the speed)
 //    -hubPage welcome|craft               open the Hub on that page
 //    -openMap                             open the museum map after launch
 //    -visitList                           with -visit: open the journey in List mode
@@ -38,6 +42,10 @@ import Foundation
     public var journeySpeed: Double = 1
     public var journeyLoops = false
     public var listJourneys = false
+    public var logPath: String?
+    public var logDay: String?
+    public var logFrom: String?
+    public var logTo: String?
     public var openMap = false
     public var hubPage: String?
     public var routeTo: String?
@@ -72,6 +80,10 @@ import Foundation
         journeySpeed = value(after: "-journeySpeed").flatMap(Double.init) ?? 1
         journeyLoops = arguments.contains("-journeyLoop")
         listJourneys = arguments.contains("-listJourneys")
+        logPath = value(after: "-logPlayback")
+        logDay = value(after: "-logDay")
+        logFrom = value(after: "-logFrom")
+        logTo = value(after: "-logTo")
         openMap = arguments.contains("-openMap")
         hubPage = value(after: "-hubPage")
         routeTo = value(after: "-routeTo")
@@ -113,7 +125,14 @@ import Foundation
                 Self.log("journeys failed: \(error.localizedDescription)")
             }
         }
-        if let journeyID {
+        if let logPath {
+            do {
+                let count = try await venue.playLog(path: logPath, day: logDay, from: logFrom, to: logTo, speed: journeySpeed)
+                Self.log("log playback started: \(count) positions · \(logDay ?? "every day") \(logFrom ?? "start")–\(logTo ?? "end") · speed \(journeySpeed)")
+            } catch {
+                Self.log("log playback failed: \(error.localizedDescription)")
+            }
+        } else if let journeyID {
             do {
                 try await venue.playJourney(id: journeyID, speed: journeySpeed, loops: journeyLoops)
                 Self.log("journey playback started: \(journeyID)")
