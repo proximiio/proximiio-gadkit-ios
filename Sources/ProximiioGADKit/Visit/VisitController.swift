@@ -205,6 +205,7 @@ final class VisitController: ObservableObject {
     /// The last time `checkLegDeviation` drew the leg again from the visitor.
     private var lastLegReroute = Date.distantPast
     private var lastGalleryRouteRefresh = Date.distantPast
+    private var lastNearestArtworkCheck = Date.distantPast
     /// The gallery of an open journey artwork the visitor was in at the last fix (`checkGalleryEntry`).
     private var visitorJourneyGalleryID: String?
     /// When the visitor's fix first lay in `visitorJourneyGalleryID`.
@@ -815,6 +816,59 @@ final class VisitController: ObservableObject {
                 self.persist(self.navigator.journey)
             }
         })
+    }
+
+    /// Called on every guidance update. A personalised journey and the visitor in the gallery of the
+    /// current artwork: when another open artwork of that gallery is
+    /// `GADSettings.orderSwitchMinimumMeters` nearer to the visitor, in a straight line, it becomes
+    /// the current stop (`GADSettings.ordersNearestArtworkInGalleryFirst`). It also runs for a
+    /// visitor on the leg: the leg to an artwork 16.5 m away passed an open artwork 3.7 m away, and
+    /// `checkGalleryRoute` runs only off the leg (PM's field test, 2026-11-18 15:42 UTC). At most
+    /// every `galleryRouteRefreshSeconds`. Not while paused, during a detour, on a floor without
+    /// positioning or at a reached artwork.
+    func checkNearestArtworkInGallery(_ guidance: RouteGuidance?, isFloorGuideActive: Bool) {
+        guard settings.ordersNearestArtworkInGalleryFirst, managesProgress, !keepsOrder, isNavigating, !isPaused, !isFloorGuideActive,
+              navigator.detourStop == nil, !navigator.hasArrived, let guidance, !guidance.hasArrived,
+              Date.now.timeIntervalSince(lastNearestArtworkCheck) >= settings.galleryRouteRefreshSeconds,
+              let active = navigator.activeStop, let position = session.position,
+              let gallery = galleryRouting.galleryHolding(active.coordinate),
+              gallery.gallery.contains(position.coordinate.proximiio, level: position.floor?.level)
+        else { return }
+        lastNearestArtworkCheck = .now
+        let origin = position.coordinate.proximiio
+        let open = navigator.journey.stops.filter { ($0.state == .pending || $0.id == active.id) && $0.kind != .detour }
+        let distances = open.filter { galleryRouting.galleryHolding($0.coordinate)?.placeID == gallery.placeID }
+            .map { (id: $0.id, meters: GeoMath.haversineDistance(from: $0.coordinate.proximiio, to: origin)) }
+        guard let nearest = Self.nearestStop(distances, active: active.id, settings: settings) else { return }
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self, self.navigator.activeStop?.id == active.id, !self.navigator.hasArrived, self.navigator.detourStop == nil
+                else { return }
+                guard var proposal = await self.navigator.proposeOrder(from: .visitor, strategy: self.orderStrategy),
+                      proposal.pinnedStopIDs.isEmpty
+                else {
+                    FieldLog.log("gallery route: \(nearest.id) is nearer than \(active.title) · no order from the visitor")
+                    return
+                }
+                proposal.order = [nearest.id] + proposal.currentOrder.filter { $0 != nearest.id }
+                await self.rerouting {
+                    FieldLog.log(String(format: "gallery route: \(nearest.id) is %.1f m nearer than \(active.title) in %@ · it is the current stop", nearest.nearerMeters, gallery.gallery.name))
+                    await self.apply(proposal)
+                }
+                self.persist(self.navigator.journey)
+            }
+        })
+    }
+
+    /// The open stop of the visitor's gallery that takes the place of `active`: the nearest one,
+    /// when it is not `active` and `GADSettings.orderSwitchMinimumMeters` nearer. Pure; covered by tests.
+    nonisolated static func nearestStop(_ distances: [(id: String, meters: Double)], active: String,
+                                        settings: GADSettings) -> (id: String, nearerMeters: Double)? {
+        guard let current = distances.first(where: { $0.id == active }),
+              let nearest = distances.min(by: { $0.meters < $1.meters }), nearest.id != active
+        else { return nil }
+        let nearer = current.meters - nearest.meters
+        return nearer >= settings.orderSwitchMinimumMeters && nearer > 0 ? (nearest.id, nearer) : nil
     }
 
     /// Whether `checkGalleryRoute` refreshes the route: the setting is on, the visitor is more than

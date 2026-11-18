@@ -156,6 +156,23 @@ struct OffRouteTests {
         #expect(VisitController.switchesStop(nearerMeters: 0, entersVisitorGallery: false, settings: settings))
     }
 
+    /// The leg to an artwork 16.5 m away passed an open artwork of the same gallery 3.7 m away
+    /// (PM's field test, 2026-11-18 15:42 UTC).
+    @Test func theNearestArtworkOfTheGalleryTakesTheStop() throws {
+        var settings = GADSettings()
+        #expect(settings.ordersNearestArtworkInGalleryFirst)
+        let nearest = try #require(VisitController.nearestStop([("watan", 16.5), ("jand", 3.7)], active: "watan", settings: settings))
+        #expect(nearest.id == "jand")
+        #expect(abs(nearest.nearerMeters - 12.8) < 0.001)
+        // The current stop is the nearest, or the other one is less than 3 m nearer: no change.
+        #expect(VisitController.nearestStop([("watan", 3.7), ("jand", 16.5)], active: "watan", settings: settings) == nil)
+        #expect(VisitController.nearestStop([("watan", 6), ("jand", 4)], active: "watan", settings: settings) == nil)
+        // The current stop is not in the visitor's gallery: this check changes nothing.
+        #expect(VisitController.nearestStop([("jand", 3.7)], active: "watan", settings: settings) == nil)
+        settings.orderSwitchMinimumMeters = 0
+        #expect(VisitController.nearestStop([("watan", 6), ("jand", 6)], active: "watan", settings: settings) == nil)
+    }
+
     /// An improvement of the map keeps its order inside and outside the visitor's gallery.
     @Test func anImprovedOrderKeepsItsOrderBehindTheVisitorsGallery() throws {
         let improved = proposal(order: ["b104", "d101", "a104", "c101"], current: ["a104", "b104", "c101", "d101"], currentMeters: 100, proposedMeters: 60)

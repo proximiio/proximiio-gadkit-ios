@@ -128,6 +128,12 @@ public struct GADSettings: Equatable, Sendable {
     /// the visitor's gallery takes the place of one outside it at any distance. 0 takes every other
     /// order, as before 1.53.0, also between two artworks at the same distance.
     public var orderSwitchMinimumMeters: Double = 3
+    /// Personalised journeys: in the gallery of the current artwork, the nearest open artwork of
+    /// that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the
+    /// visitor than the current stop, in a straight line, also for a visitor on the leg. Checked at
+    /// most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg
+    /// (`refreshesRouteInGallery`), as before 1.54.0.
+    public var ordersNearestArtworkInGalleryFirst = true
     /// Gallery first: an artwork that led to the artwork because the visitor was in its gallery
     /// leads to the gallery again when the visitor is more than this many metres outside the
     /// gallery's outline, or on another floor.

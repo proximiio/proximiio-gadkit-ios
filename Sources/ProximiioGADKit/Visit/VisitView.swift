@@ -542,6 +542,7 @@ struct VisitView: View {
             .onReceive(controller.navigator.$guidance) { guidance in
                 checkStopNearby(position: controller.session.position, guidance: guidance)
                 controller.checkGalleryRoute(guidance, isFloorGuideActive: floorGuide.isActive)
+                controller.checkNearestArtworkInGallery(guidance, isFloorGuideActive: floorGuide.isActive)
                 controller.checkLegDeviation(guidance, isFloorGuideActive: floorGuide.isActive)
             }
             .onValueChange(of: controller.navigator.activeStop?.id) { _, _ in
