@@ -93,7 +93,7 @@ struct ProximiMapTests {
         #expect(MapStyle.options(settings: settings).maximumZoom == 20)
         #expect(MapStyle.exploreOptions(settings: settings).maximumZoom == 20)
         #expect(MapStyle.options().minimumZoom == 15)
-        #expect(MapStyle.options().maximumZoom == 21)
+        #expect(MapStyle.options().maximumZoom == 22)
         #expect(MapStyle.exploreOptions().minimumZoom == 15)
         settings.minimumZoom = nil
         settings.maximumZoom = nil

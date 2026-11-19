@@ -636,15 +636,16 @@ struct VisitView: View {
         options.contains(.offRoutePrompt) && controller.isOffRoute && hasStops && !floorGuide.isActive
     }
 
-    /// The zoom of "Centre on me" and of the follow: `GADSettings.galleryFollowZoom` inside a gallery
-    /// in a personalised journey, else `followZoom` (PM, Monday "Navigation to a gallery" and
-    /// "Curated tours: zoom level", 2026-10-27). A camera that follows the visitor zooms to it; one
+    /// The zoom of "Centre on me" and of the follow: `GADSettings.galleryFollowZoom` inside a gallery,
+    /// else `followZoom` (operator, K-39, 2026-11-19). A camera that follows the visitor zooms to it; one
     /// the visitor moved stays.
     private func applyFollowZoom() {
         let zoom = Self.followZoom(inGallery: currentGallery != nil, kind: kind, settings: settings)
         guard controller.session.options.recentreZoom != zoom else { return }
         controller.session.options.recentreZoom = zoom
-        if controller.session.cameraMode == .follow, !floorGuide.isActive {
+        // Both follow modes: the journey map follows with the heading by default, and the zoom of
+        // a gallery never applied there before 1.56.0.
+        if controller.session.cameraMode == .follow || controller.session.cameraMode == .followWithHeading, !floorGuide.isActive {
             FieldLog.log("follow zoom \(zoom) · in a gallery \(currentGallery ?? "-")")
             controller.session.recentre(zoom: zoom)
         }
@@ -652,7 +653,7 @@ struct VisitView: View {
 
     /// Pure; covered by tests.
     static func followZoom(inGallery: Bool, kind: JourneyKind, settings: GADSettings) -> Double {
-        guard inGallery, kind.guidesToGalleryFirst, let zoom = settings.galleryFollowZoom else { return settings.followZoom }
+        guard inGallery, let zoom = settings.galleryFollowZoom else { return settings.followZoom }
         return zoom
     }
 

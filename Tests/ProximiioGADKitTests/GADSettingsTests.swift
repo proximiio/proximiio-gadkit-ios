@@ -137,19 +137,18 @@ struct GADSettingsTests {
         #expect(plain.groupsOverlapping)
     }
 
-    /// One zoom in every situation and both journey kinds (PM, Monday "Zoom level at start +
-    /// navigation", 2026-10-30). A host's `galleryFollowZoom` still applies in a gallery of a
-    /// personalised journey.
-    @Test @MainActor func theFollowZoomIs19Point5Everywhere() {
+    /// The follow zooms in when the visitor enters a gallery, in both journey kinds (operator, K-39,
+    /// 2026-11-19). Without `galleryFollowZoom` there is one zoom.
+    @Test @MainActor func theFollowZoomsInInsideAGallery() {
         let settings = GADSettings.standard
-        #expect(settings.galleryFollowZoom == nil)
-        #expect(VisitView.followZoom(inGallery: false, kind: .personalised, settings: settings) == 19.5)
-        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 19.5)
-        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 19.5)
-        var withGalleryZoom = settings
-        withGalleryZoom.galleryFollowZoom = 20
-        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: withGalleryZoom) == 20)
-        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: withGalleryZoom) == 19.5)
+        #expect(settings.maximumZoom == 22)
+        #expect(VisitView.followZoom(inGallery: false, kind: .personalised, settings: settings) == 19)
+        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 22)
+        #expect(VisitView.followZoom(inGallery: false, kind: .curated, settings: settings) == 19)
+        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 22)
+        var oneZoom = settings
+        oneZoom.galleryFollowZoom = nil
+        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: oneZoom) == 19)
     }
 
     @Test func theRelayAPICanBeAURL() throws {

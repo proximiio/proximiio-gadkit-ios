@@ -865,8 +865,8 @@ let configuration = GADConfiguration(
 | `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `nil`: at any distance. The remaining distance and the instructions follow every position. |
 | `routeToStopMaximumMeters` | 15 m | A route ends where its stop projects onto the path network. The line goes on in a straight line to the stop when the stop is at most this far from that point; the remaining distance and the walking time include that segment. A leg to a gallery's POI (gallery first) ends on the path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from a path, so 15 m extends every route. |
 | `routeFromOriginMaximumMeters` | 15 m | A route starts where its origin projects onto the path network. The line starts at the origin, in a straight line to that point, when the origin is at most this far from it. The origin is the visitor's position when the route is computed; the segment does not move with later positions. 0: every route starts on the path. |
-| `followZoom` | 19.5 | Zoom of "Centre on me", of the first position and of the follow, in personalised and curated journeys. |
-| `galleryFollowZoom` | `nil` | Zoom of the follow while the visitor is in a gallery during a personalised journey; `nil` for `followZoom`. A camera the visitor moved stays. |
+| `followZoom` | 19 | Zoom of "Centre on me", of the first position and of the follow, in personalised and curated journeys, while the visitor is in no gallery. |
+| `galleryFollowZoom` | 22 | Zoom of the follow while the visitor is in a gallery, in personalised and curated journeys; `nil` for `followZoom`. A camera the visitor moved stays. |
 | `startZoom` | 17 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
 | `startZoomSeconds` | 2 | How long the journey map stays at `startZoom`. |
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
@@ -876,7 +876,7 @@ let configuration = GADConfiguration(
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
 | `bearingDeadband` | 5° | Heading changes smaller than this do not turn the map (`MapOptions.bearingDeadband`, map default 0°). |
-| `minimumZoom`, `maximumZoom` | 15, 21 | The zoom levels the visitor cannot go beyond on every map of the package; `nil` for the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
+| `minimumZoom`, `maximumZoom` | 15, 22 | The zoom levels the visitor cannot go beyond on every map of the package; `nil` for the map library's limits. The frames the map sets keep to them too (`MapOptions.minimumZoom`, `maximumZoom`, map 6.0.0-beta.52). |
 | `cameraBounds` | `.guggenheimAbuDhabi` | The box the screen stays inside on the journey map and the Explore Museum map, for gestures and for every camera move; `nil` for no limit (`MapOptions.cameraBounds`, map 6.0.0-beta.62). The default is south-west 24.53557985, 54.39348543 and north-east 24.54644005, 54.40758853 (latitude, longitude). The map stops zooming out where the box covers the view: near zoom 15.6 on an upright iPhone of 390 × 844 pt and near 16.3 on an upright 13-inch iPad. A `minimumZoom` below that zoom is not reached. With the heading-up map a corner of the view can show past the box. |
 | `ordersGalleriesByWalkingTime` | `true` | `true` picks the first gallery on a floor and the gallery after a finished one by routed walking time (`JourneyOrderStrategy.floorThenGalleryRouted`, map 6.0.0-beta.62). `false` picks them by straight-line distance. Which floor comes next and the order inside a gallery use straight-line distance in both. A stop without a route uses the straight line. The first proposal asks the SDK for the walking time between every pair of stops; the time on the GAD venue is not measured. |
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
@@ -1115,6 +1115,17 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.56.0 (2026-11-19)
+
+No change is needed in the code of a host app. The defaults of three settings change; a host app
+that sets them keeps its values.
+
+- The follow zooms in when the visitor enters a gallery and out when the visitor leaves it:
+  `GADSettings.galleryFollowZoom` is 22, was `nil`, and `followZoom` is 19, was 19.5.
+  `galleryFollowZoom` now holds for curated tours too. `galleryFollowZoom = nil` and
+  `followZoom = 19.5` keep the behaviour of 1.55.1.
+- `GADSettings.maximumZoom` is 22, was 21.
 
 ### 1.55.1 (2026-11-18)
 

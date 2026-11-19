@@ -175,13 +175,14 @@ public struct GADSettings: Equatable, Sendable {
     // MARK: Map
 
     /// Zoom of "Centre on me", of the first position and of the follow, in personalised and curated
-    /// journeys. The follow eases to it from `startZoom` (PM, Monday "Zoom level at start +
-    /// navigation", 2026-10-30).
-    public var followZoom: Double = 19.5
-    /// Zoom of the follow while the visitor is in a gallery during a personalised journey, or `nil`
-    /// for `followZoom` (PM, Monday "Navigation to a gallery", 2026-10-27). `nil` since the PM asked
-    /// for one zoom in every situation (Monday "Zoom level at start + navigation", 2026-10-30).
-    public var galleryFollowZoom: Double?
+    /// journeys, while the visitor is in no gallery. The follow eases to it from `startZoom`. 19
+    /// since 1.56.0, was 19.5 (operator, K-39, 2026-11-19).
+    public var followZoom: Double = 19
+    /// Zoom of the follow while the visitor is in a gallery, in personalised and curated journeys,
+    /// or `nil` for `followZoom`. 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in
+    /// when the visitor enters a gallery); `nil` before, and personalised journeys only. Above
+    /// `maximumZoom` the map stops at `maximumZoom`.
+    public var galleryFollowZoom: Double? = 22
     /// The journey map shows the visitor at this zoom for `startZoomSeconds` before it follows them:
     /// when the journey starts, on the first fix and when the position comes back. `nil` follows at
     /// once (PM, Monday "Zoom level at start + navigation", 2026-10-29 and 2026-10-30).
@@ -222,9 +223,9 @@ public struct GADSettings: Equatable, Sendable {
     /// levels. The camera keeps to the range in every frame the map sets too (`MapOptions`).
     /// 15 since 1.34.0 (user, 2026-11-03).
     public var minimumZoom: Double? = 15
-    /// The farthest the visitor can zoom in, or `nil` for the map library's limit. 21 since 1.34.0
-    /// (user, 2026-11-03).
-    public var maximumZoom: Double? = 21
+    /// The farthest the visitor can zoom in, or `nil` for the map library's limit. 22 since 1.56.0,
+    /// for `galleryFollowZoom`; 21 since 1.34.0 (user, 2026-11-03).
+    public var maximumZoom: Double? = 22
     /// The box the screen stays inside, or `nil` for no limit. It holds for gestures and for every
     /// camera move the map makes, on the journey map and the Explore Museum map
     /// (`MapOptions.cameraBounds`, map 6.0.0-beta.62). The map stops zooming out where the box
