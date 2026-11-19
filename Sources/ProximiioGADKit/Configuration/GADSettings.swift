@@ -260,6 +260,10 @@ public struct GADSettings: Equatable, Sendable {
     /// The smallest width and height in metres of the area the map shows for an amenity picked in
     /// the menu, so a near amenity does not zoom the map in further than this.
     public var amenityFramingMinimumMeters: Double = 40
+    /// The Explore Museum map opens on the spaces whose centre is at most this far from the median
+    /// centre of all spaces, so a space far from the building does not shrink the museum on the
+    /// screen (PM, on site, 2026-11-19). `nil` frames every space, as before 1.58.0.
+    public var exploreFramingMaximumMeters: Double? = 150
 
     // MARK: Lift
 

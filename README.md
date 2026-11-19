@@ -883,6 +883,7 @@ let configuration = GADConfiguration(
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
 | `mapLoadingTimeout` | 20 s | The longest time a map shows its spinner while the venue's features are not on the map. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
+| `exploreFramingMaximumMeters` | 150 m | The Explore Museum map opens on the spaces whose centre is at most this far from the median centre of all spaces. `nil` frames every space. |
 | `galleryFirstMarginMeters` | 50 m | Gallery first: an artwork farther than this outside its gallery's geofence, or on another floor, is routed to directly. |
 | `liftRideDwell`, `liftExitFixes` | 3 s, 2 | Seconds of fixes inside a lift outline before the visitor counts as riding it, and the fixes outside that end the ride. The field log records the rides. |
 | `levelsWithoutPositioning` | [0] | Floors without positioning. See "Floors without positioning". |
@@ -1116,6 +1117,17 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.58.0 (2026-11-19)
+
+- The follow zoom changes with the gallery outline that holds the visitor's position, on the same
+  fix as the gallery fills. Before, it changed on the gallery geofence events, which arrive up to
+  `geofenceExitDelay` (5 s) after the position leaves the gallery (PM, on site, 2026-11-19). The
+  values stay `galleryFollowZoom` inside a gallery and `followZoom` outside.
+- The Explore Museum map opens on the spaces near the building. A space whose centre is more than
+  `GADSettings.exploreFramingMaximumMeters` (150 m) from the median centre of all spaces is left
+  out of the first frame, so the museum fills the screen and sits in its centre. `nil` frames every
+  space, as before. The field log line `explore frame:` names the spaces left out.
 
 ### 1.57.0 (2026-11-19)
 

@@ -397,7 +397,14 @@ struct ExploreMuseumView: View {
         await load()
         // The lowest floor with a gallery, framed on the whole museum.
         show(level: catalog.spaces.map(\.level).min() ?? catalog.levels.first ?? 0)
-        if let bounds = PlaceFraming.bounds(of: catalog.spaces.flatMap(\.framedPoints), minimumMeters: 60) {
+        let outlines = catalog.spaces.map(\.framedPoints)
+        let framed = PlaceFraming.nearTheMedianCentre(outlines, maximumMeters: venue.settings.exploreFramingMaximumMeters)
+        let distances = PlaceFraming.distancesFromTheMedianCentre(of: outlines)
+        let far = zip(catalog.spaces, distances).filter { $0.1 > (venue.settings.exploreFramingMaximumMeters ?? .infinity) }
+            .map { "\($0.0.title) \(Int($0.1)) m" }
+        FieldLog.log("explore frame: \(framed.count) of \(outlines.count) spaces · farthest \(Int(distances.max() ?? 0)) m"
+            + (far.isEmpty ? "" : " · left out: " + far.joined(separator: ", ")))
+        if let bounds = PlaceFraming.bounds(of: framed.flatMap { $0 }, minimumMeters: 60) {
             session.camera.fit(bounds: bounds, padding: mapInsets, animated: false)
         }
     }

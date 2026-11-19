@@ -11,6 +11,20 @@ import Testing
 struct PlaceFramingTests {
     private let metresPerDegree = 111_320.0
 
+    @Test func aSpaceFarFromTheOthersIsLeftOutOfTheFrame() {
+        let origin = ProximiioCoordinate(latitude: 24.54, longitude: 54.4)
+        func space(north: Double) -> [ProximiioCoordinate] {
+            [ProximiioCoordinate(latitude: origin.latitude + north / metresPerDegree, longitude: origin.longitude)]
+        }
+        let spaces = [space(north: 0), space(north: 20), space(north: 40), space(north: 60), space(north: 400)]
+        let distances = PlaceFraming.distancesFromTheMedianCentre(of: spaces)
+        #expect(abs(distances[4] - 360) < 0.01)
+        #expect(PlaceFraming.nearTheMedianCentre(spaces, maximumMeters: 150).count == 4)
+        // Without a limit every space is framed.
+        #expect(PlaceFraming.nearTheMedianCentre(spaces, maximumMeters: nil).count == 5)
+        #expect(PlaceFraming.nearTheMedianCentre([], maximumMeters: 150).isEmpty)
+    }
+
     @Test func aNearAmenityIsShownInTheMinimumArea() throws {
         let visitor = ProximiioCoordinate(latitude: 24.5, longitude: 54.4)
         let amenity = ProximiioCoordinate(latitude: 24.5 + 3 / metresPerDegree, longitude: 54.4)

@@ -13,6 +13,37 @@ import ProximiioMap
 import UIKit
 
 enum PlaceFraming {
+    /// The centre of each group of points and its distance in metres from the median centre of all
+    /// groups. Pure; covered by tests.
+    static func distancesFromTheMedianCentre(of groups: [[ProximiioCoordinate]]) -> [Double] {
+        let centres = groups.map { points -> ProximiioCoordinate in
+            let count = Double(max(points.count, 1))
+            return ProximiioCoordinate(
+                latitude: points.map(\.latitude).reduce(0, +) / count,
+                longitude: points.map(\.longitude).reduce(0, +) / count
+            )
+        }
+        guard !centres.isEmpty else { return [] }
+        func median(_ values: [Double]) -> Double { values.sorted()[values.count / 2] }
+        let latitude = median(centres.map(\.latitude))
+        let longitude = median(centres.map(\.longitude))
+        let metresPerDegree = 111_320.0
+        return centres.map { centre in
+            let north = (centre.latitude - latitude) * metresPerDegree
+            let east = (centre.longitude - longitude) * metresPerDegree * cos(latitude * .pi / 180)
+            return (north * north + east * east).squareRoot()
+        }
+    }
+
+    /// `groups` without those whose centre is more than `maximumMeters` from the median centre of
+    /// all of them. `nil` keeps every group. A frame of the museum leaves out a space that lies far
+    /// from the building (PM, on site, 2026-11-19). Pure; covered by tests.
+    static func nearTheMedianCentre(_ groups: [[ProximiioCoordinate]], maximumMeters: Double?) -> [[ProximiioCoordinate]] {
+        guard let maximumMeters else { return groups }
+        let distances = distancesFromTheMedianCentre(of: groups)
+        return zip(groups, distances).filter { $0.1 <= maximumMeters }.map(\.0)
+    }
+
     /// The area that holds `points`, grown about its centre to at least `minimumMeters` wide and
     /// high. Pure; covered by tests.
     static func bounds(of points: [ProximiioCoordinate], minimumMeters: Double) -> MapBoundingBox? {

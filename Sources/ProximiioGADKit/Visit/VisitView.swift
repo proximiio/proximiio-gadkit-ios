@@ -376,14 +376,12 @@ struct VisitView: View {
                 let events = await venue.sdk.geofenceEvents()
                 // The stream does not repeat the geofences entered before it started.
                 controller.enteredGeofenceIDs = await venue.sdk.enteredGeofenceIds
-                // A journey opened inside a gallery gets no entry event for it: without this the
-                // follow kept the zoom of outside (PM, on site, 2026-11-19).
+                // A journey opened inside a gallery gets no entry event for it.
                 if currentGallery == nil,
                    let gallery = await venue.data.geofences().first(where: { $0.isGallery && controller.enteredGeofenceIDs.contains($0.id) }) {
                     currentGallery = gallery.name
                     FieldLog.log("journey opened in a gallery: \(gallery.name ?? "-")")
                     refreshMapLayers()
-                    applyFollowZoom()
                 }
                 checkArrival()
                 for await event in events {
@@ -398,11 +396,9 @@ struct VisitView: View {
                     case .entered(let geofence) where geofence.isGallery:
                         currentGallery = geofence.name
                         refreshMapLayers()
-                        applyFollowZoom()
                     case .exited(let geofence, _) where geofence.isGallery:
                         if currentGallery == geofence.name {
                             currentGallery = nil
-                            applyFollowZoom()
                         }
                     case .entered(let geofence) where geofence.isArtwork:
                         controller.artworkGeofenceEntered(remoteID: geofence.remoteId)
@@ -647,15 +643,17 @@ struct VisitView: View {
 
     /// The zoom of "Centre on me" and of the follow: `GADSettings.galleryFollowZoom` inside a gallery,
     /// else `followZoom` (operator, K-39, 2026-11-19). A camera that follows the visitor zooms to it; one
-    /// the visitor moved stays.
+    /// the visitor moved stays. "Inside a gallery" is the gallery outline that holds the position, the
+    /// signal of the gallery fills, so the zoom and the fills change on the same fix. The geofence
+    /// events came up to `geofenceExitDelay` later (PM, on site, 2026-11-19).
     private func applyFollowZoom() {
-        let zoom = Self.followZoom(inGallery: currentGallery != nil, kind: kind, settings: settings)
+        let zoom = Self.followZoom(inGallery: visitorGalleryID != nil, kind: kind, settings: settings)
         guard controller.session.options.recentreZoom != zoom else { return }
         controller.session.options.recentreZoom = zoom
         // Both follow modes: the journey map follows with the heading by default, and the zoom of
         // a gallery never applied there before 1.56.0.
         if controller.session.cameraMode == .follow || controller.session.cameraMode == .followWithHeading, !floorGuide.isActive {
-            FieldLog.log("follow zoom \(zoom) · in a gallery \(currentGallery ?? "-")")
+            FieldLog.log("follow zoom \(zoom) · in a gallery \(galleries.first { $0.id == visitorGalleryID }?.name ?? "-")")
             controller.session.recentre(zoom: zoom)
         }
     }
@@ -879,6 +877,7 @@ struct VisitView: View {
         visitorGalleryID = galleryID
         refreshMapLayers()
         applyStopMarkers()
+        applyFollowZoom()
     }
 
     /// Shows the lift or stairs view for `GADSettings.levelChangeViewSeconds` when the visitor reaches
