@@ -267,7 +267,7 @@ final class HostedMapModel: ObservableObject {
     private func show(_ journey: ProximiJourney) {
         current = journey
         guard let venue else { return }
-        let matched = HostedJourney(journey, places: places, galleries: galleries)
+        let matched = HostedJourney(ordered(journey), places: places, galleries: galleries)
         let visited = journey.stops.filter { $0.state == .visited }.count
         let skipped = journey.stops.filter { $0.state == .skipped }.count
         FieldLog.log("hosted map: start · \(journey.kind.rawValue) · \(matched.journey.stops.count) of \(journey.stops.count) stops on the map · from the host app: \(visited) visited, \(skipped) skipped")
@@ -275,6 +275,17 @@ final class HostedMapModel: ObservableObject {
         incoming = nil
         generation += 1
         loaded = Loaded(venue: venue, journey: matched.journey, kind: journey.kind, options: options, generation: generation)
+    }
+
+    /// The host app's journey with the visited and skipped stops first, for a personalised journey
+    /// with `Options.progress` (`GADSettings.ordersDoneStopsFirst`). Else the journey as passed.
+    private func ordered(_ journey: ProximiJourney) -> ProximiJourney {
+        guard journey.kind == .personalised, options.contains(.progress), venue?.settings.ordersDoneStopsFirst == true else { return journey }
+        let ordered = journey.withDoneStopsFirst()
+        if ordered != journey {
+            FieldLog.log("hosted map: visited and skipped stops moved before the pending ones")
+        }
+        return ordered
     }
 
     /// Reads the places again in the new app language, for the host app's next journeys. The open
@@ -298,7 +309,7 @@ final class HostedMapModel: ObservableObject {
         latest = journey
         guard venue != nil, journey != current else { return }
         current = journey
-        let matched = HostedJourney(journey, places: places, galleries: galleries)
+        let matched = HostedJourney(ordered(journey), places: places, galleries: galleries)
         guard let hosted, let loaded, matched.canReplace(hosted, kind: journey.kind, shownKind: loaded.kind) else {
             show(journey)
             return

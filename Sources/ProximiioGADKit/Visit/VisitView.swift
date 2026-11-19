@@ -376,6 +376,15 @@ struct VisitView: View {
                 let events = await venue.sdk.geofenceEvents()
                 // The stream does not repeat the geofences entered before it started.
                 controller.enteredGeofenceIDs = await venue.sdk.enteredGeofenceIds
+                // A journey opened inside a gallery gets no entry event for it: without this the
+                // follow kept the zoom of outside (PM, on site, 2026-11-19).
+                if currentGallery == nil,
+                   let gallery = await venue.data.geofences().first(where: { $0.isGallery && controller.enteredGeofenceIDs.contains($0.id) }) {
+                    currentGallery = gallery.name
+                    FieldLog.log("journey opened in a gallery: \(gallery.name ?? "-")")
+                    refreshMapLayers()
+                    applyFollowZoom()
+                }
                 checkArrival()
                 for await event in events {
                     switch event {

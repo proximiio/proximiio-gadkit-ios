@@ -118,6 +118,12 @@ public struct GADSettings: Equatable, Sendable {
     /// artwork of that gallery. `false`: the nearest artwork by the route goes first, as in 1.51.0
     /// (PM's field test and Nagarro's bug list, 2026-11-18).
     public var ordersVisitorGalleryFirst = true
+    /// `ProximiMapView` with `.progress`, personalised journeys: the view takes the states of the
+    /// journey the host app passes and puts the visited and skipped stops before the pending ones,
+    /// each group in the host app's order. It writes that order back. A host app that stores the
+    /// states but passes its first order after a restart showed a visited artwork behind open ones
+    /// in the list (PM, on site, 2026-11-19). `false` keeps the host app's order.
+    public var ordersDoneStopsFirst = true
     /// An artwork the visitor has arrived at is marked visited when the visitor enters the geofence
     /// of another artwork of the journey and is outside its own. `false`: only
     /// `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited.

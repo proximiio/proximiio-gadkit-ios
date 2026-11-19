@@ -103,4 +103,19 @@ struct HostedJourneyTests {
             .init(id: "c"), .init(id: "d"), .init(id: "e"),
         ]))
     }
+
+    /// The visited and skipped stops go before the pending ones; each group keeps its order (PM,
+    /// 2026-11-19).
+    @Test func doneStopsGoBeforeThePendingOnes() {
+        var journey = ProximiJourney(artworks: ["a", "b", "c", "d", "e"])
+        journey.stops[2].state = .visited
+        journey.stops[4].state = .skipped
+        let ordered = journey.withDoneStopsFirst()
+        #expect(ordered.stops.map(\.state) == [.visited, .skipped, .pending, .pending, .pending])
+        #expect(ordered.stops.count == 5)
+        #expect(Set(ordered.stops.map(\.id)) == Set(journey.stops.map(\.id)))
+        #expect(ordered.stops.suffix(3).map(\.id) == [journey.stops[0], journey.stops[1], journey.stops[3]].map(\.id))
+        #expect(ordered.withDoneStopsFirst() == ordered)
+        #expect(GADSettings().ordersDoneStopsFirst)
+    }
 }

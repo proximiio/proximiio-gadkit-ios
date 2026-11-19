@@ -22,6 +22,14 @@ public struct ProximiJourney: Codable, Equatable, Sendable {
         self.stops = stops
     }
 
+    /// The journey with its visited and skipped stops before the pending ones. Each group keeps
+    /// its order (`GADSettings.ordersDoneStopsFirst`).
+    func withDoneStopsFirst() -> ProximiJourney {
+        var ordered = self
+        ordered.stops = stops.filter { $0.state != .pending } + stops.filter { $0.state == .pending }
+        return ordered
+    }
+
     /// A journey whose stops are all pending.
     /// - Parameter artworks: Collection ids (`remote_id`, for example "GAD.2010.00033") or
     ///   Proximi.io POI ids, in visit order.

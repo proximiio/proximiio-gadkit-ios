@@ -854,6 +854,7 @@ let configuration = GADConfiguration(
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | Personalised journeys, the visitor in the gallery of the current artwork: this far off the leg, the stops ahead are ordered again from the visitor and the leg is drawn again from the visitor, at most this often. No warning shows. `false`: the leg stays until `offRouteMeters`. |
 | `ordersAtGalleryEntry`, `galleryEntryOrderSeconds` | `true`, 3 s | Personalised journeys: when the visitor has been this long in a gallery that holds an artwork still to visit, and the current artwork is in another gallery, the stops ahead are ordered again from the visitor. Once per entry, no warning. An entry while paused, during a detour or at a reached artwork is checked when that state ends. |
 | `ordersVisitorGalleryFirst` | `true` | Personalised journeys: every order from the visitor puts the artworks of the gallery the visitor is in (for `galleryEntryOrderSeconds`) first, also when an artwork of another gallery is nearer by the route. `false`: the nearest artwork by the route goes first, as in 1.51.0. |
+| `ordersDoneStopsFirst` | `true` | `ProximiMapView` with `.progress`, personalised journeys: the visited and skipped stops of the journey the host app passes go before the pending ones, each group in the host app's order, and the view writes that order back. `false` keeps the host app's order. |
 | `orderSwitchMinimumMeters` | 3 m | Personalised journeys, the checks that run while the visitor walks (the route refresh in the gallery, the order off the route): another artwork becomes the current stop only when it is this many metres nearer to the visitor than the current stop, in a straight line. An artwork of the visitor's gallery takes the place of one outside it at any distance. 0: every other order changes the stop, as in 1.52.0. |
 | `artworkArrivalMarginMeters`, `artworkArrivalMarginSeconds` | 0 m (off), 3 s | With a distance above 0: the visitor has arrived at the current artwork after this time within this distance of its geofence, outside it and inside no geofence of another open artwork of the journey. 0 m: only a fix inside the geofence is the arrival. Keep it below `artworkVisitedMeters`. |
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the visitor, in a straight line, also for a visitor on the leg. Checked at most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg. |
@@ -1115,6 +1116,23 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.57.0 (2026-11-19)
+
+No change is needed in the code of a host app. `ProximiMapView` with `.progress` may write another
+order of the stops to the `journey` binding at its start.
+
+- `GADSettings.ordersDoneStopsFirst` (`true`). `ProximiMapView` with `.progress`, personalised
+  journeys: the view takes the states of the journey the host app passes and puts the visited and
+  skipped stops before the pending ones, each group in the host app's order. It writes that order
+  back and reports `stopOrderChanged`. Before, a host app that stored the states and passed its
+  first order after a restart got a visited artwork behind open ones in the journey list. `false`
+  keeps the host app's order. Field log line
+  `hosted map: visited and skipped stops moved before the pending ones`.
+- Fixed: a journey opened while the visitor is in a gallery kept the zoom of outside
+  (`followZoom`) until the visitor entered a gallery again. The view now reads the gallery the
+  visitor is in at its start and follows at `galleryFollowZoom`. Field log line
+  `journey opened in a gallery: <name>`.
 
 ### 1.56.0 (2026-11-19)
 
