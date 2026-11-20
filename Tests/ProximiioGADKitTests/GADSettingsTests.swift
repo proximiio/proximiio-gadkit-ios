@@ -143,9 +143,9 @@ struct GADSettingsTests {
         let settings = GADSettings.standard
         #expect(settings.maximumZoom == 22)
         #expect(VisitView.followZoom(inGallery: false, kind: .personalised, settings: settings) == 19)
-        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 22)
+        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 21.5)
         #expect(VisitView.followZoom(inGallery: false, kind: .curated, settings: settings) == 19)
-        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 22)
+        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 21.5)
         var oneZoom = settings
         oneZoom.galleryFollowZoom = nil
         #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: oneZoom) == 19)

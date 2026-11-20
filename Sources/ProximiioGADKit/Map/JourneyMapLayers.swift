@@ -113,6 +113,16 @@ final class JourneyMapLayers {
         static func imageName(for style: Style) -> String { "gad-stop-dot-\(style.rawValue)" }
     }
 
+    /// The pin in the marker of a journey artwork (`VisitView.stopIcons`).
+    struct StopIcon: Equatable {
+        let coordinate: ProximiioCoordinate
+        let level: Double
+        /// The current artwork: a white pin on the red marker. Else a dark pin on a white marker.
+        let isCurrent: Bool
+
+        static func imageName(isCurrent: Bool) -> String { isCurrent ? "gad-stop-pin-current" : "gad-stop-pin" }
+    }
+
     static func highlight(of place: VenuePlace?) -> Highlight? {
         guard let place, let kind = AmenityKind.allCases.first(where: { $0.matches(place) }) else { return nil }
         return Highlight(coordinate: place.coordinate, level: place.level, icon: kind.icon)
@@ -132,6 +142,8 @@ final class JourneyMapLayers {
     private static let changerLayer = "gad-level-changer"
     private static let stopDotSource = "gad-stop-dots"
     private static let stopDotLayer = "gad-stop-dots"
+    private static let stopIconSource = "gad-stop-icons"
+    private static let stopIconLayer = "gad-stop-icons"
     /// The standard and visited gallery names. They give way to each other, to the destination's
     /// name and to the stop markers (Monday, the PM's crowded map of 2026-10-29).
     private static let galleryNameLayer = "gad-gallery-names"
@@ -150,6 +162,7 @@ final class JourneyMapLayers {
     private var highlight: Highlight?
     private var galleryMarkers: [GalleryMarker] = []
     private var stopDots: [StopDot] = []
+    private var stopIcons: [StopIcon] = []
     private var cones: [VenueCone] = []
     /// The cones' images, drawn when their floor first shows.
     private var coneShadings: [String: ConeShading] = [:]
@@ -174,6 +187,7 @@ final class JourneyMapLayers {
         if levelChanged {
             applyLevelChanger(on: style)
             applyStopDots(on: style)
+            applyStopIcons(on: style)
             applyCones(on: style)
         }
     }
@@ -236,6 +250,14 @@ final class JourneyMapLayers {
         stopDots = dots
         guard let style = session?.canvas?.style else { return }
         applyStopDots(on: style)
+    }
+
+    /// The pins in the markers of the journey artworks.
+    func updateStopIcons(_ icons: [StopIcon]) {
+        guard icons != stopIcons else { return }
+        stopIcons = icons
+        guard let style = session?.canvas?.style else { return }
+        applyStopIcons(on: style)
     }
 
     // MARK: Style
@@ -336,10 +358,24 @@ final class JourneyMapLayers {
             // Above the route, below the level changers, the gallery names and the numbered markers.
             canvas.addLayer(layer, at: .below(layerID: Self.changerLayer))
         }
+        if style.source(withIdentifier: Self.stopIconSource) == nil {
+            for isCurrent in [false, true] {
+                canvas.floors.register(Self.stopPinImage(isCurrent: isCurrent), named: StopIcon.imageName(isCurrent: isCurrent))
+            }
+            let source = MLNShapeSource(identifier: Self.stopIconSource, shape: nil)
+            style.addSource(source)
+            let layer = MLNSymbolStyleLayer(identifier: Self.stopIconLayer, source: source)
+            layer.iconImageName = NSExpression(forKeyPath: "image")
+            layer.iconAllowsOverlap = NSExpression(forConstantValue: true)
+            layer.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+            // Over the stop markers the map library draws.
+            canvas.addLayer(layer, at: .top)
+        }
         apply(on: style)
         applyConnector(on: style)
         applyLevelChanger(on: style)
         applyStopDots(on: style)
+        applyStopIcons(on: style)
         applyCones(on: style)
         styleConeOutlines(on: style)
     }
@@ -353,6 +389,46 @@ final class JourneyMapLayers {
             return feature
         }
         source.shape = MLNShapeCollectionFeature(shapes: features)
+    }
+
+    private func applyStopIcons(on style: MLNStyle) {
+        guard let source = style.source(withIdentifier: Self.stopIconSource) as? MLNShapeSource else { return }
+        let features = stopIcons.filter { sameLevel($0.level) }.map { icon -> MLNPointFeature in
+            let feature = MLNPointFeature()
+            feature.coordinate = CLLocationCoordinate2D(latitude: icon.coordinate.latitude, longitude: icon.coordinate.longitude)
+            feature.attributes = ["image": StopIcon.imageName(isCurrent: icon.isCurrent)]
+            return feature
+        }
+        source.shape = MLNShapeCollectionFeature(shapes: features)
+    }
+
+    /// The size of the pin in a stop marker of 30 points, in points: 0.4 of the marker's height, as
+    /// in RPR's picture of the three markers (PM, Monday "Icons for personalized routes",
+    /// 2026-11-20). RPR's `Pin.svg` is 10.33 × 15.83.
+    static let stopPinSize = CGSize(width: 8, height: 12)
+
+    /// RPR's pin (`Pin.svg`): a drop with a round hole. White for the current artwork, else
+    /// `#2B2B2B`.
+    static func stopPinImage(isCurrent: Bool) -> UIImage {
+        let scale = stopPinSize.height / 15.8333
+        return UIGraphicsImageRenderer(size: stopPinSize).image { _ in
+            let radius = 5.16667 * scale
+            let centre = CGPoint(x: stopPinSize.width / 2, y: radius)
+            let tip = CGPoint(x: centre.x, y: stopPinSize.height)
+            let shoulder = 9.08333 * scale
+            let pin = UIBezierPath()
+            pin.move(to: CGPoint(x: centre.x - radius, y: centre.y))
+            pin.addArc(withCenter: centre, radius: radius, startAngle: .pi, endAngle: 0, clockwise: true)
+            pin.addCurve(to: tip, controlPoint1: CGPoint(x: centre.x + radius, y: shoulder), controlPoint2: tip)
+            pin.addCurve(to: CGPoint(x: centre.x - radius, y: centre.y), controlPoint1: tip,
+                         controlPoint2: CGPoint(x: centre.x - radius, y: shoulder))
+            pin.close()
+            let hole = 2 * scale
+            pin.append(UIBezierPath(ovalIn: CGRect(x: centre.x - hole, y: centre.y - hole, width: 2 * hole, height: 2 * hole)))
+            pin.usesEvenOddFillRule = true
+            (isCurrent ? UIColor.white : UIColor(hex: 0x2B2B2B)).setFill()
+            pin.fill()
+        }
     }
 
     /// The diameter of a stop dot, in points.

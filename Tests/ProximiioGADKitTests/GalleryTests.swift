@@ -37,8 +37,49 @@ struct GalleryTests {
     }
 
     @Test func levelColours() {
-        #expect(Gallery.colors(forLevel: 1).destination == 0x6FA6FF)
-        #expect(Gallery.colors(forLevel: 3).visited == 0xFFF291)
+        #expect(Gallery.colors(forLevel: 0).destination == 0x2DE09C)
+        #expect(Gallery.colors(forLevel: 1).destination == 0x36A8FE)
+        #expect(Gallery.colors(forLevel: 2).visited == 0xDEADFF)
+        #expect(Gallery.colors(forLevel: 3).visited == 0xFFEA8E)
+        #expect(Gallery.colors(forLevel: 4).destination == 0xFF7342)
+    }
+
+    /// The visitor is in a gallery while they are in its geofence, also outside the polygon the map
+    /// fills (PM, Monday "Gallery blue colour", 2026-11-17). A gallery without a geofence uses its
+    /// own outline.
+    @Test func theVisitorsGalleryIsTheOneWhoseGeofenceHoldsThem() {
+        func ring(_ south: Double, _ west: Double, _ north: Double, _ east: Double) -> [ProximiioCoordinate] {
+            [(south, west), (south, east), (north, east), (north, west)].map { ProximiioCoordinate(latitude: $0.0, longitude: $0.1) }
+        }
+        // Polygon A: longitude 54.400 to 54.401. Its geofence reaches 54.4012.
+        let polygonA = Gallery(id: "polygon-a", name: "A", level: 1, ring: ring(24.500, 54.400, 24.501, 54.401))
+        let geofenceA = Gallery(id: "a", name: "A", level: 1, ring: ring(24.500, 54.3998, 24.501, 54.4012))
+        // Polygon B starts at 54.4011, inside the geofence of A. Its geofence is the same outline.
+        let polygonB = Gallery(id: "polygon-b", name: "B", level: 1, ring: ring(24.500, 54.4011, 24.501, 54.402))
+        let geofenceB = Gallery(id: "b", name: "B", level: 1, ring: polygonB.ring)
+        let outline = Gallery(id: "outline", name: "C", level: 1, ring: ring(24.510, 54.400, 24.511, 54.401))
+        let entry = ProximiioCoordinate(latitude: 24.5005, longitude: 54.4005)
+        let destinations = [
+            GalleryDestination(gallery: geofenceA, entry: entry, placeID: "poi-a", polygon: polygonA),
+            GalleryDestination(gallery: geofenceB, entry: entry, placeID: "poi-b", polygon: polygonB),
+        ]
+        let galleries = [polygonA, polygonB, outline]
+        func gallery(_ longitude: Double, latitude: Double = 24.5005, level: Double? = 1, current: String? = nil) -> String? {
+            Gallery.ofVisitor(at: ProximiioCoordinate(latitude: latitude, longitude: longitude), level: level, in: galleries,
+                              destinations: destinations, current: current)?.id
+        }
+        #expect(gallery(54.4005) == "polygon-a")
+        // Outside the polygon of A, inside its geofence.
+        #expect(gallery(54.40105) == "polygon-a")
+        #expect(gallery(54.3999) == "polygon-a")
+        // In the geofence of A and in the polygon of B: the polygon decides.
+        #expect(gallery(54.40115) == "polygon-b")
+        #expect(gallery(54.40115, current: "polygon-a") == "polygon-b")
+        #expect(gallery(54.4015) == "polygon-b")
+        // Outside every geofence, on another floor, and a gallery with an outline only.
+        #expect(gallery(54.4030) == nil)
+        #expect(gallery(54.4005, level: 2) == nil)
+        #expect(gallery(54.4005, latitude: 24.5105) == "outline")
     }
 
     @Test func stopGroupIsTheGalleryThatContainsIt() {

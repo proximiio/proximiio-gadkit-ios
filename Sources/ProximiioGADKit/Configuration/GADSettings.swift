@@ -156,6 +156,11 @@ public struct GADSettings: Equatable, Sendable {
     /// "Skip it?" with `ProximiMapView.Options.skipPrompt`). `false`: the swipe reveals the skip
     /// button, and a tap on it asks for the skip.
     public var skipsAtSwipe = false
+    /// The journey list while the journey is paused (`ProximiMapView`'s `isPaused`, "Add a stop"):
+    /// `false`, the default since 1.59.0, takes no swipe on an artwork and shows a text in place of
+    /// the swipe hint (PM, Monday "Swipe to skip disabled when navigation is paused", 2026-11-20).
+    /// `true` keeps the swipe, as before.
+    public var skipsWhilePaused = false
     /// The position dot is drawn on the route while it is within this many metres of it. Display
     /// only; guidance and arrival use the real position.
     public var routeSnapMeters: Double = 0.5
@@ -185,10 +190,11 @@ public struct GADSettings: Equatable, Sendable {
     /// since 1.56.0, was 19.5 (operator, K-39, 2026-11-19).
     public var followZoom: Double = 19
     /// Zoom of the follow while the visitor is in a gallery, in personalised and curated journeys,
-    /// or `nil` for `followZoom`. 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in
-    /// when the visitor enters a gallery); `nil` before, and personalised journeys only. Above
-    /// `maximumZoom` the map stops at `maximumZoom`.
-    public var galleryFollowZoom: Double? = 22
+    /// or `nil` for `followZoom`. 21.5 since 1.59.0 (PM, Monday "Zoom level", 2026-11-20: 22 is too
+    /// close); 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in when the visitor
+    /// enters a gallery); `nil` before, and personalised journeys only. Above `maximumZoom` the map
+    /// stops at `maximumZoom`.
+    public var galleryFollowZoom: Double? = 21.5
     /// The journey map shows the visitor at this zoom for `startZoomSeconds` before it follows them:
     /// when the journey starts, on the first fix and when the position comes back. `nil` follows at
     /// once (PM, Monday "Zoom level at start + navigation", 2026-10-29 and 2026-10-30).
@@ -217,6 +223,11 @@ public struct GADSettings: Equatable, Sendable {
     /// in the list. `false`, the default since 1.50.0, shows the same circles without the number
     /// (operator, 2026-11-17). The badge of grouped markers keeps its count (`groupsStopMarkers`).
     public var showsStopNumbers = false
+    /// `true` draws a pin icon in the marker of a journey artwork on the map while
+    /// `showsStopNumbers` is `false`: white in the marker of the current artwork, dark in the others
+    /// (RPR design; PM, Monday "Icons for personalized routes", 2026-11-20). `false` shows the
+    /// circles alone, as before 1.59.0. The detour's marker and the stop dots have no pin.
+    public var showsStopIcons = true
     /// `true` orders the stops ahead of a personalised journey again from the visitor when an artwork
     /// is marked visited while the visitor stands in another gallery than the next stop's, and that
     /// gallery has an artwork still to visit. `false` keeps the order, as before 1.46.0.

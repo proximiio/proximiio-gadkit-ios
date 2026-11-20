@@ -1328,6 +1328,16 @@
         }
       }
     },
+    "Resume your journey to skip an artwork" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "استأنف رحلتك لتخطي عمل فني"
+          }
+        }
+      }
+    },
     "Scan QR code" : {
       "localizations" : {
         "ar" : {

@@ -243,14 +243,31 @@ struct Gallery: Identifiable, Equatable, Sendable {
         galleries.first { $0.contains(coordinate, level: level) }
     }
 
-    /// Fill colours per level (page 3, section `Colors`, node 10930:60509).
+    /// The gallery of `galleries` the visitor is in. A gallery of `destinations` is tested by its
+    /// geofence (`GalleryDestination.gallery`), not by the polygon the map fills: the geofence is
+    /// what the visitor's entry and exit events use (PM, Monday "Gallery blue colour", 2026-11-17).
+    /// Every other gallery is tested by its own outline. When several hold the position, the one
+    /// whose filled outline holds it wins, then `current`, then the first. Pure; covered by tests.
+    static func ofVisitor(at coordinate: ProximiioCoordinate, level: Double?, in galleries: [Gallery],
+                          destinations: [GalleryDestination], current: String?) -> Gallery? {
+        let geofences = Dictionary(destinations.map { ($0.shown.id, $0.gallery) }, uniquingKeysWith: { first, _ in first })
+        let holding = galleries.filter { (geofences[$0.id] ?? $0).contains(coordinate, level: level) }
+        guard holding.count > 1 else { return holding.first }
+        return holding.first { $0.contains(coordinate, level: level) }
+            ?? holding.first { $0.id == current }
+            ?? holding.first
+    }
+
+    /// Fill colours per level: the floor colour for the destination gallery and its 50 % shade for
+    /// a visited one (RPR colour scheme; PM, Monday "New colour scheme", 2026-11-20). Before 1.59.0:
+    /// page 3, section `Colors`, node 10930:60509.
     static func colors(forLevel level: Double) -> (destination: UInt32, visited: UInt32) {
         switch Int(level.rounded()) {
-        case 0: (0x00FFB2, 0x80FFD9)
-        case 1: (0x6FA6FF, 0xB7D3FF)
-        case 2: (0xBB87F3, 0xDDC3F9)
-        case 3: (0xFFE523, 0xFFF291)
-        default: (0xFA8352, 0xFDC1A8)
+        case 0: (0x2DE09C, 0x96F0CE)
+        case 1: (0x36A8FE, 0x9BD4FF)
+        case 2: (0xBC5AFF, 0xDEADFF)
+        case 3: (0xFED41D, 0xFFEA8E)
+        default: (0xFF7342, 0xFFB9A1)
         }
     }
 }

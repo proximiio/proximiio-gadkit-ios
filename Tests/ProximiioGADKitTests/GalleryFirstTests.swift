@@ -170,6 +170,15 @@ struct GalleryFirstRoutingTests {
         #expect(VisitView.stopDots(stops, hiddenStopIDs: [], showsNumbers: false).map(\.style) == [.skipped, .active, .pending, .pending])
         // Numbers shown and nothing hidden: the skipped artwork only.
         #expect(VisitView.stopDots(stops, hiddenStopIDs: [], showsNumbers: true).map(\.style) == [.skipped])
+        // The pins: one for each marker the map draws, white for the current artwork.
+        let icons = VisitView.stopIcons(stops, hiddenStopIDs: ["pending"], showsMarkers: true)
+        #expect(icons.map(\.isCurrent) == [false, true, false])
+        #expect(icons.allSatisfy { $0.level == 1 })
+        // The route leads to a gallery: only the visited artworks have a marker.
+        #expect(VisitView.stopIcons(stops, hiddenStopIDs: [], showsMarkers: false).map(\.isCurrent) == [false])
+        #expect(VisitView.stopIcons(stops, hiddenStopIDs: ["visited"], showsMarkers: false).isEmpty)
+        #expect(JourneyMapLayers.stopPinImage(isCurrent: true).size == JourneyMapLayers.stopPinSize)
+        #expect(JourneyMapLayers.stopPinSize.height < 30 / 2)
         // One image per style, of the dot's size.
         let images = JourneyMapLayers.StopDot.Style.allCases.map { JourneyMapLayers.stopDotImage(style: $0) }
         #expect(images.allSatisfy { $0.size == CGSize(width: 14, height: 14) })

@@ -239,7 +239,7 @@ struct VisitView: View {
                 // "List view transparency", 2026-11-02; Figma 03.P.03D). The map stays loaded.
                 .opacity(showsList ? 0 : 1)
             if showsList {
-                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, showsNumbers: settings.showsStopNumbers, skipsAtSwipe: settings.skipsAtSwipe, onSkip: requestSkip)
+                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, isSkipPaused: controller.isPaused && !settings.skipsWhilePaused, showsNumbers: settings.showsStopNumbers, skipsAtSwipe: settings.skipsAtSwipe, onSkip: requestSkip)
                     .background(Palette.white.opacity(Self.listBackgroundOpacity))
                     .transition(.opacity)
             }
@@ -819,6 +819,21 @@ struct VisitView: View {
         if controller.session.journeyStopMarkerStyle != style { controller.session.journeyStopMarkerStyle = style }
         mapLayers.updateStopDots(settings.showsStopDots
             ? Self.stopDots(stops, hiddenStopIDs: style.hiddenStopIDs, showsNumbers: showsNumbers) : [])
+        mapLayers.updateStopIcons(settings.showsStopIcons && !settings.showsStopNumbers
+            ? Self.stopIcons(stops, hiddenStopIDs: style.hiddenStopIDs, showsMarkers: showsNumbers) : [])
+    }
+
+    /// The pins in the artworks' markers (`GADSettings.showsStopIcons`): one for each marker the map
+    /// draws. With `showsMarkers` false (`MapStyle.journeyStopsHidden`) only the visited artworks
+    /// have a marker. A skipped artwork, an artwork in `hiddenStopIDs`, a detour and a stop without a
+    /// floor have none. Pure; covered by tests.
+    static func stopIcons(_ stops: [JourneyStop], hiddenStopIDs: Set<String>, showsMarkers: Bool) -> [JourneyMapLayers.StopIcon] {
+        stops.compactMap { stop in
+            guard stop.kind != .detour, stop.state != .skipped, !hiddenStopIDs.contains(stop.id),
+                  showsMarkers || stop.state == .done, let level = stop.floor?.level else { return nil }
+            let isCurrent = stop.state == .active || stop.state == .reached
+            return JourneyMapLayers.StopIcon(coordinate: stop.coordinate.proximiio, level: level, isCurrent: isCurrent)
+        }
     }
 
     /// The dots of the artworks that have no numbered marker: every artwork while the numbers are
@@ -871,7 +886,10 @@ struct VisitView: View {
         let placeID = position.flatMap { position in
             galleryDestinations.first { $0.gallery.contains(position.coordinate.proximiio, level: position.floor?.level) }?.placeID
         }
-        let galleryID = position.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries)?.id }
+        let galleryID = position.flatMap {
+            Gallery.ofVisitor(at: $0.coordinate.proximiio, level: $0.floor?.level, in: galleries,
+                              destinations: galleryDestinations, current: visitorGalleryID)?.id
+        }
         guard placeID != visitorGalleryPlaceID || galleryID != visitorGalleryID else { return }
         visitorGalleryPlaceID = placeID
         visitorGalleryID = galleryID

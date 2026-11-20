@@ -860,6 +860,7 @@ let configuration = GADConfiguration(
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the visitor, in a straight line, also for a visitor on the leg. Checked at most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg. |
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor has arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
+| `skipsWhilePaused` | `false` | Journey list while the journey is paused: `false` takes no swipe on an artwork and shows "Resume your journey to skip an artwork" in place of the swipe hint. `true` keeps the swipe. |
 | `skipsAtSwipe` | `false` | Journey list: a swipe on an artwork asks for the skip at once (`skipRequested`, and the dialog with `.skipPrompt`). `false`: the swipe reveals the skip button, and a tap on it asks for the skip. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
@@ -867,12 +868,13 @@ let configuration = GADConfiguration(
 | `routeToStopMaximumMeters` | 15 m | A route ends where its stop projects onto the path network. The line goes on in a straight line to the stop when the stop is at most this far from that point; the remaining distance and the walking time include that segment. A leg to a gallery's POI (gallery first) ends on the path. 0: every route ends on the path. The SDK routes to a stop at most 15 m from a path, so 15 m extends every route. |
 | `routeFromOriginMaximumMeters` | 15 m | A route starts where its origin projects onto the path network. The line starts at the origin, in a straight line to that point, when the origin is at most this far from it. The origin is the visitor's position when the route is computed; the segment does not move with later positions. 0: every route starts on the path. |
 | `followZoom` | 19 | Zoom of "Centre on me", of the first position and of the follow, in personalised and curated journeys, while the visitor is in no gallery. |
-| `galleryFollowZoom` | 22 | Zoom of the follow while the visitor is in a gallery, in personalised and curated journeys; `nil` for `followZoom`. A camera the visitor moved stays. |
+| `galleryFollowZoom` | 21.5 | Zoom of the follow while the visitor is in a gallery, in personalised and curated journeys; `nil` for `followZoom`. A camera the visitor moved stays. |
 | `startZoom` | 17 | The journey map shows the visitor at this zoom for `startZoomSeconds`, then follows them: when the journey starts, on the first fix and when the position comes back. `nil` follows at once. |
 | `startZoomSeconds` | 2 | How long the journey map stays at `startZoom`. |
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
 | `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `true` in 1.43.0. |
+| `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map while `showsStopNumbers` is `false`: white in the marker of the current artwork, dark in the others. `false` shows the circles alone. |
 | `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
@@ -1117,6 +1119,32 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.59.0 (2026-11-20)
+
+No change is needed in the code of a host app. The defaults below change what the visitor sees.
+
+- `GADSettings.galleryFollowZoom` is 21.5, was 22 (PM, Monday "Zoom level", 2026-11-20). A host
+  app that sets the value keeps it.
+- `GADSettings.showsStopIcons` (`true`). The marker of a journey artwork on the map has a pin while
+  `showsStopNumbers` is `false`: white in the red marker of the current artwork, dark in the white
+  markers of the visited and the open ones (RPR design; PM, Monday "Icons for personalized
+  routes"). The detour's marker and a skipped artwork have none. `false` shows the circles alone.
+- The gallery the visitor is in is found by the gallery geofence, on every position. Before, by
+  the gallery polygon the map fills, so a visitor at the edge of the polygon and still inside the
+  geofence got the gallery coloured as left (PM, Monday "Gallery blue colour"). A gallery without
+  a geofence keeps its polygon. The gallery fills, the artwork markers of the visitor's gallery and
+  the follow zoom use this gallery. Where two gallery geofences overlap, the polygon that holds the
+  position decides.
+- New fill colours of the destination gallery and of a visited gallery, by level, on the journey
+  map and on the Explore Museum map (RPR colour scheme; PM, Monday "New colour scheme"): level 0
+  `#2DE09C` and `#96F0CE`, level 1 `#36A8FE` and `#9BD4FF`, level 2 `#BC5AFF` and `#DEADFF`,
+  level 3 `#FED41D` and `#FFEA8E`, level 4 `#FF7342` and `#FFB9A1`. The floor tint of the scheme
+  is in the map style, not in the package.
+- `GADSettings.skipsWhilePaused` (`false`). While the journey is paused (`isPaused`, "Add a stop")
+  the journey list takes no swipe on an artwork and shows "Resume your journey to skip an artwork"
+  in place of the swipe hint (PM, Monday "Swipe to skip disabled when navigation is paused"). The
+  text is ours until the PM sends the wording; its Arabic is not reviewed. `true` keeps the swipe.
 
 ### 1.58.0 (2026-11-19)
 
