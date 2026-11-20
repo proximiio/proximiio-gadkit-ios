@@ -848,7 +848,7 @@ let configuration = GADConfiguration(
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
 | `galleryNearbyMeters` | 5 m | The distance of `ProximiMapEvent.galleryNearby`, from an entrance of the gallery, or from the gallery's POI when it has no entrance POI. |
 | `galleryEntranceAmenityID` | the GAD entrance amenity | The amenity of the gallery entrance POIs. An entrance names its gallery in `metadata.gallery_id`; a gallery can have several (GAD PM, 2026-11-15). |
-| `mapTopFadeHeight`, `mapBottomFadeHeight` | 40 pt, 60 pt | The heights over which the journey map fades out at the top and the bottom of its card. The faded part, and the whole card in List mode, show what the host app draws behind `ProximiMapView`. 0: no fade. |
+| `mapTopFadeHeight`, `mapBottomFadeHeight` | 110 pt, 170 pt | The heights over which the journey map fades out at the top and the bottom of its card. The faded part, and the whole card in List mode, show what the host app draws behind `ProximiMapView`. 0: no fade. |
 | `offRouteMeters`, `offRouteSeconds` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, or off the journey this long. Back within two thirds of the distance the visitor is on the leg again. |
 | `offRouteWarningSeconds` | 10 s | How long "Looks like you've left your route" stays open, unless the visitor closes it. |
 | `refreshesRouteInGallery`, `galleryRouteRefreshMeters`, `galleryRouteRefreshSeconds` | `true`, 3 m, 3 s | Personalised journeys, the visitor in the gallery of the current artwork: this far off the leg, the stops ahead are ordered again from the visitor and the leg is drawn again from the visitor, at most this often. No warning shows. `false`: the leg stays until `offRouteMeters`. |
@@ -860,6 +860,8 @@ let configuration = GADConfiguration(
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the visitor, in a straight line, also for a visitor on the leg. Checked at most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg. |
 | `ordersInOpenArea`, `openAreaOrderMinimumMeters`, `openAreaOrderSeconds` | `true`, 15 m, 20 s | Personalised journeys, the visitor in no gallery of the journey: the stops ahead are ordered again from the visitor when that order starts with another artwork and saves this many metres of walking by the route. Checked at most this often. `false`: outside the galleries the order changes only after a visit and after a detour. |
 | `followsAgainAtGalleryChange` | `true` | The journey map follows the visitor again each time they enter or leave a gallery, when a gesture left the camera free. Not while the journey is paused. `false`: only "Centre on me" takes the follow again. |
+| `connectsRouteToPosition` | `true` | The journey map draws a line from the visitor to the nearest point of the route ahead, at every position, on the visitor's floor. The route is not computed again. No line within 2 m of the route's end or after the arrival. |
+| `routeConnectorMaximumMeters` | 6 m | The longest line `connectsRouteToPosition` draws. Further from the route there is no line. |
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor has arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
 | `skipsWhilePaused` | `false` | Journey list while the journey is paused: `false`: a swipe on an artwork skips nothing, reports no event and shows "Resume your journey to skip the artwork" with "Dismiss"; the same text replaces the swipe hint. `true` keeps the swipe. |
@@ -1122,6 +1124,20 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.65.0 (2026-11-20)
+
+No change is needed in the code of a host app.
+
+- `GADSettings.connectsRouteToPosition` (`true`). The journey map draws a line from the visitor to
+  the nearest point of the route ahead, in the colour of the route's start. The line follows every
+  position; the route is not computed again (PM, Monday "Route drawing feels off", 2026-11-20: the
+  route did not start at the blue dot). On the visitor's floor only, not within 2 m of the route's
+  end, not after the arrival. `false`: no line, as before.
+- `GADSettings.routeConnectorMaximumMeters` (6 m). The longest line `connectsRouteToPosition`
+  draws. Further from the route there is no line: a long one crosses walls.
+- `GADSettings.mapTopFadeHeight` is 110 pt and `mapBottomFadeHeight` is 170 pt again (PM,
+  2026-11-20). 1.64.0 had 40 pt and 60 pt.
 
 ### 1.64.0 (2026-11-20)
 

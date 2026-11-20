@@ -20,8 +20,10 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.trackingLostAfter == 110)
         #expect(GADSettings.standard.stopNearbyMeters == 5)
         #expect(GADSettings.standard.galleryNearbyMeters == 5)
-        #expect(GADSettings.standard.mapTopFadeHeight == 40)
-        #expect(GADSettings.standard.mapBottomFadeHeight == 60)
+        #expect(GADSettings.standard.connectsRouteToPosition)
+        #expect(GADSettings.standard.routeConnectorMaximumMeters == 6)
+        #expect(GADSettings.standard.mapTopFadeHeight == 110)
+        #expect(GADSettings.standard.mapBottomFadeHeight == 170)
         // The warning at 12 m off the route (PM, Monday "Personalized tour: off-route and re-route
         // behaviour", 2026-10-28).
         #expect(GADSettings.standard.offRouteMeters == 12)

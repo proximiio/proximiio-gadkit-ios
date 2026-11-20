@@ -95,6 +95,16 @@ struct OffRouteTests {
 
     /// A gallery change takes the follow again only for a free camera of a running journey (PM,
     /// 2026-11-20).
+    /// The line from the blue dot to the route: up to the maximum length, and not without the setting.
+    @Test @MainActor func theRouteConnectorHasAMaximumLength() {
+        var settings = GADSettings.standard
+        #expect(VisitView.connectsRoute(meters: 0.5, settings: settings))
+        #expect(VisitView.connectsRoute(meters: 6, settings: settings))
+        #expect(!VisitView.connectsRoute(meters: 6.1, settings: settings))
+        settings.connectsRouteToPosition = false
+        #expect(!VisitView.connectsRoute(meters: 0.5, settings: settings))
+    }
+
     @Test func aGalleryChangeTakesTheFollowAgain() {
         var settings = GADSettings()
         #expect(VisitView.followsAgain(settings: settings, isFollowing: false, isPaused: false, isFloorGuideActive: false, hasPosition: true))

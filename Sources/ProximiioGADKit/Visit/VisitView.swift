@@ -1053,14 +1053,18 @@ struct VisitView: View {
     /// The line from the visitor to the start of the route ahead, on the visitor's floor only.
     /// The session updates the guidance on every fix, after the position. Within
     /// `connectorEndMeters` of the route's end there is no line: it would lead straight to the
-    /// stop, through walls (PM review 2026-10-12). Off while `showsConnector` is false.
+    /// stop, through walls (PM review 2026-10-12). Off without `GADSettings.connectsRouteToPosition`.
     private func refreshConnector() {
         let session = controller.session
-        guard Self.showsConnector, let guidance = session.guidance, !guidance.hasArrived,
+        guard settings.connectsRouteToPosition, let guidance = session.guidance, !guidance.hasArrived,
               guidance.remainingMeters >= Self.connectorEndMeters,
               let start = guidance.progress.point,
               let position = session.position,
-              position.floor.map({ VenueLevel.same($0.level, session.selectedFloor.level) }) ?? true
+              position.floor.map({ VenueLevel.same($0.level, session.selectedFloor.level) }) ?? true,
+              Self.connectsRoute(
+                meters: CLLocation(latitude: position.coordinate.latitude, longitude: position.coordinate.longitude)
+                    .distance(from: CLLocation(latitude: start.latitude, longitude: start.longitude)),
+                settings: settings)
         else {
             mapLayers.updateConnector(from: nil, to: nil)
             return
@@ -1292,9 +1296,12 @@ struct VisitView: View {
     }
 
     private static let connectorEndMeters = 2.0
-    /// False: no connector. Its bend moved with every fix, so the route looked redrawn "like a
-    /// snake" (PM review 2026-10-12, screen recording 21-26-05).
-    private static let showsConnector = false
+
+    /// Whether the line from the visitor to the route is drawn at `meters` between them: up to
+    /// `GADSettings.routeConnectorMaximumMeters`. A longer line crosses walls. Pure; covered by tests.
+    static func connectsRoute(meters: Double, settings: GADSettings) -> Bool {
+        settings.connectsRouteToPosition && meters <= settings.routeConnectorMaximumMeters
+    }
 
     // MARK: Leaving
 

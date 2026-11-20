@@ -159,6 +159,16 @@ public struct GADSettings: Equatable, Sendable {
     /// Not while the journey is paused. `false`: only "Centre on me" takes the follow again, as
     /// before 1.63.0.
     public var followsAgainAtGalleryChange = true
+    /// The journey map draws a line from the visitor to the nearest point of the route ahead, at
+    /// every position, on the visitor's floor (PM, Monday "Route drawing feels off", 2026-11-20:
+    /// the route did not start at the blue dot). The route itself is not computed again. No line
+    /// within 2 m of the route's end, none after the arrival, and none further than
+    /// `routeConnectorMaximumMeters` from the route. `false`: no line, as from
+    /// 2026-10-12 to 1.64.0.
+    public var connectsRouteToPosition = true
+    /// The longest line `connectsRouteToPosition` draws, in metres. Further from the route there
+    /// is no line: a long one crosses walls.
+    public var routeConnectorMaximumMeters: Double = 6
     /// How many metres of walking the order from the visitor saves before `ordersInOpenArea` takes
     /// it. A small value changes the destination at every step between two galleries.
     public var openAreaOrderMinimumMeters: Double = 15
@@ -223,10 +233,10 @@ public struct GADSettings: Equatable, Sendable {
     /// The height in points over which the journey map fades out at the top of its card, under the
     /// Map / List control. The faded part shows what the host app draws behind `ProximiMapView`.
     /// 0: no fade.
-    public var mapTopFadeHeight: Double = 40
+    public var mapTopFadeHeight: Double = 110
     /// The height in points over which the journey map fades out at the bottom of its card, under
     /// the stop card. 0: no fade.
-    public var mapBottomFadeHeight: Double = 60
+    public var mapBottomFadeHeight: Double = 170
     /// `true` shows journey stop markers that would overlap as one marker with a badge holding the
     /// number of the others (PM, Monday "Clustering", 2026-10-29).
     public var groupsStopMarkers = true
