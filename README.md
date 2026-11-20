@@ -1122,6 +1122,16 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.62.0 (2026-11-20)
+
+No change is needed in the code of a host app.
+
+- The highlight red is `#BF3447` (was `#ED3731`; RPR colour scheme, PM 2026-11-20): the marker of
+  the active stop and of the destination, the outline of a visited stop's marker, the end of the
+  route gradient, the destination gallery label, the outline of a visited gallery's label, the filled badges of the journey list and the
+  red text of the journey screens. Not changed: the blue of the position and of the route start
+  (`#3F69FF`), the red of an input error, the colours of the galleries per level.
+
 ### 1.61.1 (2026-11-20)
 
 No change is needed in the code of a host app. The order of a personalised journey changes in one

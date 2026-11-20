@@ -7,10 +7,10 @@
 //
 //  - current location `#3F69FF`, with a white arrow for the heading. The dot is 30 pt across,
 //    the size of a journey stop marker (PM review 2026-10-12).
-//  - path ahead: gradient `#3F69FF` → `#ED3731`, 6 pt, round cap
+//  - path ahead: gradient `#3F69FF` → `#BF3447`, 6 pt, round cap
 //  - path traveled: `#3F69FF` at 30 %: the part of the computed leg behind the visitor. The leg
 //    keeps its shape until the arrival (PM review 2026-10-12).
-//  - markers `#ED3731` with a `#EEEDED` stroke
+//  - markers `#BF3447` with a `#EEEDED` stroke
 //  - journey stop markers (section `Markers`, node 10930:60881): a 30 pt circle with the stop
 //    number. Next stop: red fill, white stroke. Visited: white, red stroke. Default: white,
 //    `#EEEDED` stroke. An amenity detour: red fill, white stroke, the amenity's icon and no
@@ -25,7 +25,7 @@ import UIKit
 
 enum MapStyle {
     static let location = MapColor(hex: 0x3F69FF)
-    static let marker = MapColor(hex: 0xED3731)
+    static let marker = MapColor(hex: 0xBF3447)
     static let markerStroke = MapColor(hex: 0xEEEDED)
 
     /// Map options shared by the map screens. The journey screen draws its own stop markers

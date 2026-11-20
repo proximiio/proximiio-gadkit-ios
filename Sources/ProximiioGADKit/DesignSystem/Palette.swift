@@ -29,8 +29,9 @@ import SwiftUI
     // MARK: Glass and badges (Figma components)
     public static let glassEdge = Color(hex: 0xE6E6E6)
     public static let badgeStroke = Color(hex: 0xEEEDED)
-    /// Red of the active stop and the destination marker (Figma map frames).
-    public static let activeRed = Color(hex: 0xED3731)
+    /// The highlight red: the active stop, the destination marker, the end of the route gradient and
+    /// the filled badges (RPR colour scheme of 2026-11-20; `#ED3731` before 1.62.0).
+    public static let activeRed = Color(hex: 0xBF3447)
     /// Blue of the "you are here" marker (`You_are_here.svg`).
     public static let position = Color(hex: 0x3F69FF)
 

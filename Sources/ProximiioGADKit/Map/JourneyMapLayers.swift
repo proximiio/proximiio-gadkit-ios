@@ -467,8 +467,8 @@ final class JourneyMapLayers {
         let fill: UIColor, stroke: UIColor, width: CGFloat
         switch style {
         case .pending: (fill, stroke, width) = (.white, UIColor(hex: 0xEEEDED), 1)
-        case .visited: (fill, stroke, width) = (.white, UIColor(hex: 0xED3731), 2)
-        case .active: (fill, stroke, width) = (UIColor(hex: 0xED3731), .white, 2)
+        case .visited: (fill, stroke, width) = (.white, UIColor(hex: 0xBF3447), 2)
+        case .active: (fill, stroke, width) = (UIColor(hex: 0xBF3447), .white, 2)
         case .skipped: (fill, stroke, width) = (UIColor(hex: 0xBDBDBD), .white, 1)
         }
         let size = CGSize(width: stopDotDiameter, height: stopDotDiameter)
@@ -513,7 +513,7 @@ final class JourneyMapLayers {
     /// navigation", 2026-10-28): the destination red with a white border and white text, a visited
     /// gallery white with a red outline, the others white with a black outline.
     static func galleryMarkerImage(name: String, style: GalleryMarker.Style, shape: GalleryMarker.Shape = .pill) -> UIImage {
-        let red = UIColor(hex: 0xED3731)
+        let red = UIColor(hex: 0xBF3447)
         let ink = UIColor(hex: 0x2B2B2B)
         let (fill, outline, outlineWidth, text): (UIColor, UIColor, CGFloat, UIColor) = switch style {
         case .destination: (red, .white, 2, .white)
@@ -571,7 +571,7 @@ final class JourneyMapLayers {
         let size = CGSize(width: 30, height: 30)
         return UIGraphicsImageRenderer(size: size).image { _ in
             let circle = UIBezierPath(ovalIn: CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1))
-            UIColor(hex: 0xED3731).setFill()
+            UIColor(hex: 0xBF3447).setFill()
             circle.fill()
             UIColor.white.setStroke()
             circle.lineWidth = 2
