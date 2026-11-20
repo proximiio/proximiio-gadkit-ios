@@ -157,8 +157,9 @@ public struct GADSettings: Equatable, Sendable {
     /// button, and a tap on it asks for the skip.
     public var skipsAtSwipe = false
     /// The journey list while the journey is paused (`ProximiMapView`'s `isPaused`, "Add a stop"):
-    /// `false`, the default since 1.59.0, takes no swipe on an artwork and shows a text in place of
-    /// the swipe hint (PM, Monday "Swipe to skip disabled when navigation is paused", 2026-11-20).
+    /// `false`, the default since 1.59.0: a swipe on an artwork skips nothing, reports no event and
+    /// shows "Resume your journey to skip the artwork" with "Dismiss"; the text also replaces the
+    /// swipe hint (PM, Monday "Swipe to skip disabled when navigation is paused", 2026-11-20).
     /// `true` keeps the swipe, as before.
     public var skipsWhilePaused = false
     /// The position dot is drawn on the route while it is within this many metres of it. Display

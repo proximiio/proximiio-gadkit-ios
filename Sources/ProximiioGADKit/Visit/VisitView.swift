@@ -28,6 +28,8 @@ struct VisitView: View {
     @StateObject private var controller: VisitController
     @State private var mode: VisitMode = .map
     @State private var stopToSkip: JourneyStop?
+    /// The notice after a swipe on an artwork while the journey is paused.
+    @State private var isShowingSkipPaused = false
     @StateObject private var monitor: TrackingMonitor
     @State private var places: [VenuePlace] = []
     /// `places` and the gallery entrance POIs, for `galleryNearby`.
@@ -608,6 +610,9 @@ struct VisitView: View {
                     stopToSkip = nil
                     emit(.skipCancelled(stop))
                 }
+            }
+            .sheet(isPresented: $isShowingSkipPaused) {
+                SkipPausedNotice { isShowingSkipPaused = false }
             }
             .task(id: controller.isRerouting) { await followRerouting() }
             .task { await MapDiagnostics.follow(controller.session, name: "journey") }
@@ -1260,7 +1265,15 @@ struct VisitView: View {
     private var showsList: Bool { mode == .list && hasStops }
 
     /// A swipe on a stop in the list: "Leave this artwork out?" with `skipPrompt`, else only the event.
+    /// While the journey is paused and `GADSettings.skipsWhilePaused` is `false`, the swipe shows
+    /// "Resume your journey to skip the artwork" and reports no event (PM, Monday "Swipe to skip
+    /// disabled when navigation is paused", 2026-11-20).
     private func requestSkip(_ stop: JourneyStop) {
+        if controller.isPaused, !settings.skipsWhilePaused {
+            FieldLog.log("skip refused: the journey is paused · \(stop.id)")
+            isShowingSkipPaused = true
+            return
+        }
         FieldLog.log("skip requested: \(stop.id) \(stop.state.rawValue)")
         if options.contains(.skipPrompt) { stopToSkip = stop }
         emit(.skipRequested(stop))
@@ -1282,7 +1295,7 @@ struct VisitView: View {
 
     private var isPresentingSomething: Bool {
         // Without `offRoutePrompt` the off-route state shows nothing and does not hold the report back.
-        lowConfidenceStop != nil || stopToSkip != nil || isConfirmingExit
+        lowConfidenceStop != nil || stopToSkip != nil || isShowingSkipPaused || isConfirmingExit
             || (options.contains(.offRoutePrompt) && controller.isOffRoute)
             || isShowingWrapUp || floorGuide.isActive || controller.isPaused
     }
@@ -1866,6 +1879,24 @@ private struct SkipConfirmation: View {
             Button(String(localized: "Keep it", bundle: .localized), action: onKeep).buttonStyle(.textAction)
         }
         // Less space under "Keep it" (PM, Monday "Skip artwork popup too large", 2026-10-28).
+        .overlaySheetStyle(bottomPadding: 12)
+    }
+}
+
+/// "Resume your journey to skip the artwork" bottom sheet, with "Dismiss" only.
+private struct SkipPausedNotice: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("Resume your journey to skip the artwork", bundle: .localized)
+                .textStyle(.h1Bold)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 20)
+                .accessibilityIdentifier("skipPausedNotice")
+            Button(String(localized: "Dismiss", bundle: .localized), action: onDismiss).buttonStyle(.primary)
+        }
         .overlaySheetStyle(bottomPadding: 12)
     }
 }

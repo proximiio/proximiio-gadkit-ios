@@ -1328,12 +1328,12 @@
         }
       }
     },
-    "Resume your journey to skip an artwork" : {
+    "Resume your journey to skip the artwork" : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "استأنف رحلتك لتخطي عمل فني"
+            "value" : "استأنف رحلتك لتخطي العمل الفني"
           }
         }
       }

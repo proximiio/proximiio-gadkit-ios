@@ -27,8 +27,9 @@ struct VisitStopList: View {
     var groupsByGallery = true
     var places: [VenuePlace] = []
     var allowsSkip = true
-    /// The journey is paused and `GADSettings.skipsWhilePaused` is `false`: no swipe, and a text in
-    /// place of the swipe hint.
+    /// The journey is paused and `GADSettings.skipsWhilePaused` is `false`: a swipe on an artwork
+    /// calls `onSkip` at once, without the skip panel, and a text replaces the swipe hint. The
+    /// owner of `onSkip` refuses the skip.
     var isSkipPaused = false
     /// `GADSettings.showsStopNumbers`: off, the badges are circles without a number.
     var showsNumbers = false
@@ -92,7 +93,7 @@ private struct StopList: View {
                             .accessibilityAddTraits(.isHeader)
                             .accessibilityIdentifier("journeyListHeader")
                     case .stop(let stop):
-                        let canSkip = allowsSkip && !isSkipPaused && SkipSwipe.canSkip(stop)
+                        let canSkip = allowsSkip && SkipSwipe.canSkip(stop)
                         SwipeToSkipRow(
                             isRevealed: Binding(
                                 get: { revealedStopID == stop.id },
@@ -100,7 +101,7 @@ private struct StopList: View {
                             ),
                             isEnabled: canSkip,
                             isSwiping: $isSwiping,
-                            skipsAtSwipe: skipsAtSwipe,
+                            skipsAtSwipe: skipsAtSwipe || isSkipPaused,
                             onSkip: {
                                 revealedStopID = nil
                                 onSkip(stop)
@@ -114,10 +115,10 @@ private struct StopList: View {
                 // "When all artworks skipped, remove 'skip artwork' text").
                 if allowsSkip, visibleStops.contains(where: SkipSwipe.canSkip) {
                     // The row slides towards the leading edge: right in a right-to-left layout.
-                    // The text of a paused journey is ours; the PM checks the wording with Nagarro
-                    // (Monday "Swipe to skip disabled when navigation is paused", 2026-11-20).
+                    // The text of a paused journey is the PM's (Monday "Swipe to skip disabled when
+                    // navigation is paused", 2026-11-20).
                     Text(
-                        isSkipPaused ? "Resume your journey to skip an artwork"
+                        isSkipPaused ? "Resume your journey to skip the artwork"
                             : layoutDirection == .rightToLeft
                             ? "Swipe right to skip an artwork" : "Swipe left to skip an artwork",
                         bundle: .localized

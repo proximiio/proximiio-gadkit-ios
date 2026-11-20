@@ -860,7 +860,7 @@ let configuration = GADConfiguration(
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the visitor, in a straight line, also for a visitor on the leg. Checked at most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg. |
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor has arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
-| `skipsWhilePaused` | `false` | Journey list while the journey is paused: `false` takes no swipe on an artwork and shows "Resume your journey to skip an artwork" in place of the swipe hint. `true` keeps the swipe. |
+| `skipsWhilePaused` | `false` | Journey list while the journey is paused: `false`: a swipe on an artwork skips nothing, reports no event and shows "Resume your journey to skip the artwork" with "Dismiss"; the same text replaces the swipe hint. `true` keeps the swipe. |
 | `skipsAtSwipe` | `false` | Journey list: a swipe on an artwork asks for the skip at once (`skipRequested`, and the dialog with `.skipPrompt`). `false`: the swipe reveals the skip button, and a tap on it asks for the skip. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
@@ -1119,6 +1119,17 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.59.1 (2026-11-20)
+
+No change is needed in the code of a host app.
+
+- Journey list while the journey is paused (`GADSettings.skipsWhilePaused` `false`): a swipe on an
+  artwork shows a bottom sheet "Resume your journey to skip the artwork" with "Dismiss" as its only
+  button (PM, Monday "Swipe to skip disabled when navigation is paused"). The swipe skips nothing
+  and reports no event, with and without `.skipPrompt`. In 1.59.0 the row took no swipe.
+- The text in place of the swipe hint is the same sentence. Its Arabic is not reviewed.
+- Field log: `skip refused: the journey is paused · <stop id>`.
 
 ### 1.59.0 (2026-11-20)
 
