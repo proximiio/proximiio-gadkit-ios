@@ -927,11 +927,35 @@ struct VisitView: View {
                               destinations: galleryDestinations, current: visitorGalleryID)?.id
         }
         guard placeID != visitorGalleryPlaceID || galleryID != visitorGalleryID else { return }
+        let galleryChanged = galleryID != visitorGalleryID
         visitorGalleryPlaceID = placeID
         visitorGalleryID = galleryID
         refreshMapLayers()
         applyStopMarkers()
         applyFollowZoom()
+        if galleryChanged { followAgainAtGalleryChange() }
+    }
+
+    /// The visitor entered or left a gallery: a camera a gesture left free follows them again, on
+    /// their floor (`GADSettings.followsAgainAtGalleryChange`; PM, Monday "map doesn't follow user",
+    /// 2026-11-20: testers touched the map by accident and it stood still from then on). Not while
+    /// the journey is paused, on a floor without positioning or during the start zoom.
+    private func followAgainAtGalleryChange() {
+        let mode = controller.session.cameraMode
+        guard Self.followsAgain(settings: settings, isFollowing: mode == .follow || mode == .followWithHeading,
+                                isPaused: controller.isPaused, isFloorGuideActive: floorGuide.isActive,
+                                hasPosition: controller.session.position != nil),
+              startZoomFollow == nil
+        else { return }
+        controller.session.followMyFloor()
+        recentre(reason: visitorGalleryID == nil ? "gallery left" : "gallery entered")
+    }
+
+    /// Whether a gallery change takes the follow again: the setting is on, the camera does not
+    /// follow, the journey is not paused, the floor guide is not shown and a position exists. Pure;
+    /// covered by tests.
+    static func followsAgain(settings: GADSettings, isFollowing: Bool, isPaused: Bool, isFloorGuideActive: Bool, hasPosition: Bool) -> Bool {
+        settings.followsAgainAtGalleryChange && !isFollowing && !isPaused && !isFloorGuideActive && hasPosition
     }
 
     /// Shows the lift or stairs view for `GADSettings.levelChangeViewSeconds` when the visitor reaches

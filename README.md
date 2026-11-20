@@ -859,6 +859,7 @@ let configuration = GADConfiguration(
 | `artworkArrivalMarginMeters`, `artworkArrivalMarginSeconds` | 0 m (off), 3 s | With a distance above 0: the visitor has arrived at the current artwork after this time within this distance of its geofence, outside it and inside no geofence of another open artwork of the journey. 0 m: only a fix inside the geofence is the arrival. Keep it below `artworkVisitedMeters`. |
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the visitor, in a straight line, also for a visitor on the leg. Checked at most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg. |
 | `ordersInOpenArea`, `openAreaOrderMinimumMeters`, `openAreaOrderSeconds` | `true`, 15 m, 20 s | Personalised journeys, the visitor in no gallery of the journey: the stops ahead are ordered again from the visitor when that order starts with another artwork and saves this many metres of walking by the route. Checked at most this often. `false`: outside the galleries the order changes only after a visit and after a detour. |
+| `followsAgainAtGalleryChange` | `true` | The journey map follows the visitor again each time they enter or leave a gallery, when a gesture left the camera free. Not while the journey is paused. `false`: only "Centre on me" takes the follow again. |
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor has arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
 | `skipsWhilePaused` | `false` | Journey list while the journey is paused: `false`: a swipe on an artwork skips nothing, reports no event and shows "Resume your journey to skip the artwork" with "Dismiss"; the same text replaces the swipe hint. `true` keeps the swipe. |
@@ -1121,6 +1122,18 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.63.0 (2026-11-20)
+
+No change is needed in the code of a host app.
+
+- `GADSettings.followsAgainAtGalleryChange` (`true`). The journey map follows the visitor again,
+  on their floor, each time they enter or leave a gallery, when a gesture left the camera free
+  (PM, Monday "map doesn't follow user", 2026-11-20: testers touched the map by accident and it
+  stood still from then on). The next gesture frees the camera again. Not while the journey is
+  paused, on a floor without positioning or during the start zoom. `false` keeps the camera free
+  until "Centre on me".
+- Field log: `recentre (gallery entered)` and `recentre (gallery left)`.
 
 ### 1.62.0 (2026-11-20)
 

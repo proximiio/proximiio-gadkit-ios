@@ -93,6 +93,19 @@ struct OffRouteTests {
         #expect(!VisitView.isRouteDeviation(.journeyFinished))
     }
 
+    /// A gallery change takes the follow again only for a free camera of a running journey (PM,
+    /// 2026-11-20).
+    @Test func aGalleryChangeTakesTheFollowAgain() {
+        var settings = GADSettings()
+        #expect(VisitView.followsAgain(settings: settings, isFollowing: false, isPaused: false, isFloorGuideActive: false, hasPosition: true))
+        #expect(!VisitView.followsAgain(settings: settings, isFollowing: true, isPaused: false, isFloorGuideActive: false, hasPosition: true))
+        #expect(!VisitView.followsAgain(settings: settings, isFollowing: false, isPaused: true, isFloorGuideActive: false, hasPosition: true))
+        #expect(!VisitView.followsAgain(settings: settings, isFollowing: false, isPaused: false, isFloorGuideActive: true, hasPosition: true))
+        #expect(!VisitView.followsAgain(settings: settings, isFollowing: false, isPaused: false, isFloorGuideActive: false, hasPosition: false))
+        settings.followsAgainAtGalleryChange = false
+        #expect(!VisitView.followsAgain(settings: settings, isFollowing: false, isPaused: false, isFloorGuideActive: false, hasPosition: true))
+    }
+
     /// In the open area the order from the visitor takes the place of the journey's order when it
     /// saves `openAreaOrderMinimumMeters` by the route (PM, 2026-11-20).
     @Test func theOpenAreaOrdersAgainWhenAnotherGalleryIsClearlyNearer() {
