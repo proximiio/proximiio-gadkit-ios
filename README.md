@@ -1120,6 +1120,16 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.59.2 (2026-11-20)
+
+No change is needed in the code of a host app. No behaviour changes.
+
+- Field log: `list swipe: not begun · velocity <x>, <y> pt/s` is written for every drag on a row of
+  the journey list that the row does not take, a vertical scroll of the list included. Before, the
+  line was written only above 50 pt/s of horizontal speed, so a slow swipe the row refused left no
+  line (PM, Monday "Swipe bug on iOS 27"). A swipe that moves no row and leaves no line did not
+  reach the row.
+
 ### 1.59.1 (2026-11-20)
 
 No change is needed in the code of a host app.

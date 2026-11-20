@@ -405,7 +405,9 @@ private struct HorizontalPan: UIGestureRecognizerRepresentable {
             guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
             let velocity = pan.velocity(in: pan.view)
             let begins = abs(velocity.x) > abs(velocity.y)
-            if !begins, abs(velocity.x) > 50 {
+            // Every refused drag is logged, a vertical scroll too: a swipe that moves no row and
+            // leaves no line did not reach the row (PM, Monday "Swipe bug on iOS 27", 2026-11-20).
+            if !begins {
                 FieldLog.log(String(format: "list swipe: not begun · velocity %.0f, %.0f pt/s", velocity.x, velocity.y))
             }
             return begins
