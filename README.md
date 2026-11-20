@@ -860,7 +860,7 @@ let configuration = GADConfiguration(
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the visitor, in a straight line, also for a visitor on the leg. Checked at most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg. |
 | `ordersInOpenArea`, `openAreaOrderMinimumMeters`, `openAreaOrderSeconds` | `true`, 15 m, 20 s | Personalised journeys, the visitor in no gallery of the journey: the stops ahead are ordered again from the visitor when that order starts with another artwork and saves this many metres of walking by the route. Checked at most this often. `false`: outside the galleries the order changes only after a visit and after a detour. |
 | `followsAgainAtGalleryChange` | `true` | The journey map follows the visitor again each time they enter or leave a gallery, when a gesture left the camera free. Not while the journey is paused. `false`: only "Centre on me" takes the follow again. |
-| `connectsRouteToPosition` | `true` | The journey map draws a line from the visitor to the nearest point of the route ahead, at every position, on the visitor's floor. The route is not computed again. No line within 2 m of the route's end or after the arrival. |
+| `connectsRouteToPosition` | `false` | The journey map draws a line from the visitor to the nearest point of the route ahead, at every position, on the visitor's floor. The route is not computed again. No line within 2 m of the route's end or after the arrival. |
 | `routeConnectorMaximumMeters` | 6 m | The longest line `connectsRouteToPosition` draws. Further from the route there is no line. |
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor has arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. |
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
@@ -1124,6 +1124,17 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.65.1 (2026-11-20)
+
+No change is needed in the code of a host app.
+
+- The stop card's caption "GALLERY · <name>" follows the gallery the map has the visitor in, found
+  by the gallery's geofence. The card tested the drawn polygon itself, so near the polygon's edge
+  the caption changed between "GALLERY · <name>" and "NEXT STOP" while the visitor stood in the
+  gallery (PM, Monday 2026-11-20).
+- `GADSettings.connectsRouteToPosition` is `false`, was `true` in 1.65.0 (PM, 2026-11-20: the
+  item is parked). The setting and `routeConnectorMaximumMeters` stay.
 
 ### 1.65.0 (2026-11-20)
 

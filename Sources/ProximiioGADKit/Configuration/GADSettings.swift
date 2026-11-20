@@ -163,9 +163,10 @@ public struct GADSettings: Equatable, Sendable {
     /// every position, on the visitor's floor (PM, Monday "Route drawing feels off", 2026-11-20:
     /// the route did not start at the blue dot). The route itself is not computed again. No line
     /// within 2 m of the route's end, none after the arrival, and none further than
-    /// `routeConnectorMaximumMeters` from the route. `false`: no line, as from
+    /// `routeConnectorMaximumMeters` from the route. Off since 1.65.1 (PM, 2026-11-20: the item
+    /// is parked). `false`: no line, as from
     /// 2026-10-12 to 1.64.0.
-    public var connectsRouteToPosition = true
+    public var connectsRouteToPosition = false
     /// The longest line `connectsRouteToPosition` draws, in metres. Further from the route there
     /// is no line: a long one crosses walls.
     public var routeConnectorMaximumMeters: Double = 6

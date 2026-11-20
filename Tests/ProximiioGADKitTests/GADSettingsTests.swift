@@ -20,7 +20,7 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.trackingLostAfter == 110)
         #expect(GADSettings.standard.stopNearbyMeters == 5)
         #expect(GADSettings.standard.galleryNearbyMeters == 5)
-        #expect(GADSettings.standard.connectsRouteToPosition)
+        #expect(!GADSettings.standard.connectsRouteToPosition)
         #expect(GADSettings.standard.routeConnectorMaximumMeters == 6)
         #expect(GADSettings.standard.mapTopFadeHeight == 110)
         #expect(GADSettings.standard.mapBottomFadeHeight == 170)

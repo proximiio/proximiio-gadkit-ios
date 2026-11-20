@@ -1505,6 +1505,7 @@ struct VisitView: View {
                             navigator: controller.navigator,
                             session: controller.session,
                             galleries: galleries,
+                            visitorGalleryID: visitorGalleryID,
                             galleryAhead: controller.galleryAhead?.gallery,
                             showsNumbers: settings.showsStopNumbers,
                             galleryIcon: controller.galleryAhead
@@ -1700,6 +1701,11 @@ private struct VisitCard: View {
     @ObservedObject var session: ProximiioMapSession
     /// The gallery outlines, for "GALLERY · <name>".
     let galleries: [Gallery]
+    /// The gallery the visitor is in, as the map has it (`Gallery.ofVisitor`, by the gallery's
+    /// geofence). The card tested the drawn polygon itself before 1.65.1: near the polygon's edge
+    /// its caption changed between "GALLERY · <name>" and "NEXT STOP" while the map kept the
+    /// visitor in the gallery (PM, Monday 2026-11-20, video 22:04:29).
+    let visitorGalleryID: String?
     /// The gallery the card names instead of the artwork.
     let galleryAhead: Gallery?
     /// `GADSettings.showsStopNumbers`: off, the circle holds the arrow or the gallery icon.
@@ -1721,7 +1727,7 @@ private struct VisitCard: View {
     let onResume: () -> Void
 
     private var visitorGallery: Gallery? {
-        session.position.flatMap { Gallery.containing($0.coordinate.proximiio, level: $0.floor?.level, in: galleries) }
+        visitorGalleryID.flatMap { id in galleries.first { $0.id == id } }
     }
 
     private var state: VisitCardState {
