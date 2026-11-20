@@ -171,8 +171,9 @@ public struct GADSettings: Equatable, Sendable {
     public var galleryLeftMeters: Double = 5
     /// The journey list: a swipe on an artwork asks for the skip at once (`skipRequested`, and
     /// "Skip it?" with `ProximiMapView.Options.skipPrompt`). `false`: the swipe reveals the skip
-    /// button, and a tap on it asks for the skip.
-    public var skipsAtSwipe = false
+    /// button, and a tap on it asks for the skip. `true` since 1.64.0 (PM and Nagarro, Monday
+    /// 2026-11-20: no second step).
+    public var skipsAtSwipe = true
     /// The journey list while the journey is paused (`ProximiMapView`'s `isPaused`, "Add a stop"):
     /// `false`, the default since 1.59.0: a swipe on an artwork skips nothing, reports no event and
     /// shows "Resume your journey to skip the artwork" with "Dismiss"; the text also replaces the
@@ -212,7 +213,7 @@ public struct GADSettings: Equatable, Sendable {
     /// close); 22 since 1.56.0 (operator, K-39, 2026-11-19: the map zooms in when the visitor
     /// enters a gallery); `nil` before, and personalised journeys only. Above `maximumZoom` the map
     /// stops at `maximumZoom`.
-    public var galleryFollowZoom: Double? = 21.5
+    public var galleryFollowZoom: Double? = 20
     /// The journey map shows the visitor at this zoom for `startZoomSeconds` before it follows them:
     /// when the journey starts, on the first fix and when the position comes back. `nil` follows at
     /// once (PM, Monday "Zoom level at start + navigation", 2026-10-29 and 2026-10-30).
@@ -222,10 +223,10 @@ public struct GADSettings: Equatable, Sendable {
     /// The height in points over which the journey map fades out at the top of its card, under the
     /// Map / List control. The faded part shows what the host app draws behind `ProximiMapView`.
     /// 0: no fade.
-    public var mapTopFadeHeight: Double = 110
+    public var mapTopFadeHeight: Double = 40
     /// The height in points over which the journey map fades out at the bottom of its card, under
     /// the stop card. 0: no fade.
-    public var mapBottomFadeHeight: Double = 170
+    public var mapBottomFadeHeight: Double = 60
     /// `true` shows journey stop markers that would overlap as one marker with a badge holding the
     /// number of the others (PM, Monday "Clustering", 2026-10-29).
     public var groupsStopMarkers = true
@@ -251,7 +252,7 @@ public struct GADSettings: Equatable, Sendable {
     /// corners for a thematic one (operator, 2026-11-20). The type is the title of the amenity of
     /// the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a
     /// pill, as before 1.61.0.
-    public var shapesGalleryLabelsByType = true
+    public var shapesGalleryLabelsByType = false
     /// `true` orders the stops ahead of a personalised journey again from the visitor when an artwork
     /// is marked visited while the visitor stands in another gallery than the next stop's, and that
     /// gallery has an artwork still to visit. `false` keeps the order, as before 1.46.0.

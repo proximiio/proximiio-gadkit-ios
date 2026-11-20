@@ -20,8 +20,8 @@ struct GADSettingsTests {
         #expect(GADSettings.standard.trackingLostAfter == 110)
         #expect(GADSettings.standard.stopNearbyMeters == 5)
         #expect(GADSettings.standard.galleryNearbyMeters == 5)
-        #expect(GADSettings.standard.mapTopFadeHeight == 110)
-        #expect(GADSettings.standard.mapBottomFadeHeight == 170)
+        #expect(GADSettings.standard.mapTopFadeHeight == 40)
+        #expect(GADSettings.standard.mapBottomFadeHeight == 60)
         // The warning at 12 m off the route (PM, Monday "Personalized tour: off-route and re-route
         // behaviour", 2026-10-28).
         #expect(GADSettings.standard.offRouteMeters == 12)
@@ -143,9 +143,9 @@ struct GADSettingsTests {
         let settings = GADSettings.standard
         #expect(settings.maximumZoom == 22)
         #expect(VisitView.followZoom(inGallery: false, kind: .personalised, settings: settings) == 19)
-        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 21.5)
+        #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: settings) == 20)
         #expect(VisitView.followZoom(inGallery: false, kind: .curated, settings: settings) == 19)
-        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 21.5)
+        #expect(VisitView.followZoom(inGallery: true, kind: .curated, settings: settings) == 20)
         var oneZoom = settings
         oneZoom.galleryFollowZoom = nil
         #expect(VisitView.followZoom(inGallery: true, kind: .personalised, settings: oneZoom) == 19)
