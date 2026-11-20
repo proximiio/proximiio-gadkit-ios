@@ -1123,6 +1123,16 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.63.1 (2026-11-20)
+
+No change is needed in the code of a host app. No behaviour change.
+
+- Field log: `list touch: down · <x>, <y> pt` for every touch that reaches a row of the journey
+  list (iOS 18 and later), and `list touch: up · moved <dx>, <dy> pt · no swipe` when the touch
+  ends before the row's swipe was asked to begin. A swipe that moves no row and leaves no
+  `list touch` line did not reach the row: a view of the host app took it. In a recording of
+  2026-11-20 (Nagarro build 253, 1.59.2) two refused swipes left no `list swipe` line.
+
 ### 1.63.0 (2026-11-20)
 
 No change is needed in the code of a host app.

@@ -14,6 +14,7 @@
 //  it does not appear to belong to the gallery above it (PM 2026-10-15).
 //
 import Proximiio
+import UIKit.UIGestureRecognizerSubclass
 import ProximiioMap
 import SwiftUI
 import UIKit
@@ -369,6 +370,47 @@ private struct SwipeToSkipRow<Content: View>: View {
     }
 }
 
+/// The pan of a list row, with a field-log line for every touch that reaches the row: `list touch:
+/// down` at the touch, and `list touch: up` with the distance moved when the touch ends before the
+/// pan was asked to begin. A swipe that moves no row and leaves no `list touch` line did not reach
+/// the row; a view of the host app took it (PM, Monday "Swipe bug on iOS 27", video of
+/// 2026-11-20 17:23 UTC: two refused swipes without any line).
+@available(iOS 18.0, *)
+private final class TouchLoggingPan: UIPanGestureRecognizer {
+    private var start: CGPoint?
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        if start == nil, let touch = touches.first {
+            let point = touch.location(in: nil)
+            start = point
+            FieldLog.log(String(format: "list touch: down · %.0f, %.0f pt", point.x, point.y))
+        }
+        super.touchesBegan(touches, with: event)
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        logUp(touches, "up")
+        super.touchesEnded(touches, with: event)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        logUp(touches, "cancelled")
+        super.touchesCancelled(touches, with: event)
+    }
+
+    override func reset() {
+        start = nil
+        super.reset()
+    }
+
+    /// Only for a touch the pan never took: a begun pan logs `list swipe` lines.
+    private func logUp(_ touches: Set<UITouch>, _ word: String) {
+        guard state == .possible, let start, let touch = touches.first else { return }
+        let point = touch.location(in: nil)
+        FieldLog.log(String(format: "list touch: %@ · moved %.0f, %.0f pt · no swipe", word, point.x - start.x, point.y - start.y))
+    }
+}
+
 /// A pan that begins only when the drag is more horizontal than vertical. Reports the horizontal
 /// translation, and the horizontal velocity at the end.
 @available(iOS 18.0, *)
@@ -383,7 +425,7 @@ private struct HorizontalPan: UIGestureRecognizerRepresentable {
     }
 
     func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
-        let pan = UIPanGestureRecognizer()
+        let pan = TouchLoggingPan()
         pan.delegate = context.coordinator
         return pan
     }
