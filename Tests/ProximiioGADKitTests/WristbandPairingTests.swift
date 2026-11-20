@@ -185,6 +185,16 @@ struct TrackingHealthTests {
         #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: now.addingTimeInterval(-170), now: now) == .stoppedResponding)
     }
 
+    @Test func anEndedBindingGoesBeforeAPrivacyZone() {
+        #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: nil, isPrivate: true, isEnded: true, now: now) == .stoppedResponding)
+        #expect(TrackingHealth.evaluate(wasEverAvailable: false, unavailableSince: now, isPrivate: true, isEnded: true, now: now) == .stoppedResponding)
+        #expect(TrackingHealth.evaluate(wasEverAvailable: false, unavailableSince: nil, isEnded: true, now: now) == .stoppedResponding)
+        #expect(TrackingMonitor.hasEnded(["blueiot-cloud": .ended]))
+        #expect(!TrackingMonitor.hasEnded(["blueiot-cloud": .online]))
+        #expect(!TrackingMonitor.hasEnded(["blueiot-cloud": .ended, "other": .offline]))
+        #expect(!TrackingMonitor.hasEnded([:]))
+    }
+
     @Test func aPrivacyZoneIsNeverLost() {
         #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: now.addingTimeInterval(-3600), isPrivate: true, now: now) == .privacyZone)
         #expect(TrackingHealth.evaluate(wasEverAvailable: true, unavailableSince: nil, isPrivate: true, now: now) == .privacyZone)

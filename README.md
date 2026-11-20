@@ -776,7 +776,7 @@ position, search and routes.
 | `curatedTourChangeRequested` | "Edit stops" on Manage journey for a curated tour, after it closed. The host app shows its tour choice. |
 | `arrivedAtMuseum` | `isAtMuseum` became `true`. Once per launch. |
 | `wristbandChanged(WristbandStatus)` | The wristband session changed. |
-| `trackingChanged(TrackingHealth)` | During a journey: the wristband's positions stopped (`lostPlace` after `trackingLostAfter`, `stoppedResponding` after `trackingStoppedAfter`), came back (`tracking`), or the visitor is in a privacy zone (`privacyZone`, never lost there). |
+| `trackingChanged(TrackingHealth)` | During a journey: the wristband's positions stopped (`lostPlace` after `trackingLostAfter`, `stoppedResponding` after `trackingStoppedAfter`), came back (`tracking`), or the visitor is in a privacy zone (`privacyZone`, never lost there). An ended wristband binding gives `stoppedResponding` at once. |
 | `geofenceEntered(ProximiGeofence)`, `geofenceExited(ProximiGeofence)` | Every geofence enter and exit, with or without a journey. An artwork geofence has `type` `artwork` and the collection id in `artworkID`. An exit comes `GADSettings.geofenceExitDelay` (5 s) after the position left the geofence (SDK 6.0.0-beta.63). |
 | `journeyChanged(JourneySummary?)` | A new, planned, edited or deleted (`nil`) journey, and the progress after the journey screen closed. |
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
@@ -1124,6 +1124,16 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.65.2 (2026-11-20)
+
+No change is needed in the code of a host app.
+
+- `ProximiMapEvent.trackingChanged` reports `stoppedResponding` when the wristband binding has
+  ended (superseded by another phone or app, unbound, or past its end time), at once and inside a
+  privacy zone too. Before, a binding that ended inside a privacy zone kept `privacyZone` at every
+  map start: no position arrives after the end, so the exit from the zone was never reported
+  (field log, 2026-11-20). The connection is read at the map's start and every 5 s.
 
 ### 1.65.1 (2026-11-20)
 

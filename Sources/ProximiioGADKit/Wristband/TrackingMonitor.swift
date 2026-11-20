@@ -16,6 +16,12 @@
 //  `.privacyZone`, however long the band is silent there: the visitor is not lost (Monday "Privacy
 //  zones", 2026-10-19).
 //
+//  An ended binding (`CustomPositionProviderConnection.ended`: superseded, unbound or past its end
+//  time) delivers no more positions, so the SDK never reports the exit from a privacy zone. The
+//  state is then `.stoppedResponding`, not `.privacyZone` (field log 2026-11-20: a binding
+//  superseded inside a zone kept `.privacyZone` at every map start). The connection is read at
+//  the start and every 5 s.
+//
 import Combine
 import Foundation
 import Proximiio
@@ -28,13 +34,16 @@ public enum TrackingHealth: Equatable, Sendable {
     /// No positions for `GADSettings.trackingLostAfter` seconds.
     case lostPlace
     /// No positions for `GADSettings.trackingStoppedAfter` seconds, for example an empty battery.
+    /// Also the state of an ended wristband binding, at once and inside a privacy zone too.
     case stoppedResponding
     /// The visitor is in a privacy zone (`PrivacyZoneState.isPrivate`). The map holds a grey dot at
     /// the last position before the zone.
     case privacyZone
 
-    /// `settings`: `trackingLostAfter` and `trackingStoppedAfter`. Pure; covered by tests.
-    static func evaluate(wasEverAvailable: Bool, unavailableSince: Date?, isPrivate: Bool = false, now: Date, settings: GADSettings = .standard) -> TrackingHealth {
+    /// `settings`: `trackingLostAfter` and `trackingStoppedAfter`. `isEnded`: the wristband
+    /// binding has ended, which goes before a privacy zone. Pure; covered by tests.
+    static func evaluate(wasEverAvailable: Bool, unavailableSince: Date?, isPrivate: Bool = false, isEnded: Bool = false, now: Date, settings: GADSettings = .standard) -> TrackingHealth {
+        if isEnded { return .stoppedResponding }
         if isPrivate { return .privacyZone }
         guard wasEverAvailable else { return .waiting }
         guard let unavailableSince else { return .tracking }
@@ -54,6 +63,7 @@ final class TrackingMonitor: ObservableObject {
     private var wasEverAvailable = false
     private var unavailableSince: Date?
     private var isPrivate = false
+    private var isEnded = false
     private let sdk: Proximiio
     private let settings: GADSettings
     private var tasks: [Task<Void, Never>] = []
@@ -110,19 +120,33 @@ final class TrackingMonitor: ObservableObject {
         // Moves "lost your place" to "stopped responding" while nothing else changes.
         tasks.append(Task { [weak self] in
             while !Task.isCancelled {
+                // The monitor is not held during the sleep.
+                guard await self?.readConnections() != nil else { return }
                 try? await Task.sleep(for: .seconds(5))
-                guard let self else { return }
-                self.reevaluate()
-                if FieldLog.isEnabled {
-                    let connections = await self.sdk.positionProviderConnections()
-                    FieldLog.log("connections \(connections.mapValues(\.rawValue)) health \(self.health)")
-                }
             }
         })
     }
 
+    /// Whether every position provider's connection has ended. False without a provider. Pure;
+    /// covered by tests.
+    nonisolated static func hasEnded(_ connections: [String: CustomPositionProviderConnection]) -> Bool {
+        !connections.isEmpty && connections.values.allSatisfy { $0 == .ended }
+    }
+
+    /// Reads the providers' connections and evaluates the state again.
+    private func readConnections() async {
+        let connections = await sdk.positionProviderConnections()
+        let isEnded = Self.hasEnded(connections)
+        if isEnded != self.isEnded {
+            FieldLog.log("wristband binding ended: \(isEnded)")
+            self.isEnded = isEnded
+        }
+        reevaluate()
+        FieldLog.log("connections \(connections.mapValues(\.rawValue)) health \(health)")
+    }
+
     private func reevaluate() {
-        let health = TrackingHealth.evaluate(wasEverAvailable: wasEverAvailable, unavailableSince: unavailableSince, isPrivate: isPrivate, now: Date(), settings: settings)
+        let health = TrackingHealth.evaluate(wasEverAvailable: wasEverAvailable, unavailableSince: unavailableSince, isPrivate: isPrivate, isEnded: isEnded, now: Date(), settings: settings)
         guard health != self.health else { return }
         FieldLog.log("tracking health: \(health)")
         self.health = health
