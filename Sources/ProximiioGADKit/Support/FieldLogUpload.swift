@@ -18,7 +18,7 @@ import UIKit
 
 public extension FieldLog {
     /// The version of the package, sent with each upload.
-    static let packageVersion = "1.61.0"
+    static let packageVersion = "1.61.1"
 
     /// Starts sending the field log to the relay-api of `binding`, with its app token. Call it once,
     /// after the host app created its `BlueiotWristbandBinding`. A second call replaces the first.

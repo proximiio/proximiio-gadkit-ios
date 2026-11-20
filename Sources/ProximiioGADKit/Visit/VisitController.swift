@@ -206,6 +206,8 @@ final class VisitController: ObservableObject {
     private var lastLegReroute = Date.distantPast
     private var lastGalleryRouteRefresh = Date.distantPast
     private var lastNearestArtworkCheck = Date.distantPast
+    /// The last time `checkOpenAreaOrder` asked the map for an order.
+    private var lastOpenAreaOrderCheck = Date.distantPast
     /// Since when the visitor is near the geofence of the active artwork and outside it.
     private var nearActiveSince: Date?
     /// The gallery of an open journey artwork the visitor was in at the last fix (`checkGalleryEntry`).
@@ -896,6 +898,44 @@ final class VisitController: ObservableObject {
         else { return nil }
         let nearer = current.meters - nearest.meters
         return nearer >= settings.orderSwitchMinimumMeters && nearer > 0 ? (nearest.id, nearer) : nil
+    }
+
+    /// Called on every guidance update. A personalised journey and the visitor in no gallery of the
+    /// journey (the open area between the galleries): when the order of the stops ahead from the
+    /// visitor starts with another artwork and saves `GADSettings.openAreaOrderMinimumMeters` of
+    /// walking by the route, the journey is ordered again and leads to the nearer gallery
+    /// (`GADSettings.ordersInOpenArea`; PM, 2026-11-20: a visitor in front of another gallery was
+    /// led on to the gallery of the current artwork until they entered one). At most every
+    /// `openAreaOrderSeconds`. Not while paused, during a detour, on a floor without positioning or
+    /// at a reached artwork.
+    func checkOpenAreaOrder(_ guidance: RouteGuidance?, isFloorGuideActive: Bool) {
+        guard settings.ordersInOpenArea, managesProgress, !keepsOrder, isNavigating, !isPaused, !isFloorGuideActive,
+              navigator.detourStop == nil, !navigator.hasArrived, let guidance, !guidance.hasArrived,
+              visitorJourneyGalleryID == nil, session.position != nil, let active = navigator.activeStop,
+              Date.now.timeIntervalSince(lastOpenAreaOrderCheck) >= settings.openAreaOrderSeconds
+        else { return }
+        lastOpenAreaOrderCheck = .now
+        tasks.append(Task { [weak self] in
+            await self?.serially { [weak self] in
+                guard let self, self.navigator.activeStop?.id == active.id, !self.navigator.hasArrived, self.navigator.detourStop == nil,
+                      self.visitorJourneyGalleryID == nil, !self.isPaused,
+                      let proposal = await self.visitorOrder(), let first = proposal.order.first, first != active.id,
+                      Self.ordersInOpenArea(savedMeters: proposal.savedMeters, settings: self.settings)
+                else { return }
+                // The stop may have changed while the map routed.
+                guard self.navigator.activeStop?.id == active.id, self.visitorJourneyGalleryID == nil else { return }
+                let title = self.stop(first)?.title ?? first
+                FieldLog.log(String(format: "open area: \(title) goes before \(active.title) · %.1f m shorter · journey ordered again", proposal.savedMeters))
+                await self.rerouting { await self.apply(proposal) }
+                self.persist(self.navigator.journey)
+            }
+        })
+    }
+
+    /// Whether an order from a visitor in the open area takes the place of the journey's order: it
+    /// saves `openAreaOrderMinimumMeters` of walking. Pure; covered by tests.
+    nonisolated static func ordersInOpenArea(savedMeters: Double, settings: GADSettings) -> Bool {
+        settings.ordersInOpenArea && savedMeters >= settings.openAreaOrderMinimumMeters
     }
 
     /// Whether `checkGalleryRoute` refreshes the route: the setting is on, the visitor is more than

@@ -93,6 +93,19 @@ struct OffRouteTests {
         #expect(!VisitView.isRouteDeviation(.journeyFinished))
     }
 
+    /// In the open area the order from the visitor takes the place of the journey's order when it
+    /// saves `openAreaOrderMinimumMeters` by the route (PM, 2026-11-20).
+    @Test func theOpenAreaOrdersAgainWhenAnotherGalleryIsClearlyNearer() {
+        var settings = GADSettings()
+        #expect(VisitController.ordersInOpenArea(savedMeters: 15, settings: settings))
+        #expect(VisitController.ordersInOpenArea(savedMeters: 40, settings: settings))
+        #expect(!VisitController.ordersInOpenArea(savedMeters: 14.9, settings: settings))
+        settings.openAreaOrderMinimumMeters = 5
+        #expect(VisitController.ordersInOpenArea(savedMeters: 6, settings: settings))
+        settings.ordersInOpenArea = false
+        #expect(!VisitController.ordersInOpenArea(savedMeters: 100, settings: settings))
+    }
+
     /// Inside the gallery of the current artwork the route is refreshed beyond 3 m off the leg, at
     /// most every 3 s (PM's field test, 2026-11-17).
     @Test func theRouteInTheGalleryIsRefreshedOffTheLeg() {

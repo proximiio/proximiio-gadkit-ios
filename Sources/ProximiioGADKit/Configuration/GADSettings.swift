@@ -148,6 +148,18 @@ public struct GADSettings: Equatable, Sendable {
     /// most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg
     /// (`refreshesRouteInGallery`), as before 1.54.0.
     public var ordersNearestArtworkInGalleryFirst = true
+    /// Personalised journeys: while the visitor is in no gallery of the journey (the open area
+    /// between the galleries), the stops ahead are ordered again from the visitor when that order
+    /// starts with another artwork and saves `openAreaOrderMinimumMeters` of walking by the route.
+    /// The journey then leads to the nearer gallery (PM, 2026-11-20). `false`: outside the galleries
+    /// the order changes only after a visit and after a detour, as before 1.61.1.
+    public var ordersInOpenArea = true
+    /// How many metres of walking the order from the visitor saves before `ordersInOpenArea` takes
+    /// it. A small value changes the destination at every step between two galleries.
+    public var openAreaOrderMinimumMeters: Double = 15
+    /// The shortest time between two checks of `ordersInOpenArea`, in seconds. Each check asks the
+    /// map for an order by walking time.
+    public var openAreaOrderSeconds: TimeInterval = 20
     /// Gallery first: an artwork that led to the artwork because the visitor was in its gallery
     /// leads to the gallery again when the visitor is more than this many metres outside the
     /// gallery's outline, or on another floor.
