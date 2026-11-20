@@ -18,9 +18,24 @@ struct StopNumberBadge: View {
     /// `nil` draws the circle without a number (`GADSettings.showsStopNumbers`).
     let number: Int?
     var emphasis: Emphasis = .normal
+    /// `GADSettings.showsStopIcons`: a circle without a number holds the pin of the map's stop
+    /// markers, white on the filled circle and dark on the others (PM, Monday "Icons for
+    /// personalized routes", 2026-11-20).
+    var showsIcon = false
+
+    /// The pin of the map's marker of 30 points (8 × 12), scaled to the badge of 34 and rounded to
+    /// whole points: the image renderer rounds other sizes to the pixel grid.
+    static let pinSize = CGSize(width: 9, height: 14)
 
     var body: some View {
         Text(number.map { "\($0)" } ?? "")
+            .overlay {
+                if number == nil, showsIcon {
+                    Image(uiImage: JourneyMapLayers.stopPinImage(isCurrent: emphasis == .filled, size: Self.pinSize))
+                        .accessibilityHidden(true)
+                        .accessibilityIdentifier("stopBadgePin")
+                }
+            }
             .textStyle(.bodyMedium)
             .foregroundStyle(emphasis == .filled ? Palette.white : Palette.ink)
             .frame(width: 34, height: 34)

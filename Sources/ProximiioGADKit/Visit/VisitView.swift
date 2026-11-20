@@ -241,7 +241,7 @@ struct VisitView: View {
                 // "List view transparency", 2026-11-02; Figma 03.P.03D). The map stays loaded.
                 .opacity(showsList ? 0 : 1)
             if showsList {
-                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, isSkipPaused: controller.isPaused && !settings.skipsWhilePaused, showsNumbers: settings.showsStopNumbers, skipsAtSwipe: settings.skipsAtSwipe, onSkip: requestSkip)
+                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, isSkipPaused: controller.isPaused && !settings.skipsWhilePaused, showsNumbers: settings.showsStopNumbers, showsIcons: settings.showsStopIcons, skipsAtSwipe: settings.skipsAtSwipe, onSkip: requestSkip)
                     .background(Palette.white.opacity(Self.listBackgroundOpacity))
                     .transition(.opacity)
             }

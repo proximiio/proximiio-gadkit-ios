@@ -179,6 +179,9 @@ struct GalleryFirstRoutingTests {
         #expect(VisitView.stopIcons(stops, hiddenStopIDs: ["visited"], showsMarkers: false).isEmpty)
         #expect(JourneyMapLayers.stopPinImage(isCurrent: true).size == JourneyMapLayers.stopPinSize)
         #expect(JourneyMapLayers.stopPinSize.height < 30 / 2)
+        // The list badge of 34 points draws the same pin, scaled from the marker of 30.
+        #expect(JourneyMapLayers.stopPinImage(isCurrent: false, size: StopNumberBadge.pinSize).size == StopNumberBadge.pinSize)
+        #expect(StopNumberBadge.pinSize.height < 34 / 2)
         // One image per style, of the dot's size.
         let images = JourneyMapLayers.StopDot.Style.allCases.map { JourneyMapLayers.stopDotImage(style: $0) }
         #expect(images.allSatisfy { $0.size == CGSize(width: 14, height: 14) })

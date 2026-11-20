@@ -874,7 +874,7 @@ let configuration = GADConfiguration(
 | `groupsStopMarkers` | `true` | Journey stop markers that would overlap show as one marker, with a black badge holding the number of the others. |
 | `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `true` in 1.43.0. |
-| `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map while `showsStopNumbers` is `false`: white in the marker of the current artwork, dark in the others. `false` shows the circles alone. |
+| `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map and in the badge of its row in the journey list (since 1.60.0) while `showsStopNumbers` is `false`: white on the red circle of the current artwork, dark in the others. `false` shows the circles alone. |
 | `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
@@ -1119,6 +1119,16 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.60.0 (2026-11-20)
+
+No change is needed in the code of a host app.
+
+- Journey list: with `GADSettings.showsStopIcons` (`true`) and without numbers, the badge of each
+  artwork's row holds the pin of the map's stop markers: white on the red badge of the current
+  artwork and of a swiped row, dark on the others (PM, Monday "Icons for personalized routes":
+  "also on list view"). `showsStopIcons = false` removes the pin from the map and from the list.
+- The Arabic of "Resume your journey to skip the artwork" is the PM's text (Monday, 2026-11-20).
 
 ### 1.59.2 (2026-11-20)
 

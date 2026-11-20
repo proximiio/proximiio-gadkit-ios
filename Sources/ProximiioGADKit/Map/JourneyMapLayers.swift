@@ -409,12 +409,12 @@ final class JourneyMapLayers {
 
     /// RPR's pin (`Pin.svg`): a drop with a round hole. White for the current artwork, else
     /// `#2B2B2B`.
-    static func stopPinImage(isCurrent: Bool) -> UIImage {
-        let scale = stopPinSize.height / 15.8333
-        return UIGraphicsImageRenderer(size: stopPinSize).image { _ in
+    static func stopPinImage(isCurrent: Bool, size: CGSize = stopPinSize) -> UIImage {
+        let scale = size.height / 15.8333
+        return UIGraphicsImageRenderer(size: size).image { _ in
             let radius = 5.16667 * scale
-            let centre = CGPoint(x: stopPinSize.width / 2, y: radius)
-            let tip = CGPoint(x: centre.x, y: stopPinSize.height)
+            let centre = CGPoint(x: size.width / 2, y: radius)
+            let tip = CGPoint(x: centre.x, y: size.height)
             let shoulder = 9.08333 * scale
             let pin = UIBezierPath()
             pin.move(to: CGPoint(x: centre.x - radius, y: centre.y))

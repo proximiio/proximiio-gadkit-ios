@@ -1332,8 +1332,8 @@
       "localizations" : {
         "ar" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "استأنف رحلتك لتخطي العمل الفني"
+            "state" : "translated",
+            "value" : "تابع رحلتك لتخطي العمل الفني"
           }
         }
       }

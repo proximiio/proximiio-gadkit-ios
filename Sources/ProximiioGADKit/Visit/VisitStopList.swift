@@ -33,6 +33,8 @@ struct VisitStopList: View {
     var isSkipPaused = false
     /// `GADSettings.showsStopNumbers`: off, the badges are circles without a number.
     var showsNumbers = false
+    /// `GADSettings.showsStopIcons`: a badge without a number holds the pin of the map's markers.
+    var showsIcons = false
     /// `GADSettings.skipsAtSwipe`: the swipe itself asks for the skip.
     var skipsAtSwipe = false
     let onSkip: (JourneyStop) -> Void
@@ -47,6 +49,7 @@ struct VisitStopList: View {
             allowsSkip: allowsSkip,
             isSkipPaused: isSkipPaused,
             showsNumbers: showsNumbers,
+            showsIcons: showsIcons,
             skipsAtSwipe: skipsAtSwipe,
             onSkip: onSkip
         )
@@ -63,6 +66,7 @@ private struct StopList: View {
     let allowsSkip: Bool
     let isSkipPaused: Bool
     let showsNumbers: Bool
+    let showsIcons: Bool
     let skipsAtSwipe: Bool
     let onSkip: (JourneyStop) -> Void
 
@@ -155,7 +159,8 @@ private struct StopList: View {
         return HStack(spacing: 16) {
             StopNumberBadge(
                 number: showsNumbers ? number : nil,
-                emphasis: isRevealed || isActive ? .filled : isVisited ? .visited : .normal
+                emphasis: isRevealed || isActive ? .filled : isVisited ? .visited : .normal,
+                showsIcon: showsIcons
             )
             VStack(alignment: .leading, spacing: 5) {
                 Text(stop.title).textStyle(.bodyMedium)
