@@ -188,6 +188,43 @@ struct GalleryFirstRoutingTests {
         #expect(Set(JourneyMapLayers.StopDot.Style.allCases.map(JourneyMapLayers.StopDot.imageName)).count == 4)
     }
 
+    /// The label's shape follows the type of the gallery: the title of the amenity of its POI
+    /// (operator, K-41, 2026-11-20).
+    @Test func theLabelShapeFollowsTheGalleryType() {
+        typealias Shape = JourneyMapLayers.GalleryMarker.Shape
+        #expect(Shape.of(category: "Single Artist Gallery") == .pill)
+        #expect(Shape.of(category: "single-artist gallery") == .pill)
+        #expect(Shape.of(category: "Thematic Gallery") == .rectangle)
+        #expect(Shape.of(category: "Learning & Engagement") == nil)
+        #expect(Shape.of(category: nil) == nil)
+        #expect(Shape.pill.cornerRadius(height: 30) == 14)
+        #expect(Shape.rectangle.cornerRadius(height: 30) == 0)
+    }
+
+    /// Both shapes have the same size, and each has its own image name.
+    @MainActor @Test func aRectangleLabelHasThePillsSizeAndItsOwnImage() {
+        let pill = JourneyMapLayers.galleryMarkerImage(name: "G101 Pop Culture", style: .standard, shape: .pill)
+        let rectangle = JourneyMapLayers.galleryMarkerImage(name: "G101 Pop Culture", style: .standard, shape: .rectangle)
+        #expect(pill.size == rectangle.size)
+        // The corner pixel: clear in the pill, the outline in the rectangle.
+        #expect(Self.alpha(of: pill, at: CGPoint(x: 2, y: 2)) == 0)
+        #expect(Self.alpha(of: rectangle, at: CGPoint(x: 2, y: 2)) > 0)
+        let marker = { (shape: JourneyMapLayers.GalleryMarker.Shape) in
+            JourneyMapLayers.GalleryMarker(coordinate: .init(latitude: 0, longitude: 0), level: 1, name: "G101 Pop Culture", style: .standard, shape: shape)
+        }
+        #expect(marker(.pill).imageName != marker(.rectangle).imageName)
+    }
+
+    private static func alpha(of image: UIImage, at point: CGPoint) -> UInt8 {
+        var pixel: [UInt8] = [0, 0, 0, 0]
+        let context = CGContext(data: &pixel, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let scale = image.scale
+        context.translateBy(x: -point.x * scale, y: -(CGFloat(image.cgImage!.height) - point.y * scale - 1))
+        context.draw(image.cgImage!, in: CGRect(x: 0, y: 0, width: image.cgImage!.width, height: image.cgImage!.height))
+        return pixel[3]
+    }
+
     /// Every gallery is a 30 pt pill with its full name, the same size in each style; each style has
     /// its own image (PM, Monday "Gallery numbers in gallery navigation", 2026-10-28).
     @MainActor @Test func everyGalleryIsAPillWithItsName() {

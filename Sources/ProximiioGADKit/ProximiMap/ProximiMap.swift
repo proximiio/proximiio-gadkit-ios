@@ -658,8 +658,8 @@ extension ProximiMap {
         case .stopPlaceDeleted(let s): return .stopPlaceDeleted(stop(s))
         case .artworkArrived(let s): return .artworkArrived(stop(s))
         case .artworkVisited(let s, let cause): return .artworkVisited(stop(s), cause: cause)
-        case .artworkReached(let s): return .artworkReached(stop(s))
-        case .artworkVisitedOutOfOrder(let s): return .artworkVisitedOutOfOrder(stop(s))
+        case .artworkReached(let s): return legacyEvent(ProximiMapEvent.self, reached: stop(s))
+        case .artworkVisitedOutOfOrder(let s): return legacyEvent(ProximiMapEvent.self, visitedOutOfOrder: stop(s))
         case .trackingChanged(let health): return .trackingChanged(health)
         case .floorWithoutPositioningEntered(let level): return .floorWithoutPositioningEntered(level: level)
         case .floorWithoutPositioningLeft(let level): return .floorWithoutPositioningLeft(level: level)
@@ -675,6 +675,25 @@ extension ProximiMap {
         }
     }
 }
+
+// MARK: - Deprecated events
+
+/// The deprecated events of host apps written before 1.41.0. The package still sends them; the
+/// protocol keeps the deprecation warning out of the package's own build.
+private protocol LegacyArtworkEvents {
+    static func legacyReached(_ stop: ProximiStop) -> Self
+    static func legacyVisitedOutOfOrder(_ stop: ProximiStop) -> Self
+}
+
+extension ProximiMapEvent: LegacyArtworkEvents {
+    @available(*, deprecated)
+    fileprivate static func legacyReached(_ stop: ProximiStop) -> ProximiMapEvent { .artworkReached(stop) }
+    @available(*, deprecated)
+    fileprivate static func legacyVisitedOutOfOrder(_ stop: ProximiStop) -> ProximiMapEvent { .artworkVisitedOutOfOrder(stop) }
+}
+
+private func legacyEvent<E: LegacyArtworkEvents>(_: E.Type, reached stop: ProximiStop) -> E { E.legacyReached(stop) }
+private func legacyEvent<E: LegacyArtworkEvents>(_: E.Type, visitedOutOfOrder stop: ProximiStop) -> E { E.legacyVisitedOutOfOrder(stop) }
 
 // MARK: - The Guggenheim app
 

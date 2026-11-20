@@ -58,6 +58,9 @@ struct VisitView: View {
     @State private var hiddenFeatureIDs: Set<String> = []
     /// The galleries of gallery first (`Gallery.destinations`).
     @State private var galleryDestinations: [GalleryDestination] = []
+    /// The shape of each gallery's name label, by the id of the gallery's POI
+    /// (`GADSettings.shapesGalleryLabelsByType`).
+    @State private var galleryLabelShapes: [String: JourneyMapLayers.GalleryMarker.Shape] = [:]
     /// The amenity icons of the venue data, by amenity id: the gallery's icon on the stop card and
     /// the gallery markers.
     @State private var amenityIcons: [String: UIImage] = [:]
@@ -309,10 +312,20 @@ struct VisitView: View {
                     controller.session.recentre(withHeading: true)
                     emit(.floorWithoutPositioningLeft(level: change.level))
                 }
-                for await event in controller.navigator.events {
+                // `artworkVisited` reaches the host app before `nextStop` and `journeyFinished`, and
+                // a step that orders the stops again gives one `nextStop` (`LegEventGate`).
+                var gate = LegEventGate()
+                controller.onLegEventsReleased = { [emit] in
+                    for event in gate.release() {
+                        FieldLog.log("journey event handed on after the visit: \(event)")
+                        emit(.journey(event))
+                    }
+                }
+                for await received in controller.navigator.events {
                     // The navigator walks to an artwork visited out of order for a moment.
-                    if case .legChanged(let stop, _) = event, stop.id == controller.passingStopID { continue }
-                    if controller.isPaused, Self.isRouteDeviation(event) { continue }
+                    if case .legChanged(let stop, _) = received, stop.id == controller.passingStopID { continue }
+                    if controller.isPaused, Self.isRouteDeviation(received) { continue }
+                    guard let event = gate.receive(received, isHolding: controller.holdsLegEvents).first else { continue }
                     emit(.journey(event))
                     if case .detourEnded(let stop, _) = event, routedDestination?.placeID == (stop.poiID ?? stop.id) {
                         clearDestination()
@@ -705,6 +718,12 @@ struct VisitView: View {
         controller.artworkAreas = VisitController.artworkAreas(of: geofences)
         let destinations = Gallery.destinations(geofences: geofences, places: places, features: features)
         galleryDestinations = Array(destinations.values)
+        let amenityTitles = Dictionary(amenities.compactMap { amenity in amenity.title.map { (amenity.id, $0) } }, uniquingKeysWith: { first, _ in first })
+        galleryLabelShapes = Self.galleryLabelShapes(of: galleryDestinations, places: allPlaces, amenityTitles: amenityTitles)
+        let untyped = galleryDestinations.filter { galleryLabelShapes[$0.placeID] == nil }.map(\.gallery.name).sorted()
+        if !untyped.isEmpty { FieldLog.log("gallery labels: no type, drawn as a pill · \(untyped.joined(separator: ", "))") }
+        let rectangles = galleryDestinations.filter { galleryLabelShapes[$0.placeID] == .rectangle }.map(\.gallery.name).sorted()
+        FieldLog.log("gallery labels: rectangle (thematic) · \(rectangles.joined(separator: ", "))")
         applyHiddenFeatures()
         controller.setGalleryFirst(isEnabled: kind.guidesToGalleryFirst, places: places, destinations: destinations)
         galleries = await Gallery.load(from: venue.sdk, features: features, geofences: geofences, places: places)
@@ -795,9 +814,20 @@ struct VisitView: View {
             }
             let isDestination = destination.placeID == ahead || destinationGallery.map(isGallery) == true
             let style: JourneyMapLayers.GalleryMarker.Style = isDestination ? .destination : visited.contains(where: isGallery) ? .visited : .standard
+            let shape = settings.shapesGalleryLabelsByType ? galleryLabelShapes[destination.placeID] ?? .pill : .pill
             return JourneyMapLayers.GalleryMarker(coordinate: destination.entry, level: destination.gallery.level,
-                                                  name: destination.gallery.name, style: style)
+                                                  name: destination.gallery.name, style: style, shape: shape)
         }
+    }
+
+    /// The label shape of each gallery with a known type, by the id of the gallery's POI: the type
+    /// is the title of the POI's amenity. Pure; covered by tests.
+    static func galleryLabelShapes(of destinations: [GalleryDestination], places: [VenuePlace],
+                                   amenityTitles titles: [String: String]) -> [String: JourneyMapLayers.GalleryMarker.Shape] {
+        let amenityIDs = Dictionary(places.compactMap { place in place.amenityID.map { (place.id, $0) } }, uniquingKeysWith: { first, _ in first })
+        return Dictionary(destinations.compactMap { destination in
+            JourneyMapLayers.GalleryMarker.Shape.of(category: amenityIDs[destination.placeID].flatMap { titles[$0] }).map { (destination.placeID, $0) }
+        }, uniquingKeysWith: { first, _ in first })
     }
 
     /// The numbered stop markers. With gallery first they are hidden while the leg ends at a

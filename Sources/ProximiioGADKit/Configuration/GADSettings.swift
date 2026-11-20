@@ -229,6 +229,12 @@ public struct GADSettings: Equatable, Sendable {
     /// (RPR design; PM, Monday "Icons for personalized routes", 2026-11-20). `false` shows the
     /// circles alone, as before 1.59.0. The detour's marker and the stop dots have no pin.
     public var showsStopIcons = true
+    /// `true` draws a gallery's name label on the journey map in the shape of the gallery's type, as
+    /// the museum's floor plan does: a pill for a single-artist gallery, a rectangle with square
+    /// corners for a thematic one (operator, 2026-11-20). The type is the title of the amenity of
+    /// the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a
+    /// pill, as before 1.61.0.
+    public var shapesGalleryLabelsByType = true
     /// `true` orders the stops ahead of a personalised journey again from the visitor when an artwork
     /// is marked visited while the visitor stands in another gallery than the next stop's, and that
     /// gallery has an artwork still to visit. `false` keeps the order, as before 1.46.0.

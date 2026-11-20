@@ -84,13 +84,40 @@ final class JourneyMapLayers {
             case standard
         }
 
+        /// The outline of the label, by the type of the gallery (museum floor plan; operator, K-41,
+        /// 2026-11-20).
+        enum Shape: String, Equatable, CaseIterable {
+            /// A single-artist gallery, and a gallery of no known type: fully rounded ends.
+            case pill
+            /// A thematic gallery: square corners.
+            case rectangle
+
+            /// The shape for a gallery whose POI has the amenity titled `category`; `nil` for a
+            /// title that names no known type. Pure; covered by tests.
+            static func of(category: String?) -> Shape? {
+                let category = category?.lowercased() ?? ""
+                if category.contains("single") { return .pill }
+                if category.contains("thematic") { return .rectangle }
+                return nil
+            }
+
+            /// The corner radius of a label `height` high, drawn 1 pt inside its image.
+            func cornerRadius(height: CGFloat) -> CGFloat {
+                switch self {
+                case .pill: height / 2 - 1
+                case .rectangle: 0
+                }
+            }
+        }
+
         var coordinate: ProximiioCoordinate
         var level: Double
         /// The POI's title, such as "G303 Language".
         var name: String
         var style: Style
+        var shape: Shape = .pill
 
-        var imageName: String { "gad-gallery-\(style.rawValue)-\(name)" }
+        var imageName: String { "gad-gallery-\(style.rawValue)-\(shape.rawValue)-\(name)" }
     }
 
     /// `place` with the icon of its amenity kind; `nil` for a place of no `AmenityKind`.
@@ -474,7 +501,7 @@ final class JourneyMapLayers {
         for marker in galleryMarkers where sameLevel(marker.level) {
             let name = marker.imageName
             if style.image(forName: name) == nil {
-                session?.canvas?.floors.register(Self.galleryMarkerImage(name: marker.name, style: marker.style), named: name)
+                session?.canvas?.floors.register(Self.galleryMarkerImage(name: marker.name, style: marker.style, shape: marker.shape), named: name)
             }
             let kind: PointKind = marker.style == .destination ? .destinationName : .galleryName
             features.append(Self.point(marker.coordinate, image: name, sort: marker.style == .visited ? 0 : 1, kind: kind))
@@ -482,10 +509,10 @@ final class JourneyMapLayers {
         source.shape = MLNShapeCollectionFeature(shapes: features)
     }
 
-    /// A gallery's name in a 30 pt pill, its middle on the POI (PM, Monday "Gallery numbers in gallery
+    /// A gallery's name in a 30 pt label of `shape`, its middle on the POI (PM, Monday "Gallery numbers in gallery
     /// navigation", 2026-10-28): the destination red with a white border and white text, a visited
     /// gallery white with a red outline, the others white with a black outline.
-    static func galleryMarkerImage(name: String, style: GalleryMarker.Style) -> UIImage {
+    static func galleryMarkerImage(name: String, style: GalleryMarker.Style, shape: GalleryMarker.Shape = .pill) -> UIImage {
         let red = UIColor(hex: 0xED3731)
         let ink = UIColor(hex: 0x2B2B2B)
         let (fill, outline, outlineWidth, text): (UIColor, UIColor, CGFloat, UIColor) = switch style {
@@ -501,7 +528,7 @@ final class JourneyMapLayers {
         let textWidth = min(ceil(textSize.width), 220)
         let size = CGSize(width: inset + textWidth + inset + 2, height: height)
         return UIGraphicsImageRenderer(size: size).image { _ in
-            let pill = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), cornerRadius: height / 2 - 1)
+            let pill = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1), cornerRadius: shape.cornerRadius(height: height))
             fill.setFill()
             pill.fill()
             outline.setStroke()

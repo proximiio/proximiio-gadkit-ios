@@ -1012,6 +1012,23 @@ final class VisitController: ObservableObject {
         isOffRoute = false
     }
 
+    /// Whether the view holds the navigator's `legChanged` and `journeyFinished` (`LegEventGate`).
+    var holdsLegEvents: Bool { legHolds > 0 }
+    private var legHolds = 0
+    /// Called when `holdsLegEvents` turns `false`: the view hands the held events on.
+    var onLegEventsReleased: (() -> Void)?
+
+    /// Runs `body` with `holdsLegEvents` on: a step that marks an artwork visited, reports it and
+    /// orders the stops ahead again. The host app gets `artworkVisited` first and one `nextStop`.
+    private func holdingLegEvents(_ body: () async -> Void) async {
+        legHolds += 1
+        await body()
+        // The view's event loop takes the events the navigator sent last.
+        await Task.yield()
+        legHolds -= 1
+        if legHolds == 0 { onLegEventsReleased?() }
+    }
+
     /// Runs `body` with `isRerouting` on.
     private func rerouting(_ body: () async -> Void) async {
         reroutes += 1
@@ -1058,18 +1075,20 @@ final class VisitController: ObservableObject {
                 defer { self.reroutes -= 1 }
                 // The artwork moves before the stops still to visit: the numbers follow the visit
                 // order. The navigator walks to it for a moment.
-                self.passingStopID = stopID
-                await self.navigator.move(stopID: stopID, toIndex: 0)
-                let isDone = await self.navigator.markDone(stopID: stopID)
-                self.passingStopID = nil
-                if isDone, let stop = self.stop(stopID) {
-                    self.onArtworkArrived?(stop)
-                    self.onArtworkVisited?(stop, .outOfOrder)
-                }
-                await self.orderRemaining()
-                if let activeStopID, self.navigator.activeStop?.id == activeStopID {
-                    FieldLog.log("leg to \(activeStopID) drawn again from the visitor")
-                    await self.navigator.resumeJourney()
+                await self.holdingLegEvents {
+                    self.passingStopID = stopID
+                    await self.navigator.move(stopID: stopID, toIndex: 0)
+                    let isDone = await self.navigator.markDone(stopID: stopID)
+                    self.passingStopID = nil
+                    if isDone, let stop = self.stop(stopID) {
+                        self.onArtworkArrived?(stop)
+                        self.onArtworkVisited?(stop, .outOfOrder)
+                    }
+                    await self.orderRemaining()
+                    if let activeStopID, self.navigator.activeStop?.id == activeStopID {
+                        FieldLog.log("leg to \(activeStopID) drawn again from the visitor")
+                        await self.navigator.resumeJourney()
+                    }
                 }
                 self.persist(self.navigator.journey)
             }
@@ -1113,17 +1132,19 @@ final class VisitController: ObservableObject {
                 guard !Task.isCancelled, self.navigator.activeStop?.id == stopID else { return }
                 // Reported here, not by `reportReachedStopDone` on the leg change.
                 if self.reachedStopID == stopID { self.reachedStopID = nil }
-                let changed = await self.navigator.markDone(stopID: stopID)
-                self.persist(self.navigator.journey)
-                if changed, let stop = self.stop(stopID) { self.onArtworkVisited?(stop, cause) }
-                guard changed else { return }
-                if self.outOfOrderArrivedID == stopID {
-                    // Entered out of order: the stops ahead are ordered from the visitor, as they
-                    // were at the entry before 1.48.0.
-                    self.outOfOrderArrivedID = nil
-                    await self.rerouting { await self.orderRemaining() }
-                } else {
-                    await self.orderFromTheVisitorsGallery()
+                await self.holdingLegEvents {
+                    let changed = await self.navigator.markDone(stopID: stopID)
+                    self.persist(self.navigator.journey)
+                    if changed, let stop = self.stop(stopID) { self.onArtworkVisited?(stop, cause) }
+                    guard changed else { return }
+                    if self.outOfOrderArrivedID == stopID {
+                        // Entered out of order: the stops ahead are ordered from the visitor, as they
+                        // were at the entry before 1.48.0.
+                        self.outOfOrderArrivedID = nil
+                        await self.rerouting { await self.orderRemaining() }
+                    } else {
+                        await self.orderFromTheVisitorsGallery()
+                    }
                 }
             }
         })
@@ -1265,11 +1286,14 @@ final class VisitController: ObservableObject {
         let marked = target.stops.filter { $0.kind != .detour && $0.state == .done && !done.contains($0.id) }.map(\.id)
         // Reported below, not by `reportReachedStopDone` on the leg change.
         if let reached = reachedStopID, marked.contains(reached) { reachedStopID = nil }
-        let taken = await navigator.update(to: target)
-        for id in marked {
-            guard let stop = stop(id), stop.state == .done else { continue }
-            FieldLog.log("artwork visited (the host app): \(id)")
-            onArtworkVisited?(stop, .app)
+        var taken = false
+        await holdingLegEvents {
+            taken = await navigator.update(to: target)
+            for id in marked {
+                guard let stop = stop(id), stop.state == .done else { continue }
+                FieldLog.log("artwork visited (the host app): \(id)")
+                onArtworkVisited?(stop, .app)
+            }
         }
         FieldLog.log("journey applied · \(target.stops.count) stops · \(taken ? "taken" : "not taken: two stops with one id")")
     }

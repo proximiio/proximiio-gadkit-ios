@@ -220,12 +220,18 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// `journey` binding (`.app`); the host app does not mark the stop again for this event.
     ///
     /// For one artwork: `artworkArrived`, `artworkVisited`, then `nextStop`, `stopOrderChanged` or
-    /// `journeyFinished`.
+    /// `journeyFinished`. The package holds `nextStop` and `journeyFinished` until it has sent
+    /// `artworkVisited` and ordered the stops ahead, and sends one `nextStop` for the stop the
+    /// visitor walks to then. No `nextStop` follows when that stop did not change (an artwork
+    /// visited out of order). The cause `.journeyMovedOn` is the exception: it follows the
+    /// `nextStop` that moved the journey on.
     case artworkVisited(ProximiStop, cause: ArtworkVisitCause)
     /// Use `artworkVisited`. The active artwork is visited: sent after `artworkVisited` for every
     /// cause but `.outOfOrder` and `.app`. Removed in a later release.
+    @available(*, deprecated, message: "Use artworkVisited.")
     case artworkReached(ProximiStop)
     /// Use `artworkVisited` with the cause `.outOfOrder`. Sent after it. Removed in a later release.
+    @available(*, deprecated, message: "Use artworkVisited with the cause .outOfOrder.")
     case artworkVisitedOutOfOrder(ProximiStop)
     /// `ProximiMapView` with `Options.progress`: the view ordered the stops again, from the visitor's
     /// first position, after `artworkVisitedOutOfOrder` or after a detour. The journey in the host

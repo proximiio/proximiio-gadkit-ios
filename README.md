@@ -36,8 +36,8 @@ repository. From 1.0.0 a minor or patch version does not break the public API. N
 cases come in minor versions; a `switch` with `default` keeps compiling. The [Changelog](#changelog)
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.73 and `proximiio-map-ios-binary`
-6.0.0-beta.64 exactly. The host app needs no dependency on them. A host app that also depends on
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.74 and `proximiio-map-ios-binary`
+6.0.0-beta.66 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -248,7 +248,7 @@ The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
-- uses `proximiio-sdk-ios-binary` 6.0.0-beta.73, the version this package pins;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.74, the version this package pins;
 - closes the view when the SDK stops on a refused token (`syncFailed(reason: "unauthorized")`,
   `tokenStatus == .rejected`). The map drops the venue and the navigator ends. After a new successful
   `authenticate()` and `start()`, a new view draws the journey again;
@@ -785,8 +785,8 @@ position, search and routes.
 | `positionUncertain(ProximiStop)` | `ProximiMapView` without `.uncertainPositionPrompt`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.uncertainPositionPrompt` the view asks "Probably at …" instead. |
 | `artworkArrived(ProximiStop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence it becomes the active stop (`nextStop`), then `artworkArrived` comes; with `visitsOutOfOrderAtEntry` it comes just before its `artworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
 | `artworkVisited(ProximiStop, cause: ArtworkVisitCause)` | An artwork of the journey is visited: its stop is done. Sent for every cause: `.left` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `.enteredAnotherArtwork` (a fix outside the artwork's geofence and in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `.advanceDelay` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `.outOfOrder` (personalised journeys with `visitsOutOfOrderAtEntry`, or with `advancesOnArtworkExit` `false`: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `.journeyMovedOn` (a detour ended or the visitor chose another stop while at the artwork) and `.app` (the host app set the stop to `.visited` through the `journey` binding of `ProximiMapView`). The host app does not set the stop to `.visited` again for this event. For one artwork the order is `artworkArrived`, `artworkVisited`, then `nextStop`, `stopOrderChanged` or `journeyFinished`. The SDK's `geofenceExited` of the artwork does not move the journey. |
-| `artworkReached(ProximiStop)` | Use `artworkVisited`. Sent after `artworkVisited` for every cause but `.outOfOrder` and `.app`. Removed in a later release. |
-| `artworkVisitedOutOfOrder(ProximiStop)` | Use `artworkVisited` with the cause `.outOfOrder`. Sent after it. Removed in a later release. |
+| `artworkReached(ProximiStop)` | Deprecated: use `artworkVisited`. Sent after `artworkVisited` for every cause but `.outOfOrder` and `.app`. Removed in a later release. |
+| `artworkVisitedOutOfOrder(ProximiStop)` | Deprecated: use `artworkVisited` with the cause `.outOfOrder`. Sent after it. Removed in a later release. |
 | `stopOrderChanged(ProximiJourney)` | `ProximiMapView` with `.progress`: the view ordered the stops again, from the visitor's first position, after an artwork visited out of order or after a detour. The journey in the host app's ids and its new order; the `journey` binding already holds it. A change of the states alone does not send it. |
 | `skipRequested`, `stopSkipped`, `skipCancelled` (`ProximiStop`) | A swipe on a stop in the list, "Skip it", "Keep it". `ProximiMapView` without `.skipPrompt` sends only `skipRequested`. `skipUndone` is not sent since 1.13.0. |
 | `stopPlaceDeleted(ProximiStop)` | The stop's POI was deleted on the backend while the journey screen is open. Once per stop. With `.progress` (and in `ProximiMap`) the stop is skipped. |
@@ -875,6 +875,7 @@ let configuration = GADConfiguration(
 | `positionWithoutFixesOpacity` | 0.45 | The opacity of the position dot without new positions and in a privacy zone. The dot turns grey and stays; its accuracy ring does not grow. 0 hides the dot. |
 | `showsStopDots` | `false` | `true` shows a journey artwork without a numbered marker as a dot without a number: an artwork in a gallery the visitor is not in, a skipped artwork, and every artwork while the route leads to a gallery. `true` in 1.43.0. |
 | `showsStopIcons` | `true` | Draws a pin in the marker of a journey artwork on the map and in the badge of its row in the journey list (since 1.60.0) while `showsStopNumbers` is `false`: white on the red circle of the current artwork, dark in the others. `false` shows the circles alone. |
+| `shapesGalleryLabelsByType` | `true` | Draws a gallery's name label on the journey map in the shape of the gallery's type: a pill for a single-artist gallery, a rectangle with square corners for a thematic one. The type is the title of the amenity of the gallery's POI. A gallery of no known type has the pill. `false` draws every label as a pill. |
 | `showsStopNumbers` | `false` | `true` shows the number of a journey artwork in its marker on the map, on the stop card and in the list. `false` shows the same circles without the number. The badge of grouped markers keeps its count. |
 | `ordersFromVisitorGallery` | `true` | `true` orders the stops ahead of a personalised journey again from the visitor when an artwork is marked visited while the visitor stands in another gallery than the next stop's, and that gallery has an artwork still to visit. |
 | `bearingSettlingTime` | 1.5 s | Time the heading-up map takes to turn to a new heading (`MapOptions.bearingSettlingTime`, map default 0.9 s). |
@@ -1119,6 +1120,50 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.61.0 (2026-11-20)
+
+Breaking: `proximiio-sdk-ios-binary` 6.0.0-beta.74 and `proximiio-map-ios-binary` 6.0.0-beta.66. A host
+app that depends on these packages moves to the same versions. Neither has an API change.
+
+- SDK 6.0.0-beta.74:
+  - A wristband session whose end time has passed ends at once, without the relay.
+    `BlueiotWristbandBinding` reports `.ended(.expired)` as soon as it is created with such a stored
+    session (also before `restore()`), when the app returns to the foreground after the end time,
+    and at the end time while the app runs. The stored session is removed from the Keychain. The
+    host app shows the scan of a new wristband at once.
+  - A relay position without an accuracy from the relay carries 1 m (was 3 m). The accuracy circle
+    is smaller, and `GADSettings.uncertainAccuracyMeters` triggers less often.
+  - Level changers that share `properties.group` and `type` route as one changer.
+  - The binary's files carry the release date: Xcode no longer keeps the module of the previous
+    version after an update.
+- Map 6.0.0-beta.66: a map style the locked phone refused to store ("You don't have permission to
+  save the file mapstyle-….json in the folder Caches") is no longer kept in
+  `ProximiioMapSession.lastError`, and no fallback basemap is put up for it. The session stores the
+  style once the phone is unlocked. The refusal on an unlocked phone is still reported.
+- Map 6.0.0-beta.65: `JourneyRules.keepsReachedStopsOpen` (`false`). The package does not set it.
+
+Host code that matches `artworkReached` or `artworkVisitedOutOfOrder` gets a deprecation warning,
+and a build error when warnings are treated as errors. Match `artworkVisited` in their place.
+
+- Event order: `artworkVisited` reaches the host app before the `nextStop` or `journeyFinished` of
+  the same step. Before, the navigator's event came first: the navigator reports the new leg before
+  it routes, and the package reported the visit after the navigator returned.
+- One `nextStop` follows a visit, for the stop the visitor walks to after the package has ordered
+  the stops ahead. Before, two `nextStop` came within 20 ms, the first for the next stop of the old
+  order.
+- No `nextStop` follows a visit that leaves the stop walked to unchanged (an artwork visited out of
+  order). Before, a `nextStop` for the same stop came.
+- The cause `.journeyMovedOn` keeps its order: the `nextStop` that moved the journey on comes first.
+- `ProximiMapEvent.artworkReached` and `ProximiMapEvent.artworkVisitedOutOfOrder` carry
+  `@available(*, deprecated)`. The package still sends both after `artworkVisited`.
+- Field log: `journey event handed on after the visit: <event>` for each held event.
+- `GADSettings.shapesGalleryLabelsByType` (`true`). On the journey map a gallery's name label has
+  the shape of the gallery's type, as on the museum's floor plan: a pill for a single-artist
+  gallery, a rectangle with square corners for a thematic one (operator, 2026-11-20). The type is
+  the title of the amenity of the gallery's POI ("single", "thematic"). A gallery of no known type
+  keeps the pill, and the field log names it: `gallery labels: no type, drawn as a pill · <names>`.
+  Colours, sizes and states do not change. `false` draws every label as a pill.
 
 ### 1.60.0 (2026-11-20)
 

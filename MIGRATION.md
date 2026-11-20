@@ -1,8 +1,8 @@
 # Moving to ProximiioGADKit
 
 This guide is for a host app on SDK 6.0.0-beta.58 and Map 6.0.0-beta.43 that shows its journey with
-the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.51.0 uses SDK
-6.0.0-beta.73 and Map 6.0.0-beta.64.
+the map library's `ProximiioMapView` and its own `JourneyNavigator`. ProximiioGADKit 1.61.0 uses SDK
+6.0.0-beta.74 and Map 6.0.0-beta.66.
 
 Each change has a mark:
 
@@ -68,6 +68,9 @@ calls compile unchanged.
 | SDK 6.0.0-beta.71, Map 6.0.0-beta.63 | In a venue with barrier features (`properties.metadata.type` `"barrier"`), a position that jumps through a wall stops at the wall. Geofence events, the dot and the arrival use the stopped point. A venue without barrier features behaves as before. | To turn it off: `ProximiioConfiguration.positioning.barriers.isEnabled = false`. | **Check** |
 | SDK 6.0.0-beta.72 | New `ProximiioConfiguration.privacyZoneExitDelay` (default `nil`: privacy zones use `geofenceExitDelay`). ProximiioGADKit 1.40.0 sets 1 s through `GADSettings.privacyZoneExitDelay` when `ProximiMap` starts the SDK. | A host app on `ProximiMapView` sets `configuration.privacyZoneExitDelay = 1` on its own configuration for the first position 1 s after a privacy zone. | Info |
 | SDK 6.0.0-beta.73 | The venue data package is checked about once an hour (was every 5 minutes while the change log was quiet). A failed upload waits 60 s, doubling up to 30 min, and is dropped after 10 answered failures. Visitor analytics the server refuses for good are dropped. The relay's polling fallback runs every 5 s (was 1 s). | | Info |
+| SDK 6.0.0-beta.74 | A wristband session whose end time has passed ends at once, without the relay: `BlueiotWristbandBinding` reports `.ended(.expired)` as soon as it is created with such a stored session (also before `restore()`), when the app returns to the foreground after the end time, and at the end time while the app runs. The stored session is removed. The app offers the scan of a new wristband at once. | Remove any own wait for the relay before the scan. | **Check** |
+| SDK 6.0.0-beta.74 | A relay position without an accuracy from the relay carries 1 m (was 3 m). The accuracy circle on the map is smaller, and `GADSettings.uncertainAccuracyMeters` triggers less often. | | Info |
+| Map 6.0.0-beta.66 | A map style the locked phone refused to store ("You don't have permission to save the file mapstyle-….json") is no longer kept in `ProximiioMapSession.lastError` and puts up no fallback basemap. The session stores the style once the phone is unlocked. | | Info |
 
 ### Added
 
@@ -148,8 +151,8 @@ The SDK and Map changelogs of these versions have the full entries.
 
 - Add `https://github.com/proximiio/proximiio-gadkit-ios`, "Up to Next Major Version" from `1.27.0`,
   and the product `ProximiioGADKit` to the app target.
-- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.73` and `proximiio-map-ios-binary` to exactly
-  `6.0.0-beta.64`. ProximiioGADKit pins these versions; with other versions the packages do not
+- Set `proximiio-sdk-ios-binary` to exactly `6.0.0-beta.74` and `proximiio-map-ios-binary` to exactly
+  `6.0.0-beta.66`. ProximiioGADKit pins these versions; with other versions the packages do not
   resolve.
 - ProximiioGADKit does not re-export the SDK and the Map. Files that use their types keep
   `import Proximiio` and `import ProximiioMap`. The file that shows the map adds
@@ -244,6 +247,10 @@ The app's `for await event in navigator.events` loop and its `onCue` closure mov
   finish. The app cancels its old task. Any other change of the journey goes to `update(to:)` of the
   same navigator.
 - The view sets neither `onCue` nor `cueRules`.
+- `ProximiMapEvent.artworkReached` and `ProximiMapEvent.artworkVisitedOutOfOrder` are deprecated
+  since ProximiioGADKit 1.61.0. Code that matches them gets a deprecation warning, and a build error
+  when warnings are treated as errors. Match `artworkVisited(_:cause:)`: it is sent for every visit,
+  before the `nextStop` of the same step.
 
 ### Step 7: Changes of the journey (Required)
 
