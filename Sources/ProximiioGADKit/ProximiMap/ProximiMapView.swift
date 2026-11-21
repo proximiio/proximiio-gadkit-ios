@@ -199,6 +199,9 @@ public struct ProximiMapView: View {
             if #unavailable(iOS 17) { model.startAgain() }
             Task { await model.languageChanged() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
+            model.protectedDataBecameAvailable()
+        }
     }
 }
 
@@ -233,6 +236,10 @@ final class HostedMapModel: ObservableObject {
     private var generation = 0
     private var revision = 0
     private var isStarting = false
+    /// The screen started while the phone was locked (`LockedStart`).
+    private var startedWhileLocked = false
+    /// Whether the phone is unlocked. Tests replace it.
+    var isProtectedDataAvailable: @MainActor () -> Bool = { UIApplication.shared.isProtectedDataAvailable }
 
     /// Loads the venue and shows `journey`. Called again when the view is back on screen, it follows
     /// the venue data changes again if the SDK stopped in between.
@@ -273,6 +280,8 @@ final class HostedMapModel: ObservableObject {
         FieldLog.log("hosted map: start · \(journey.kind.rawValue) · \(matched.journey.stops.count) of \(journey.stops.count) stops on the map · from the host app: \(visited) visited, \(skipped) skipped")
         hosted = matched
         incoming = nil
+        startedWhileLocked = !isProtectedDataAvailable()
+        if startedWhileLocked { FieldLog.log("hosted map: started while the phone is locked") }
         generation += 1
         loaded = Loaded(venue: venue, journey: matched.journey, kind: journey.kind, options: options, generation: generation)
     }
@@ -300,6 +309,15 @@ final class HostedMapModel: ObservableObject {
     func startAgain() {
         guard let current, loaded != nil else { return }
         FieldLog.log("hosted map: start again · app language \(AppLanguage.current)")
+        show(current)
+    }
+
+    /// The phone was unlocked. A screen that started while it was locked starts again, with the
+    /// journey as it is now (`LockedStart`).
+    func protectedDataBecameAvailable() {
+        guard LockedStart.startsAgain(startedWhileLocked: startedWhileLocked, settings: venue?.settings),
+              let current, loaded != nil else { return }
+        FieldLog.log("hosted map: start again · the phone was locked when the map started")
         show(current)
     }
 

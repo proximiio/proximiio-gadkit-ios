@@ -118,4 +118,13 @@ struct HostedJourneyTests {
         #expect(ordered.withDoneStopsFirst() == ordered)
         #expect(GADSettings().ordersDoneStopsFirst)
     }
+
+    /// Host app field log, 2026-11-21: a map created on a locked phone stayed blank after the unlock.
+    @Test func aMapStartedOnALockedPhoneStartsAgainAtTheUnlock() {
+        #expect(LockedStart.startsAgain(startedWhileLocked: true, settings: nil))
+        #expect(!LockedStart.startsAgain(startedWhileLocked: false, settings: nil))
+        var settings = GADSettings.standard
+        settings.restartsMapAfterUnlock = false
+        #expect(!LockedStart.startsAgain(startedWhileLocked: true, settings: settings))
+    }
 }

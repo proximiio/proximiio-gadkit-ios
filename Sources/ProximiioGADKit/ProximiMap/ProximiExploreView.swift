@@ -19,6 +19,10 @@ public struct ProximiExploreView: View {
     private let settings: GADSettings
 
     @State private var venue: VenueService?
+    /// Changes when the map starts again; `ExploreMuseumView` is created again.
+    @State private var generation = 0
+    /// The map started while the phone was locked (`LockedStart`).
+    @State private var startedWhileLocked = false
 
     /// - Parameters:
     ///   - sdk: The host app's SDK, started. The view reads the venue data the SDK holds and follows
@@ -32,7 +36,7 @@ public struct ProximiExploreView: View {
     public var body: some View {
         Group {
             if let venue {
-                ExploreMuseumView(venue: venue)
+                ExploreMuseumView(venue: venue).id(generation)
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -43,8 +47,17 @@ public struct ProximiExploreView: View {
                 // Back on screen. Follows the changes again if the SDK stopped in between.
                 await venue.data.start()
             } else {
-                venue = await VenueService.hosted(sdk: sdk, settings: settings)
+                let venue = await VenueService.hosted(sdk: sdk, settings: settings)
+                startedWhileLocked = !UIApplication.shared.isProtectedDataAvailable
+                if startedWhileLocked { FieldLog.log("explore map: started while the phone is locked") }
+                self.venue = venue
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
+            guard LockedStart.startsAgain(startedWhileLocked: startedWhileLocked, settings: settings) else { return }
+            FieldLog.log("explore map: start again · the phone was locked when the map started")
+            startedWhileLocked = false
+            generation += 1
         }
     }
 }

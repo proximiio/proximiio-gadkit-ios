@@ -1125,6 +1125,26 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.66.4 (2026-11-21)
+
+No change is needed in the code of a host app.
+
+- A `ProximiMapView` or `ProximiExploreView` that started while the phone was locked starts its map
+  again when the phone is unlocked (`UIApplication.protectedDataDidBecomeAvailableNotification`).
+  `ProximiMapView` starts with the journey as it is then and calls `onNavigator` again with a new
+  navigator, as at every new start of the screen. The field log has `hosted map: started while the
+  phone is locked` and `hosted map: start again · the phone was locked when the map started`
+  (`explore map: …` for `ProximiExploreView`). `GADSettings.restartsMapAfterUnlock = false` keeps
+  the map.
+- Source: field log of a host app of 2026-11-21 (iPhone 16, map 6.0.0-beta.66, report "map became
+  blank"). The host app created its journey map twice within 2 s, at 16:03:55 and 16:13:49 UTC. Both
+  maps took the organisation's style in the same 10 ms, 75 s and 269 s later; the map library does
+  that for a style it could not store on a locked phone. The map that stayed never drew the venue.
+  A new start of the app drew it in 0.42 s.
+- Not reproduced. Two maps created 1.4 s apart on an unlocked simulator both draw the venue
+  (1.2 s and 2.3 s). The start on a locked phone is inferred from the log, and the simulator has no
+  data protection. Checked with unit tests and builds.
+
 ### 1.66.3 (2026-11-21)
 
 No change is needed in the code of a host app.

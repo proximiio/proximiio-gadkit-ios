@@ -124,6 +124,12 @@ public struct GADSettings: Equatable, Sendable {
     /// states but passes its first order after a restart showed a visited artwork behind open ones
     /// in the list (PM, on site, 2026-11-19). `false` keeps the host app's order.
     public var ordersDoneStopsFirst = true
+    /// A `ProximiMapView` or `ProximiExploreView` that started while the phone was locked starts its
+    /// map again when the phone is unlocked, with the journey as it is then. On a locked phone the
+    /// map cannot read its stored style and tiles when the host app's files have complete data
+    /// protection, and such a map stayed blank after the unlock (host app field log, 2026-11-21).
+    /// `ProximiMapView` calls `onNavigator` again with a new navigator. `false` keeps the map.
+    public var restartsMapAfterUnlock = true
     /// An artwork the visitor has arrived at is marked visited when the visitor enters the geofence
     /// of another artwork of the journey and is outside its own. `false`: only
     /// `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited.
