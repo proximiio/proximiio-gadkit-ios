@@ -109,8 +109,9 @@ struct GalleryTests {
     }
 
     /// Nagarro, 2026-11-20 15:32 UTC: three of five artworks of gallery 101 and both of 104 were
-    /// visited, the visited stops were before the others, and 101 had two headers.
-    @Test func aGallerySeenInPartIsOneSection() {
+    /// visited, the visited stops were before the others, and 101 had two headers. The PM keeps
+    /// this: a gallery visited twice has two headers (2026-11-21).
+    @Test func aGalleryVisitedTwiceHasTwoHeaders() {
         let ids = ["moon", "stations", "andy", "sangre", "untitled", "retrospective", "salon", "ama"]
         let places = ids.map { VenuePlace(id: $0, title: $0, coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1) }
         var stops = VisitPlan.journey(poiIDs: ids, places: places).stops
@@ -122,8 +123,9 @@ struct GalleryTests {
         ]
         let rows = VisitPlan.listRows(stops) { section[$0.id] }
         #expect(rows.map(\.id) == [
+            "header-moon", "moon", "stations", "andy",
             "header-sangre", "sangre", "untitled",
-            "header-moon", "moon", "stations", "andy", "retrospective", "salon",
+            "header-retrospective", "retrospective", "salon",
             "header-ama", "ama",
         ])
     }

@@ -1125,6 +1125,14 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.66.2 (2026-11-21)
+
+No change is needed in the code of a host app.
+
+- Journey list: the section headers are as in 1.66.0 again. A header precedes each run of
+  neighbouring rows of one gallery, and a gallery visited twice has two headers (PM, 2026-11-21:
+  this is the agreed behaviour). The change of 1.66.1 is taken back.
+
 ### 1.66.1 (2026-11-21)
 
 No change is needed in the code of a host app.
