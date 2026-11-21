@@ -1125,6 +1125,17 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.65.3 (2026-11-21)
+
+No change is needed in the code of a host app.
+
+- Fixed: `FieldLog.log` ended the app with `NSFileHandleOperationException`,
+  `-[_NSStdIOFileHandle writeData:]: Input/output error`, when the write to standard error
+  failed (Nagarro crash report, 2026-11-20, a build started from Xcode). The line is now written
+  with POSIX `write`, and a failure is ignored. The line still goes to `Documents/gad-debug.log`.
+- A failed write to `Documents/gad-debug.log`, for example on a full disk, no longer raises an
+  exception: the line is dropped.
+
 ### 1.65.2 (2026-11-20)
 
 No change is needed in the code of a host app.

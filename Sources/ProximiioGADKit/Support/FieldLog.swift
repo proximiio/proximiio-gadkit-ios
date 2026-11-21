@@ -45,8 +45,15 @@ public enum FieldLog {
     public static func log(_ message: @autoclosure () -> String) {
         guard isEnabled else { return }
         let line = "[GAD] \(Date().formatted(timeStamp)) \(message())\n"
-        FileHandle.standardError.write(Data(line.utf8))
+        writeToStandardError(Data(line.utf8))
         queue.async { append(Data(line.utf8)) }
+    }
+
+    /// Writes to standard error with POSIX `write` and ignores a failure. `FileHandle.write(_:)`
+    /// raises an Objective-C exception when the write fails, which ends the app: standard error
+    /// returns an input/output error after the terminal of a debug session is gone.
+    static func writeToStandardError(_ data: Data) {
+        data.withUnsafeBytes { _ = Darwin.write(STDERR_FILENO, $0.baseAddress, $0.count) }
     }
 
     /// Writes the header of a new session: app version, build and date, then the device model and
@@ -92,7 +99,8 @@ public enum FieldLog {
         }
         defer { try? handle.close() }
         let size = (try? handle.seekToEnd()) ?? 0
-        handle.write(data)
+        // `write(contentsOf:)` throws; `write(_:)` raises an Objective-C exception, for example on a full disk.
+        guard (try? handle.write(contentsOf: data)) != nil else { return }
         if size + UInt64(data.count) > UInt64(maxBytes) { truncate() }
     }
 
