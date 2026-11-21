@@ -90,21 +90,55 @@ enum VisitPlan {
         }
     }
 
-    /// The journey list in visit order, one flat list: a header before each run of consecutive
-    /// stops with the same section, for example a gallery. A gallery visited twice gets two
-    /// headers, so the list keeps the visit order. A run without a section has no header. A
-    /// header's id follows the first stop of its run, so rows keep their identity when the order
+    /// The journey list, one flat list: a header before each run of stops with the same section,
+    /// for example a gallery. A run without a section has no header.
+    ///
+    /// The stops still to visit keep their order: a gallery the route enters twice gets two
+    /// headers. A visited stop (`done`) goes to the top of the first run of its section that has a
+    /// stop to visit, so a gallery seen in part is one section. Visited stops of a section without
+    /// a stop to visit are one run per section, before the runs with stops to visit. Before
+    /// 1.66.1 the visited stops kept their place, and a gallery seen in part had two headers once
+    /// the visited stops moved before the others (Nagarro, video of 2026-11-20 15:32 UTC).
+    ///
+    /// A header's id follows the first stop of its run, so rows keep their identity when the order
     /// changes (PM 2026-10-15: the list showed rows of an older order). Pure; covered by tests.
     static func listRows(_ stops: [JourneyStop], sectionOf: (JourneyStop) -> String?) -> [ListRow] {
-        var rows: [ListRow] = []
-        var current: String?
-        for (index, stop) in stops.enumerated() {
+        struct Run {
+            let section: String?
+            var stops: [JourneyStop]
+        }
+        var openRuns: [Run] = []
+        var visitedRuns: [Run] = []
+        var visitedOfOpenRun: [Int: [JourneyStop]] = [:]
+        var visited: [(stop: JourneyStop, section: String?)] = []
+        for stop in stops {
             let section = sectionOf(stop)
-            if index == 0 || section != current, let section {
-                rows.append(.header(id: "header-\(stop.id)", title: section))
+            if stop.state == .done {
+                visited.append((stop, section))
+            } else if let last = openRuns.indices.last, openRuns[last].section == section {
+                openRuns[last].stops.append(stop)
+            } else {
+                openRuns.append(Run(section: section, stops: [stop]))
             }
-            current = section
-            rows.append(.stop(stop))
+        }
+        for (stop, section) in visited {
+            if let section, let index = openRuns.firstIndex(where: { $0.section == section }) {
+                visitedOfOpenRun[index, default: []].append(stop)
+            } else if let index = visitedRuns.firstIndex(where: { $0.section == section }) {
+                visitedRuns[index].stops.append(stop)
+            } else {
+                visitedRuns.append(Run(section: section, stops: [stop]))
+            }
+        }
+        let runs = visitedRuns + openRuns.enumerated().map { index, run in
+            Run(section: run.section, stops: (visitedOfOpenRun[index] ?? []) + run.stops)
+        }
+        var rows: [ListRow] = []
+        for run in runs {
+            if let section = run.section, let first = run.stops.first {
+                rows.append(.header(id: "header-\(first.id)", title: section))
+            }
+            rows.append(contentsOf: run.stops.map(ListRow.stop))
         }
         return rows
     }

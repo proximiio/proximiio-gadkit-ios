@@ -108,6 +108,35 @@ struct GalleryTests {
         #expect(titles == ["G1", "G2", "G1"])
     }
 
+    /// Nagarro, 2026-11-20 15:32 UTC: three of five artworks of gallery 101 and both of 104 were
+    /// visited, the visited stops were before the others, and 101 had two headers.
+    @Test func aGallerySeenInPartIsOneSection() {
+        let ids = ["moon", "stations", "andy", "sangre", "untitled", "retrospective", "salon", "ama"]
+        let places = ids.map { VenuePlace(id: $0, title: $0, coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1) }
+        var stops = VisitPlan.journey(poiIDs: ids, places: places).stops
+        for index in 0..<5 { stops[index].state = .done }
+        stops[5].state = .active
+        let section = [
+            "moon": "101", "stations": "101", "andy": "101", "sangre": "104", "untitled": "104",
+            "retrospective": "101", "salon": "101", "ama": "102",
+        ]
+        let rows = VisitPlan.listRows(stops) { section[$0.id] }
+        #expect(rows.map(\.id) == [
+            "header-sangre", "sangre", "untitled",
+            "header-moon", "moon", "stations", "andy", "retrospective", "salon",
+            "header-ama", "ama",
+        ])
+    }
+
+    @Test func visitedStopsWithoutASectionStayBeforeTheOthers() {
+        let ids = ["a", "b", "c"]
+        let places = ids.map { VenuePlace(id: $0, title: $0, coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1) }
+        var stops = VisitPlan.journey(poiIDs: ids, places: places).stops
+        stops[0].state = .done
+        // A curated tour: no sections.
+        #expect(VisitPlan.listRows(stops) { _ in nil }.map(\.id) == ["a", "b", "c"])
+    }
+
     @Test func listRowIDsAreUnique() {
         let places = ["a", "b", "c"].map {
             VenuePlace(id: $0, title: $0, coordinate: .init(latitude: 24.5, longitude: 54.4), level: 1)

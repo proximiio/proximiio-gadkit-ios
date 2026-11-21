@@ -1125,6 +1125,19 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.66.1 (2026-11-21)
+
+No change is needed in the code of a host app.
+
+- Journey list: a gallery seen in part is one section. A visited artwork goes to the top of the
+  section of its gallery that has an artwork still to visit. Visited artworks of a gallery without
+  an artwork to visit are one section, before the sections with artworks to visit. The artworks
+  still to visit keep their order: a gallery the route enters twice still gets two headers. Before,
+  the header followed every change of gallery between neighbouring rows. When the visited stops
+  moved before the others, a gallery seen in part had two headers (Nagarro, video of 2026-11-20
+  15:32 UTC, build 253: "101 Pop Culture" above its three visited artworks and again above the two
+  others, with "104 Abstractions" between them).
+
 ### 1.66.0 (2026-11-21)
 
 Breaking: `proximiio-map-ios-binary` 6.0.0-beta.67. A host app that depends on the package moves to
