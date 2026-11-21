@@ -37,7 +37,7 @@ cases come in minor versions; a `switch` with `default` keeps compiling. The [Ch
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
 `Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.74 and `proximiio-map-ios-binary`
-6.0.0-beta.66 exactly. The host app needs no dependency on them. A host app that also depends on
+6.0.0-beta.67 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -1124,6 +1124,19 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.66.0 (2026-11-21)
+
+Breaking: `proximiio-map-ios-binary` 6.0.0-beta.67. A host app that depends on the package moves to
+this version. No change is needed in the code of a host app. The SDK stays 6.0.0-beta.74.
+
+- Map 6.0.0-beta.67: a map canvas keeps its map view for one turn of the main queue when it is
+  released. Before, a canvas released inside a MapLibre callback freed the map under MapLibre's own
+  call: `SIGSEGV` at address 0 in `mln::style::Style::Impl::onSourceChanged`, with only MapLibre
+  frames on the main thread (Nagarro crash report, 2026-11-21, two journey maps closed 230 ms
+  apart). The crash was not reproduced; the fix follows from the report and the map's code.
+- Show one `ProximiMapView` for a journey at a time. Two alive at once load the map twice and
+  write every field log line twice.
 
 ### 1.65.3 (2026-11-21)
 
