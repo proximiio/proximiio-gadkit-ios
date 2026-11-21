@@ -18,7 +18,7 @@ import UIKit
 
 public extension FieldLog {
     /// The version of the package, sent with each upload.
-    static let packageVersion = "1.66.2"
+    static let packageVersion = "1.66.3"
 
     /// Starts sending the field log to the relay-api of `binding`, with its app token. Call it once,
     /// after the host app created its `BlueiotWristbandBinding`. A second call replaces the first.
@@ -195,14 +195,19 @@ actor FieldLogUploader {
                 request.setValue(value, forHTTPHeaderField: field)
             }
             let status: Int
+            let isChallenge: Bool
             do {
                 let (_, response) = try await session.upload(for: request, from: chunk.data)
-                status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                let http = response as? HTTPURLResponse
+                status = http?.statusCode ?? 0
+                isChallenge = Self.isProxyChallenge(
+                    mitigated: http?.value(forHTTPHeaderField: "cf-mitigated"),
+                    contentType: http?.value(forHTTPHeaderField: "Content-Type"))
             } catch {
                 FieldLog.log("log upload: \(chunk.sequence) failed: \(error.localizedDescription)")
                 return
             }
-            switch Self.outcome(of: status) {
+            switch Self.outcome(of: status, isProxyChallenge: isChallenge) {
             case .stored:
                 await onQueue { FieldLogUploadState.accepted(chunk.data.count) }
                 stored += 1
@@ -216,7 +221,7 @@ actor FieldLogUploader {
                 stop()
                 return
             case .retry:
-                FieldLog.log("log upload: \(chunk.sequence) answered \(status)")
+                FieldLog.log("log upload: \(chunk.sequence) answered \(status)\(isChallenge ? " · proxy challenge, not the relay" : "")")
                 return
             }
         }
@@ -234,14 +239,24 @@ actor FieldLogUploader {
     enum Outcome: Equatable { case stored, tooLarge, refused, retry }
 
     /// What the app does with the relay's answer. 409: the relay already holds this sequence
-    /// number. Pure; covered by tests.
-    static func outcome(of status: Int) -> Outcome {
+    /// number. A 401 or 403 of a proxy in front of the relay is not the relay's answer: the chunk
+    /// is sent again at the next upload and the uploads stay on. Pure; covered by tests.
+    static func outcome(of status: Int, isProxyChallenge: Bool = false) -> Outcome {
         switch status {
         case 200..<300, 409: .stored
         case 413: .tooLarge
-        case 401, 403: .refused
+        case 401, 403: isProxyChallenge ? .retry : .refused
         default: .retry
         }
+    }
+
+    /// True when the answer comes from a proxy in front of the relay, not from the relay: it
+    /// carries the header `cf-mitigated` (Cloudflare managed challenge) or an HTML body. The relay
+    /// answers with JSON. Seen on the production hosts, 2026-11-21 (Metis T-1900): HTTP 403 with
+    /// `cf-mitigated: challenge` on up to a quarter of the requests. Pure; covered by tests.
+    static func isProxyChallenge(mitigated: String?, contentType: String?) -> Bool {
+        if let mitigated, !mitigated.isEmpty { return true }
+        return contentType?.lowercased().hasPrefix("text/html") == true
     }
 
     /// The headers of an upload. The app token goes to the relay only, as on `GET /v1/meta`.

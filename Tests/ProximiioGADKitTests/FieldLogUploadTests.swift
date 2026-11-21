@@ -84,6 +84,18 @@ struct FieldLogUploadTests {
         #expect(FieldLogUploader.outcome(of: 0) == .retry)
     }
 
+    /// Production hosts, 2026-11-21: Cloudflare answers some requests with 403 and
+    /// `cf-mitigated: challenge`. The uploads stay on.
+    @Test func aProxyChallengeIsNotTheRelaysRefusal() {
+        #expect(FieldLogUploader.isProxyChallenge(mitigated: "challenge", contentType: "text/html; charset=UTF-8"))
+        #expect(FieldLogUploader.isProxyChallenge(mitigated: nil, contentType: "Text/HTML"))
+        #expect(!FieldLogUploader.isProxyChallenge(mitigated: nil, contentType: "application/json"))
+        #expect(!FieldLogUploader.isProxyChallenge(mitigated: nil, contentType: nil))
+        #expect(FieldLogUploader.outcome(of: 403, isProxyChallenge: true) == .retry)
+        #expect(FieldLogUploader.outcome(of: 401, isProxyChallenge: true) == .retry)
+        #expect(FieldLogUploader.outcome(of: 403, isProxyChallenge: false) == .refused)
+    }
+
     @Test func theUploadCarriesTheInstallAndTheSequence() {
         let headers = FieldLogUploader.headers(sequence: 7, appToken: "t")
         #expect(headers["Authorization"] == "Bearer t")

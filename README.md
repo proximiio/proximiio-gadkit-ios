@@ -1125,6 +1125,17 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.66.3 (2026-11-21)
+
+No change is needed in the code of a host app.
+
+- Field log upload: an HTTP 401 or 403 that comes from a proxy in front of the relay no longer
+  switches the uploads off. The answer counts as the proxy's when it carries the header
+  `cf-mitigated` or an HTML body; the chunk is sent again at the next upload and the log has
+  `log upload: <n> answered 403 · proxy challenge, not the relay`. A 401 or 403 of the relay
+  itself still switches the uploads off until the next start. Seen on the production hosts on
+  2026-11-21: Cloudflare answered part of the requests with a managed challenge.
+
 ### 1.66.2 (2026-11-21)
 
 No change is needed in the code of a host app.
