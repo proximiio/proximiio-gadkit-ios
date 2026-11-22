@@ -183,4 +183,21 @@ struct GADSettingsTests {
         #expect(StopNearbyDetector.isNearby(eightMetresNorth, level: 1, stop: stop, stopLevel: 1, within: 10))
         #expect(StopNearbyDetector.isNearby(eightMetresNorth, level: 1, stop: stop, stopLevel: 1, routeMeters: 9, within: 10))
     }
+
+    /// The wristband positions come over WebSocket first (SDK 6.0.0-beta.75; the DCT production
+    /// proxy buffers Server-Sent Events). The setting reaches the binding configuration.
+    @Test @MainActor func theWristbandTransportReachesTheBinding() throws {
+        var configuration = GADConfiguration(
+            apiBaseURL: try #require(URL(string: "https://api.example.com")),
+            applicationToken: "token",
+            relayAPI: try #require(BlueiotCloudRelayEndpoint(text: "https://relay.example.com")),
+            relayAPIAppToken: "relay"
+        )
+        #expect(GADSettings.standard.wristbandTransport == .automatic)
+        #expect(WristbandSession.configuration(for: configuration).transport == .automatic)
+        configuration.settings.wristbandTransport = .serverSentEvents
+        #expect(WristbandSession.configuration(for: configuration).transport == .serverSentEvents)
+        configuration.settings.wristbandTransport = .webSocket
+        #expect(WristbandSession.configuration(for: configuration).transport == .webSocket)
+    }
 }

@@ -62,7 +62,7 @@ enum WristbandCopy {
             return String(localized: "Hold your current wristband next to the new one and scan again.", bundle: .localized)
         case .swapAtReception:
             return String(localized: "Your wristband isn't reachable. Please swap it at the reception desk.", bundle: .localized)
-        case .signingUnavailable:
+        case .signingUnavailable, .edgeChallenge:
             return String(localized: "The museum’s server is busy. Try again in a moment.", bundle: .localized)
         case .network:
             return String(localized: "The museum’s server cannot be reached. Check your connection and try again.", bundle: .localized)

@@ -67,8 +67,18 @@ final class WristbandSession: ObservableObject {
         BlueiotBindingConfiguration(
             relayURL: backend.relayAPI,
             appToken: backend.relayAPIAppToken,
+            transport: transport(for: backend.settings.wristbandTransport),
             runsInBackground: true
         )
+    }
+
+    /// The SDK's transport for the setting. Pure; covered by tests.
+    nonisolated static func transport(for setting: GADSettings.WristbandTransport) -> BlueiotBindingTransport {
+        switch setting {
+        case .serverSentEvents: .serverSentEvents
+        case .webSocket: .webSocket
+        case .automatic: .automatic
+        }
     }
 
     /// `true` while a session is active. A bind in progress does not change it.

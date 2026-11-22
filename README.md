@@ -36,8 +36,8 @@ repository. From 1.0.0 a minor or patch version does not break the public API. N
 cases come in minor versions; a `switch` with `default` keeps compiling. The [Changelog](#changelog)
 lists every change; changes that need a change in the host app are marked **Breaking**.
 
-`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.74 and `proximiio-map-ios-binary`
-6.0.0-beta.67 exactly. The host app needs no dependency on them. A host app that also depends on
+`Package.swift` pins `proximiio-sdk-ios-binary` 6.0.0-beta.75 and `proximiio-map-ios-binary`
+6.0.0-beta.68 exactly. The host app needs no dependency on them. A host app that also depends on
 these packages must use the same versions.
 
 The package depends on `https://github.com/airbnb/lottie-spm` from 4.5.0, up to the next major
@@ -248,7 +248,7 @@ The host app:
 
 - creates and starts the SDK and attaches the wristband's position provider. The view does not start,
   stop or configure the SDK and does not change the wristband session;
-- uses `proximiio-sdk-ios-binary` 6.0.0-beta.74, the version this package pins;
+- uses `proximiio-sdk-ios-binary` 6.0.0-beta.75, the version this package pins;
 - closes the view when the SDK stops on a refused token (`syncFailed(reason: "unauthorized")`,
   `tokenStatus == .rejected`). The map drops the venue and the navigator ends. After a new successful
   `authenticate()` and `start()`, a new view draws the journey again;
@@ -1125,6 +1125,37 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.69.0 (2026-11-22)
+
+Breaking: `proximiio-sdk-ios-binary` 6.0.0-beta.75 and `proximiio-map-ios-binary` 6.0.0-beta.68. A
+host app that depends on the packages moves to these versions. Map 6.0.0-beta.68 changes only its
+SDK pin: each map binary pins one SDK version exactly. A `switch` over `BlueiotBindingError` or
+`BlueiotBindingTransport` without a `default` needs the new cases (`edgeChallenge`; `webSocket`,
+`automatic`).
+
+- SDK 6.0.0-beta.75:
+  - `BlueiotBindingConfiguration.transport` has `.webSocket` and `.automatic` (WebSocket first;
+    Server-Sent Events only when a WebSocket cannot be opened). The SDK's default stays
+    `.serverSentEvents`.
+  - A stream with no frame for 30 s is closed and opened again at once
+    (`BlueiotBindingConfiguration.streamSilenceTimeout`; 45 s before). The first reconnect after a
+    dropped stream is immediate.
+  - A Cloudflare challenge on a relay call (`BlueiotBindingError.edgeChallenge`) is temporary and
+    is tried again; it does not end the binding.
+  - Released without the SDK's full test suite, at the operator's request; the WebSocket path had
+    not run on a device at the release.
+- `GADSettings.wristbandTransport` (default `.automatic`) sets the transport of the binding the
+  package creates through `ProximiMap`. On the DCT production installation the client's Azure
+  Application Gateway buffers Server-Sent Events: the positions came in bursts and the position
+  dot went grey. WebSocket passes that path.
+- **A host app that creates its own `BlueiotWristbandBinding` sets the transport itself:**
+  `BlueiotBindingConfiguration(relayURL:appToken:transport: .automatic, runsInBackground:)`.
+  Without it the binding stays on Server-Sent Events.
+- The field log line `relay stream: open · binding <id> · ws` names the transport in use (`sse`,
+  `ws` or `poll`).
+- A bind that a proxy challenge held back shows "The museum's server is busy. Try again in a
+  moment."
 
 ### 1.68.0 (2026-11-22)
 

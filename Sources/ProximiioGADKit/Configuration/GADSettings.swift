@@ -138,6 +138,22 @@ public struct GADSettings: Equatable, Sendable {
     /// two amenities of one kind have a place. `false` draws the bundled glyphs everywhere, as up
     /// to 1.67.0.
     public var usesVenueAmenityIcons = true
+    /// How the wristband positions reach the phone from the relay-api (`GET /v1/me/position`).
+    public enum WristbandTransport: String, Sendable, Equatable, CaseIterable {
+        /// Server-Sent Events. A proxy that buffers responses delivers them in bursts.
+        case serverSentEvents
+        /// WebSocket only.
+        case webSocket
+        /// WebSocket first. Server-Sent Events when a WebSocket cannot be opened; an open
+        /// WebSocket that drops is opened again as a WebSocket.
+        case automatic
+    }
+    /// The transport of the wristband positions for the binding the package creates
+    /// (`ProximiMap`). `.automatic` since 1.69.0: on the DCT production installation the client's
+    /// Azure Application Gateway buffers Server-Sent Events, the positions came in bursts and the
+    /// position dot went grey (2026-11-22). A host app that creates its own
+    /// `BlueiotWristbandBinding` sets `BlueiotBindingConfiguration.transport` itself.
+    public var wristbandTransport: WristbandTransport = .automatic
     /// An artwork the visitor has arrived at is marked visited when the visitor enters the geofence
     /// of another artwork of the journey and is outside its own. `false`: only
     /// `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited.
