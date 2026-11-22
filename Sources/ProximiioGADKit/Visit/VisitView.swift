@@ -175,7 +175,8 @@ struct VisitView: View {
             sdk: venue.sdk,
             // The leg keeps its shape until the arrival; the walked part is translucent (PM review
             // 2026-10-12). No separate trail.
-            options: MapStyle.options(routeMarkers: false, settings: settings)
+            options: MapStyle.options(routeMarkers: false, settings: settings),
+            venueIcons: settings.usesVenueAmenityIcons
         )
         var rules = JourneyRules.visit
         #if DEBUG
@@ -701,6 +702,11 @@ struct VisitView: View {
         let scale = UIScreen.main.scale
         amenityIcons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
                                   uniquingKeysWith: { first, _ in first })
+        let levelChangers = LevelChangerPlace.all(in: features)
+        let usedAmenities = Set(allPlaces.compactMap(\.amenityID) + levelChangers.compactMap(\.amenityID))
+        if VenueGlyphs.update(amenities: amenities, used: usedAmenities, icons: amenityIcons, enabled: settings.usesVenueAmenityIcons) {
+            mapLayers.kindGlyphsChanged()
+        }
         searchShortcuts = AmenityListing.search(amenities).searchShortcuts(places: places, amenities: amenities, icons: amenityIcons)
         controller.artworkRemoteIDs = Dictionary(
             places.compactMap { place in place.remoteID.map { (place.id, $0) } },
@@ -709,7 +715,6 @@ struct VisitView: View {
         // The journey map shows artworks only as the numbered stop markers. Amenities,
         // galleries and level changers stay (PM review 2026-10-12). `mapLayers` draws the
         // level changers on every floor they serve.
-        let levelChangers = LevelChangerPlace.all(in: features)
         levelChangerPlaces = levelChangers
         mapLayers.updateLevelChangers(levelChangers, amenityIcons: LevelChangerPlace.amenityIcons(of: amenities, icons: amenityIcons))
         mapLayers.updateCones(VenueCone.all(in: features))

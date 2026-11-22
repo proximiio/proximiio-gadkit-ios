@@ -42,7 +42,8 @@ struct MuseumMapView: View {
     init(venue: VenueService, initialDestination: VenuePlace? = nil) {
         self.venue = venue
         self.initialDestination = initialDestination
-        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.options(settings: venue.settings)))
+        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.options(settings: venue.settings),
+                                                          venueIcons: venue.settings.usesVenueAmenityIcons))
         _floorGuide = StateObject(wrappedValue: FloorWithoutPositioningGuide(settings: venue.settings))
     }
 
@@ -289,8 +290,12 @@ struct MuseumMapView: View {
         let scale = UIScreen.main.scale
         let icons = Dictionary(amenities.compactMap { amenity in amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: scale) }.map { (amenity.id, $0) } },
                                uniquingKeysWith: { first, _ in first })
-        availableAmenities = AmenityListing.search(amenities).searchShortcuts(places: places, amenities: amenities, icons: icons)
         let levelChangers = LevelChangerPlace.all(in: features)
+        let usedAmenities = Set(allPlaces.compactMap(\.amenityID) + levelChangers.compactMap(\.amenityID))
+        if VenueGlyphs.update(amenities: amenities, used: usedAmenities, icons: icons, enabled: venue.settings.usesVenueAmenityIcons) {
+            mapLayers.kindGlyphsChanged()
+        }
+        availableAmenities = AmenityListing.search(amenities).searchShortcuts(places: places, amenities: amenities, icons: icons)
         mapLayers.updateLevelChangers(levelChangers, amenityIcons: LevelChangerPlace.amenityIcons(of: amenities, icons: icons))
         mapLayers.updateCones(VenueCone.all(in: features))
         session.hiddenFeatureIDs = Set(levelChangers.map(\.id))

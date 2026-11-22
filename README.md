@@ -737,8 +737,9 @@ follow.
   galleries the museum's POIs use, with their map icons, and "Elevator" and "Stairs" when the venue
   has lifts or staircases. A second tap, or a drag down on the panel's
   top, closes it.
-- Icons: the design's glyph of an amenity kind (toilet, café, restaurant, help desk, prayer room, shop, theatre,
-  stairs, lift), else the icon of the POI's amenity in the venue data, the icon the map draws.
+- Icons: the icon of the POI's amenity in the venue data. An amenity kind (toilet, café, restaurant,
+  help desk, prayer room, shop, theatre, stairs, lift) is tinted and falls back to the bundled glyph
+  (`GADSettings.usesVenueAmenityIcons`).
   - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline, else the
     gallery's polygon feature with the id in `metadata.gallery_id`. The POI with the same `remote_id` gives the name, the level, the category (its amenity, such as "Thematic
     Gallery") and the description.
@@ -1124,6 +1125,30 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.68.0 (2026-11-22)
+
+No change is needed in the code of a host app.
+
+- The icons of the amenity kinds come from the venue data, so they are edited in the Proximi
+  portal (PM, 2026-11-22). The kinds are toilet, café, restaurant, help desk, prayer room, stairs,
+  lift, museum shop and theatre. Up to 1.67.0 the package drew its bundled glyph for them and did
+  not use the amenity's icon.
+  - On the maps a POI of a kind has the design's marker, a white circle, around the icon of its own
+    amenity. The marker has the size of the data icon, as before; the icon fills 16/30 of it.
+  - In the search chips, the lists, the map legend, the stop card and the red marker of a picked
+    amenity, a kind has the icon of its amenity, tinted. The package takes the one amenity of the
+    kind that a POI or a level changer uses.
+  - The bundled glyph is drawn when the amenity has no icon. In the chips, lists and legend it is
+    also drawn when two amenities of one kind have a POI, as the women's and the men's restroom:
+    the bundled "Toilet" glyph stays until the data has one amenity for it.
+  - The data icon is a dark glyph on a transparent square, without a circle of its own (120 × 120
+    px in the GAD data, the glyph about 100 px). An icon with its own circle or background is drawn
+    as it is inside the marker and looks wrong.
+- `GADSettings.usesVenueAmenityIcons` (default `true`). `false` draws the bundled glyphs, as up to
+  1.67.0.
+- The amenity chips of the place search sheet show the same icon as the chips on the map. Before,
+  they showed a system symbol.
 
 ### 1.67.0 (2026-11-22)
 

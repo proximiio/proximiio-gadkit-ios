@@ -130,6 +130,14 @@ public struct GADSettings: Equatable, Sendable {
     /// protection, and such a map stayed blank after the unlock (host app field log, 2026-11-21).
     /// `ProximiMapView` calls `onNavigator` again with a new navigator. `false` keeps the map.
     public var restartsMapAfterUnlock = true
+    /// The amenity kinds the package knows (toilet, café, restaurant, help desk, prayer room, stairs,
+    /// lift, museum shop, theatre) are drawn with the icon of their amenity in the venue data, so
+    /// the icons are edited in the Proximi portal (PM, 2026-11-22). The icon is a dark glyph on a
+    /// transparent square; the package tints it and, on the maps, draws it in the white circle
+    /// marker. The bundled glyph is drawn when the amenity has no icon, and in lists and chips when
+    /// two amenities of one kind have a place. `false` draws the bundled glyphs everywhere, as up
+    /// to 1.67.0.
+    public var usesVenueAmenityIcons = true
     /// An artwork the visitor has arrived at is marked visited when the visitor enters the geofence
     /// of another artwork of the journey and is outside its own. `false`: only
     /// `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited.

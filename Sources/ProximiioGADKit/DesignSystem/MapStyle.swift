@@ -213,12 +213,13 @@ enum MapStyle {
 
     /// A map session that draws amenities with the design's icons (`amenityImage(for:scale:)`), or
     /// with `galleryIcons` the icons of the Explore Museum map (`exploreAmenityImage(for:scale:)`).
-    @MainActor static func session(sdk: Proximiio, options: MapOptions, galleryIcons: Bool = false) -> ProximiioMapSession {
+    @MainActor static func session(sdk: Proximiio, options: MapOptions, galleryIcons: Bool = false,
+                                   venueIcons: Bool = true) -> ProximiioMapSession {
         let session = ProximiioMapSession(sdk: sdk, options: options)
         let scale = UIScreen.main.scale
         session.amenityImageDecoder = galleryIcons
-            ? { exploreAmenityImage(for: $0, scale: scale) }
-            : { amenityImage(for: $0, scale: scale) }
+            ? { exploreAmenityImage(for: $0, scale: scale, venueIcons: venueIcons) }
+            : { amenityImage(for: $0, scale: scale, venueIcons: venueIcons) }
         AppLanguage.follow(session)
         return session
     }
@@ -228,18 +229,20 @@ enum MapStyle {
     /// then gives the same size here and in MapTap: 120 px at 0.2 is 24 pt (PM, 2026-10-27: the
     /// gallery icons were 8 pt at 0.2, with the icon at the screen's scale).
     ///
-    /// A kind the design draws (`AmenityKind`) gets its marker (PM 2026-10-14, "Amenity icons
-    /// larger") at the size of the data's icon it replaces. Other amenities, such as artworks and
-    /// galleries, keep their icon.
-    static func amenityImage(for amenity: ProximiioAmenity, scale: CGFloat) -> UIImage? {
+    /// A kind the design draws (`AmenityKind`) gets the design's marker (PM 2026-10-14, "Amenity
+    /// icons larger") at the size of the data's icon: the white circle around the amenity's own
+    /// icon (PM, 2026-11-22: the icons are edited in the portal). Without a data icon, or with
+    /// `venueIcons` false (`GADSettings.usesVenueAmenityIcons`), the circle holds the bundled glyph.
+    /// Other amenities, such as artworks and galleries, keep their icon.
+    static func amenityImage(for amenity: ProximiioAmenity, scale: CGFloat, venueIcons: Bool = true) -> UIImage? {
         let icon = amenity.icon.flatMap { AmenityIcon.rasterImage($0, scale: 1) }
-        if let kind = AmenityKind.kind(forAmenityID: amenity.id, title: amenity.title),
-           let name = kind.icon.markerImageName,
-           let marker = UIImage(named: name, in: .module, compatibleWith: nil) {
-            let size = styleIconSize(of: icon)
-            return render(size: size, scale: scale) { marker.draw(in: CGRect(origin: .zero, size: size)) }
+        guard let kind = AmenityKind.kind(forAmenityID: amenity.id, title: amenity.title), kind.icon.markerImageName != nil else {
+            return icon
         }
-        return icon
+        let size = styleIconSize(of: icon)
+        if venueIcons, let icon { return VenueGlyphs.marker(glyph: icon, size: size, scale: scale) }
+        guard let name = kind.icon.markerImageName, let marker = UIImage(named: name, in: .module, compatibleWith: nil) else { return icon }
+        return render(size: size, scale: scale) { marker.draw(in: CGRect(origin: .zero, size: size)) }
     }
 
     /// The map icon of an amenity on the Explore Museum map. A gallery's icon from the venue data on
@@ -247,9 +250,9 @@ enum MapStyle {
     /// "Explore museum view: default map view", 2026-10-26). The circle has the data icon's size in
     /// points, as `amenityImage(for:scale:)`. An icon without a circle of its own shows the design
     /// best.
-    static func exploreAmenityImage(for amenity: ProximiioAmenity, scale: CGFloat) -> UIImage? {
+    static func exploreAmenityImage(for amenity: ProximiioAmenity, scale: CGFloat, venueIcons: Bool = true) -> UIImage? {
         if AmenityKind.kind(forAmenityID: amenity.id, title: amenity.title) != nil {
-            return amenityImage(for: amenity, scale: scale)
+            return amenityImage(for: amenity, scale: scale, venueIcons: venueIcons)
         }
         guard let icon = amenity.icon.flatMap({ AmenityIcon.rasterImage($0, scale: 1) }) else { return nil }
         let side = max(icon.size.width, icon.size.height)
@@ -284,8 +287,8 @@ enum MapStyle {
     /// label colour, white on the red marker (PM 2026-10-15: the marker had no icon).
     @MainActor static func registerStopIcons(on canvas: ProximiioMapCanvas) {
         for icon in GADIcon.allCases where icon.markerImageName != nil {
-            guard let image = UIImage(named: icon.rawValue, in: .module, compatibleWith: nil) else { continue }
-            canvas.floors.register(image.withRenderingMode(.alwaysTemplate), named: icon.rawValue)
+            guard let image = icon.glyphImage else { continue }
+            canvas.floors.register(image, named: icon.rawValue)
         }
     }
 

@@ -28,11 +28,7 @@ struct PlaceSearchSheet: View {
                                         Label {
                                             Text(shortcut.title)
                                         } icon: {
-                                            if let kind = shortcut.kind {
-                                                Image(systemName: kind.symbol)
-                                            } else {
-                                                shortcut.image?.resizable().scaledToFit().frame(width: 16, height: 16)
-                                            }
+                                            shortcut.image?.resizable().scaledToFit().frame(width: 16, height: 16)
                                         }
                                             .textStyle(.bodySmallRegular)
                                             .padding(.horizontal, 12)

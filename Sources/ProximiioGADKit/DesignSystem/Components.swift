@@ -147,8 +147,31 @@ enum GADIcon: String, CaseIterable {
     /// 16444:202832; PM, Monday "Accessible route icon", 2026-11-02).
     case wheelchair = "IconWheelchair"
 
-    /// The glyph, tinted with the foreground style.
-    var image: Image { Image(rawValue, bundle: .module).renderingMode(.template) }
+    /// The glyph, tinted with the foreground style: the venue data's glyph of the kind
+    /// (`VenueGlyphs`), else the bundled one.
+    var image: Image {
+        if let glyph = VenueGlyphs.glyph(for: self) { return Self.template(glyph) }
+        return Image(rawValue, bundle: .module).renderingMode(.template)
+    }
+
+    /// A data icon as a glyph that takes the foreground style.
+    static func template(_ glyph: UIImage) -> Image {
+        Image(uiImage: glyph).renderingMode(.template).interpolation(.high)
+    }
+
+    /// The glyph as a template image, from the venue data or the bundle.
+    var glyphImage: UIImage? {
+        (VenueGlyphs.glyph(for: self) ?? UIImage(named: rawValue, in: .module, compatibleWith: nil))?
+            .withRenderingMode(.alwaysTemplate)
+    }
+
+    /// The white circle marker of the maps: drawn around the venue data's glyph, else the bundled
+    /// marker. `nil` for icons without one.
+    var markerImage: UIImage? {
+        guard let name = markerImageName else { return nil }
+        if let glyph = VenueGlyphs.glyph(for: self) { return VenueGlyphs.marker(glyph: glyph) }
+        return UIImage(named: name, in: .module, compatibleWith: nil)
+    }
 
     /// The icon of a lift, staircase or escalator, from the route's feature type.
     static func levelChanger(featureType: String) -> GADIcon {

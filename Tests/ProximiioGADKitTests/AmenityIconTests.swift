@@ -101,4 +101,42 @@ struct AmenityIconTests {
             }
         }
     }
+
+    /// A kind takes the icon of its one amenity with a place. Two amenities of a kind (the women's
+    /// and the men's restroom) leave the bundled glyph; so does an amenity no place uses (the
+    /// "Cafe" of another category) and one without an icon.
+    @Test func aKindTakesTheIconOfItsOnlyUsedAmenity() {
+        let amenities = [
+            ProximiioAmenity(id: "a-cafe", title: "Cafe"), ProximiioAmenity(id: "a-cafe-other", title: "Cafe"),
+            ProximiioAmenity(id: "a-women", title: "Women's Restroom"), ProximiioAmenity(id: "a-men", title: "Men's Restroom"),
+            ProximiioAmenity(id: "a-prayer", title: "Prayer Room"), ProximiioAmenity(id: "a-stairs", title: "Staircase"),
+            ProximiioAmenity(id: "a-gallery", title: "Thematic Gallery"),
+        ]
+        let ids = VenueGlyphs.amenityIDs(
+            amenities: amenities, used: ["a-cafe", "a-women", "a-men", "a-prayer", "a-stairs", "a-gallery"],
+            withIcon: ["a-cafe", "a-cafe-other", "a-women", "a-men", "a-stairs", "a-gallery"])
+        #expect(ids == [.cafe: "a-cafe", .stairs: "a-stairs"])
+    }
+
+    /// The portal's icon of a kind is drawn in the design's marker: the marker keeps the data
+    /// icon's size and the glyph is in its centre, 16/30 of the marker.
+    @Test func aKindsDataIconIsDrawnInTheDesignsMarker() throws {
+        let cafe = ProximiioAmenity(id: "org:cafe", title: "Cafe", icon: Self.icon(side: 120))
+        let marker = try #require(MapStyle.amenityImage(for: cafe, scale: 1))
+        #expect(marker.size == CGSize(width: 120, height: 120))
+        // The data icon is a black square: in the marker it is the 64 px square in the centre.
+        let bounds = Self.glyphBounds(of: marker, tint: false, scale: 1)
+        #expect(abs(bounds.width - 64) <= 2 && abs(bounds.height - 64) <= 2, "\(bounds)")
+        #expect(abs(bounds.midX - 60) <= 1 && abs(bounds.midY - 60) <= 1, "\(bounds)")
+        // With the setting off the bundled marker is drawn, at the same size.
+        let bundled = try #require(MapStyle.amenityImage(for: cafe, scale: 1, venueIcons: false))
+        #expect(bundled.size == CGSize(width: 120, height: 120))
+        #expect(Self.glyphBounds(of: bundled, tint: false, scale: 1).width < 60)
+    }
+
+    @Test func aGlyphKeepsItsProportions() {
+        let rect = CGRect(x: 7, y: 7, width: 16, height: 16)
+        #expect(VenueGlyphs.aspectFit(CGSize(width: 120, height: 120), in: rect) == rect)
+        #expect(VenueGlyphs.aspectFit(CGSize(width: 120, height: 60), in: rect) == CGRect(x: 7, y: 11, width: 16, height: 8))
+    }
 }

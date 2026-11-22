@@ -62,7 +62,8 @@ struct ExploreMuseumView: View {
 
     init(venue: VenueService) {
         self.venue = venue
-        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.exploreOptions(settings: venue.settings), galleryIcons: true))
+        _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.exploreOptions(settings: venue.settings), galleryIcons: true,
+                                                          venueIcons: venue.settings.usesVenueAmenityIcons))
     }
 
     /// The map area under the level title and above the tab bar.
@@ -423,6 +424,10 @@ struct ExploreMuseumView: View {
         let categories = Dictionary(amenities.compactMap { amenity in amenity.title.map { (amenity.id, $0) } },
                                     uniquingKeysWith: { first, _ in first })
         let levelChangers = LevelChangerPlace.all(in: features)
+        let usedAmenities = Set(allPlaces.compactMap(\.amenityID) + levelChangers.compactMap(\.amenityID))
+        if VenueGlyphs.update(amenities: amenities, used: usedAmenities, icons: amenityIcons, enabled: venue.settings.usesVenueAmenityIcons) {
+            mapLayers.kindGlyphsChanged()
+        }
         let destinations = Gallery.destinations(geofences: geofences, places: places, features: features)
         let polygons = destinations.values.filter { $0.polygon != nil }.count
         FieldLog.log("explore: \(destinations.count) galleries · \(polygons) filled on their polygon, \(destinations.count - polygons) on their geofence · \(Gallery.polygonOutlines(features: features).count) gallery polygons in the venue data")
@@ -651,7 +656,7 @@ private struct ExploreText: View {
     }
 }
 
-/// The icon in a white circle: the design's glyph of an amenity kind, else the icon of the POI's
+/// The icon in a white circle: the glyph of an amenity kind (`GADIcon.image`), else the icon of the POI's
 /// amenity in the venue data (the icon the map draws), else a symbol for the gallery's category.
 private struct ExploreIcon: View {
     let item: ExploreItem

@@ -241,6 +241,29 @@ final class JourneyMapLayers {
         applyLevelChanger(on: style)
     }
 
+    /// Registers the images made from the glyphs of the amenity kinds: the lift and stairs markers,
+    /// the red markers and the glyphs of a detour stop. Called at the style load and when the venue
+    /// data's glyphs change (`VenueGlyphs`).
+    private func registerKindGlyphs(on canvas: ProximiioMapCanvas) {
+        for type in LevelChangerPlace.featureTypes {
+            if let image = Self.changerImage(featureType: type) { canvas.floors.register(image, named: LevelChanger.imageName(for: type)) }
+            if let image = Self.icon(featureType: type).markerImage {
+                canvas.floors.register(image, named: LevelChanger.standardImageName(for: type))
+            }
+        }
+        for icon in Set(AmenityKind.allCases.map(\.icon)) {
+            if let image = Self.redMarker(glyph: icon) { canvas.floors.register(image, named: Highlight.imageName(for: icon)) }
+        }
+        MapStyle.registerStopIcons(on: canvas)
+    }
+
+    /// The venue data's glyphs of the amenity kinds changed: the map images made from them are
+    /// registered again.
+    func kindGlyphsChanged() {
+        guard let canvas = session?.canvas, canvas.style != nil else { return }
+        registerKindGlyphs(on: canvas)
+    }
+
     private func registerChangerAmenityIcons(on canvas: ProximiioMapCanvas) {
         for (amenityID, image) in changerAmenityIcons {
             canvas.floors.register(image, named: LevelChanger.amenityImageName(for: amenityID))
@@ -335,16 +358,8 @@ final class JourneyMapLayers {
             canvas.addLayer(layer, at: .below(.route))
         }
         if style.source(withIdentifier: Self.changerSource) == nil {
-            for type in LevelChangerPlace.featureTypes {
-                if let image = Self.changerImage(featureType: type) { canvas.floors.register(image, named: LevelChanger.imageName(for: type)) }
-                if let image = UIImage(named: Self.icon(featureType: type).markerImageName ?? "", in: .module, compatibleWith: nil) {
-                    canvas.floors.register(image, named: LevelChanger.standardImageName(for: type))
-                }
-            }
+            registerKindGlyphs(on: canvas)
             registerChangerAmenityIcons(on: canvas)
-            for icon in Set(AmenityKind.allCases.map(\.icon)) {
-                if let image = Self.redMarker(glyph: icon) { canvas.floors.register(image, named: Highlight.imageName(for: icon)) }
-            }
             let source = MLNShapeSource(identifier: Self.changerSource, shape: nil)
             style.addSource(source)
             let layer = MLNSymbolStyleLayer(identifier: Self.changerLayer, source: source)
@@ -566,8 +581,7 @@ final class JourneyMapLayers {
 
     /// The 30 pt red marker with `glyph` in white.
     private static func redMarker(glyph icon: GADIcon) -> UIImage? {
-        guard let glyph = UIImage(named: icon.rawValue, in: .module, compatibleWith: nil)?
-            .withTintColor(.white, renderingMode: .alwaysOriginal) else { return nil }
+        guard let glyph = icon.glyphImage?.withTintColor(.white, renderingMode: .alwaysOriginal) else { return nil }
         let size = CGSize(width: 30, height: 30)
         return UIGraphicsImageRenderer(size: size).image { _ in
             let circle = UIBezierPath(ovalIn: CGRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1))
@@ -576,7 +590,7 @@ final class JourneyMapLayers {
             UIColor.white.setStroke()
             circle.lineWidth = 2
             circle.stroke()
-            glyph.draw(in: CGRect(x: 6, y: 6, width: 18, height: 18))
+            glyph.draw(in: VenueGlyphs.aspectFit(glyph.size, in: CGRect(x: 6, y: 6, width: 18, height: 18)))
         }
     }
 
