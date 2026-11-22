@@ -38,6 +38,8 @@ struct VisitStopList: View {
     var showsIcons = false
     /// `GADSettings.skipsAtSwipe`: the swipe itself asks for the skip.
     var skipsAtSwipe = false
+    /// `GADSettings.skipsAtSwipeBothWays`: a swipe towards the trailing edge asks for the skip too.
+    var skipsBothWays = false
     let onSkip: (JourneyStop) -> Void
 
     var body: some View {
@@ -52,6 +54,7 @@ struct VisitStopList: View {
             showsNumbers: showsNumbers,
             showsIcons: showsIcons,
             skipsAtSwipe: skipsAtSwipe,
+            skipsBothWays: skipsBothWays,
             onSkip: onSkip
         )
     }
@@ -69,6 +72,7 @@ private struct StopList: View {
     let showsNumbers: Bool
     let showsIcons: Bool
     let skipsAtSwipe: Bool
+    let skipsBothWays: Bool
     let onSkip: (JourneyStop) -> Void
 
     private var visibleStops: [JourneyStop] {
@@ -107,6 +111,7 @@ private struct StopList: View {
                             isEnabled: canSkip,
                             isSwiping: $isSwiping,
                             skipsAtSwipe: skipsAtSwipe || isSkipPaused,
+                            skipsBothWays: skipsBothWays,
                             onSkip: {
                                 revealedStopID = nil
                                 onSkip(stop)
@@ -218,9 +223,11 @@ enum SkipSwipe {
     }
 
     /// The logical offset of the row for a logical drag. It rubber-bands past the open position
-    /// and past the closed one.
-    static func offset(isRevealed: Bool, drag: CGFloat) -> CGFloat {
+    /// and past the closed one. With `bothWays` the row follows a drag towards the trailing edge
+    /// as far as `revealWidth` and rubber-bands after it.
+    static func offset(isRevealed: Bool, drag: CGFloat, bothWays: Bool = false) -> CGFloat {
         let raw = (isRevealed ? -revealWidth : 0) + drag
+        if raw > 0, bothWays { return raw > revealWidth ? revealWidth + (raw - revealWidth) * 0.3 : raw }
         if raw > 0 { return raw * 0.2 }
         if raw < -revealWidth { return -revealWidth + (raw + revealWidth) * 0.3 }
         return raw
@@ -234,8 +241,10 @@ enum SkipSwipe {
 
     /// The end of a drag: whether the skip panel stays revealed, and whether the skip is asked for
     /// now. With `skipsAtSwipe` a drag that would reveal the panel asks for the skip and the row
-    /// slides back.
-    static func end(isRevealed: Bool, projected: CGFloat, skipsAtSwipe: Bool) -> (revealed: Bool, skips: Bool) {
+    /// slides back. With `bothWays` as well, a drag of the same length towards the trailing edge
+    /// asks for the skip too (PM's video, 2026-11-22: 7 of 10 swipes went that way and did nothing).
+    static func end(isRevealed: Bool, projected: CGFloat, skipsAtSwipe: Bool, bothWays: Bool = false) -> (revealed: Bool, skips: Bool) {
+        if skipsAtSwipe, bothWays, !isRevealed, projected > revealWidth / 2 { return (false, true) }
         let revealed = reveals(isRevealed: isRevealed, projected: projected)
         return skipsAtSwipe && revealed ? (false, true) : (revealed, false)
     }
@@ -251,6 +260,7 @@ private struct SwipeToSkipRow<Content: View>: View {
     let isEnabled: Bool
     @Binding var isSwiping: Bool
     var skipsAtSwipe = false
+    var skipsBothWays = false
     let onSkip: () -> Void
     @ViewBuilder let content: Content
 
@@ -269,7 +279,7 @@ private struct SwipeToSkipRow<Content: View>: View {
 
     /// The logical offset of the row; `dragX` is a screen distance.
     private var offset: CGFloat {
-        SkipSwipe.offset(isRevealed: isRevealed, drag: dragX * sign)
+        SkipSwipe.offset(isRevealed: isRevealed, drag: dragX * sign, bothWays: skipsAtSwipe && skipsBothWays)
     }
 
     var body: some View {
@@ -336,7 +346,7 @@ private struct SwipeToSkipRow<Content: View>: View {
 
     /// Ends a horizontal drag that would stop `projected` logical points from its start.
     private func end(projected: CGFloat) {
-        let end = SkipSwipe.end(isRevealed: isRevealed, projected: projected, skipsAtSwipe: skipsAtSwipe)
+        let end = SkipSwipe.end(isRevealed: isRevealed, projected: projected, skipsAtSwipe: skipsAtSwipe, bothWays: skipsBothWays)
         FieldLog.log(String(format: "list swipe: ended · %.0f pt · skip %@", projected, end.skips ? "asked" : end.revealed ? "shown" : "hidden"))
         withAnimation(.snappy(duration: 0.25)) {
             dragX = 0

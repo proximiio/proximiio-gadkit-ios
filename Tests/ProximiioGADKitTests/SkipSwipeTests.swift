@@ -56,4 +56,21 @@ struct SkipSwipeTests {
         let button = SkipSwipe.end(isRevealed: false, projected: -60, skipsAtSwipe: false)
         #expect(button.revealed && !button.skips)
     }
+
+    /// With both ways a swipe towards the trailing edge asks for the skip; without it, and
+    /// without `skipsAtSwipe`, it does nothing.
+    @Test func aSwipeTowardsTheTrailingEdgeAsksForTheSkipWhenSet() {
+        let trailing = SkipSwipe.end(isRevealed: false, projected: 103, skipsAtSwipe: true, bothWays: true)
+        #expect(!trailing.revealed && trailing.skips)
+        let short = SkipSwipe.end(isRevealed: false, projected: 30, skipsAtSwipe: true, bothWays: true)
+        #expect(!short.revealed && !short.skips)
+        let oneWay = SkipSwipe.end(isRevealed: false, projected: 103, skipsAtSwipe: true, bothWays: false)
+        #expect(!oneWay.revealed && !oneWay.skips)
+        let button = SkipSwipe.end(isRevealed: false, projected: 103, skipsAtSwipe: false, bothWays: true)
+        #expect(!button.revealed && !button.skips)
+        // The row follows the finger towards the trailing edge, then rubber-bands.
+        #expect(SkipSwipe.offset(isRevealed: false, drag: 50, bothWays: true) == 50)
+        #expect(SkipSwipe.offset(isRevealed: false, drag: 172, bothWays: true) == 102)
+        #expect(SkipSwipe.offset(isRevealed: false, drag: 50) == 10)
+    }
 }

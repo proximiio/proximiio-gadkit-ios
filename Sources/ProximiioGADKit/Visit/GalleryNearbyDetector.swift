@@ -8,9 +8,13 @@
 //  `GADSettings.galleryEntranceAmenityID` and the gallery's id in `metadata.gallery_id`; a gallery
 //  without one uses its own POI (GAD PM, Monday "Entry POIs, connected to gallery", 2026-11-15).
 //  A visitor inside the outline of another gallery with an artwork still to visit is reported too,
-//  with the first such artwork: the visitor left the route and entered that gallery. `VisitView` reports it as `VisitEvent.galleryNearby`; the host app
-//  can start the gallery's introduction on it (Nagarro, PM, Monday "Approaching gallery
-//  information", 2026-11-10).
+//  with the first such artwork: the visitor left the route and entered that gallery. That report
+//  waits until the visitor has been inside for `GADSettings.otherGalleryNearbySeconds` (by default
+//  `galleryEntryOrderSeconds`, the time after which the journey is ordered again with that gallery
+//  first), so the report and the new order come on the same position (infra, Metis T-1928,
+//  2026-11-22: a visitor at a gallery's edge got the report 52 s before the route changed).
+//  `VisitView` reports it as `VisitEvent.galleryNearby`; the host app can start the gallery's
+//  introduction on it (Nagarro, PM, Monday "Approaching gallery information", 2026-11-10).
 //
 //  A gallery is reported once while it stays the gallery of the active stop: two stops in a row in
 //  one gallery report it once, and a journey that comes back to a gallery reports it again.
@@ -26,15 +30,21 @@ import ProximiioMap
 final class GalleryNearbyDetector {
     private let nearbyMeters: CLLocationDistance
     private let entranceAmenityID: String
+    /// Seconds inside another gallery of the journey before it is reported.
+    private let otherGallerySeconds: TimeInterval
     /// The `gallery_id` of the last gallery reported, while it is still the active stop's gallery.
     private var reportedGalleryID: String?
     /// The `gallery_id` of another gallery of the journey reported while the visitor is inside it.
     private var reportedOtherGalleryID: String?
+    /// The other gallery of the journey the visitor is inside, and since when.
+    private var otherGalleryInside: (id: String, since: Date)?
 
     init(nearbyMeters: CLLocationDistance = GADSettings.standard.galleryNearbyMeters,
-         entranceAmenityID: String = GADSettings.standard.galleryEntranceAmenityID) {
+         entranceAmenityID: String = GADSettings.standard.galleryEntranceAmenityID,
+         otherGallerySeconds: TimeInterval = 0) {
         self.nearbyMeters = nearbyMeters
         self.entranceAmenityID = entranceAmenityID
+        self.otherGallerySeconds = otherGallerySeconds
     }
 
     /// The next `update` reports the active stop's gallery again when it is nearby.
@@ -46,9 +56,9 @@ final class GalleryNearbyDetector {
     /// The stop whose gallery is reported now, else `nil`: `stop` when its gallery is nearby and was
     /// not reported yet, else the first of `openStops` whose gallery the visitor is inside.
     /// `outlines` are the gallery outlines by `gallery_id` (`GalleryDestination`); `openStops` the
-    /// stops still to visit, in the journey's order.
+    /// stops still to visit, in the journey's order. `now` is the time of the position.
     func update(position: VenuePosition?, stop: JourneyStop?, places: [VenuePlace], outlines: [GalleryDestination],
-                openStops: [JourneyStop] = []) -> JourneyStop? {
+                openStops: [JourneyStop] = [], now: Date = .now) -> JourneyStop? {
         if let reported = active(position: position, stop: stop, places: places, outlines: outlines) { return reported }
         guard let position else { return nil }
         let here = position.coordinate.proximiio
@@ -60,12 +70,15 @@ final class GalleryNearbyDetector {
                   outlines.first(where: { $0.id == galleryID })?.gallery.contains(here, level: level) == true
             else { continue }
             guard galleryID != reportedOtherGalleryID else { return nil }
+            if otherGalleryInside?.id != galleryID { otherGalleryInside = (galleryID, now) }
+            guard let since = otherGalleryInside?.since, now.timeIntervalSince(since) >= otherGallerySeconds else { return nil }
             reportedOtherGalleryID = galleryID
             FieldLog.log("gallery nearby: \(gallery.title) · stop \(other.title) · inside, not the active stop's gallery")
             return other
         }
         // Outside every other gallery of the journey: the next entry reports again.
         reportedOtherGalleryID = nil
+        otherGalleryInside = nil
         return nil
     }
 

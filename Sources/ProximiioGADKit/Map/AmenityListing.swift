@@ -104,7 +104,8 @@ struct AmenityListing: Equatable, Sendable {
             let placed = Set(places.compactMap(\.amenityID))
             for amenity in amenities where kinds[amenity.id] == nil && placed.contains(amenity.id) {
                 guard let rank = rank(of: amenity.id) else { continue }
-                let title = amenity.title(language: language) ?? amenity.title ?? amenity.id
+                let title = VenueTitles.title(in: VenueTitles.translations(of: amenity), language: language)
+                    ?? amenity.title(language: language) ?? amenity.title ?? amenity.id
                 ranked.append((AmenityShortcut(amenityID: amenity.id, title: title, icon: icons[amenity.id]), rank))
             }
         }

@@ -194,7 +194,9 @@ public enum ProximiMapEvent: Equatable, Sendable {
     /// sent again when it resumes.
     ///
     /// Also sent when the visitor enters another gallery with an artwork of the journey still to
-    /// visit: `stop` is the first such artwork. Once per entry.
+    /// visit: `stop` is the first such artwork. Once per entry, after the visitor has been inside
+    /// for `GADSettings.otherGalleryNearbySeconds` (by default `galleryEntryOrderSeconds`, the
+    /// position that orders the journey again).
     case galleryNearby(ProximiGallery, stop: ProximiStop)
     /// The position is uncertain near the active stop: the accuracy is worse than
     /// `GADSettings.uncertainAccuracyMeters` and the stop is within it. Sent by `ProximiMapView` without `Options.uncertainPositionPrompt`,

@@ -173,6 +173,16 @@ public final class ProximiMap: ObservableObject {
 
     private func performStart() async throws {
         let started = ContinuousClock.now
+        // A value the SDK cannot start with fails the start here: the SDK stops the process on a
+        // base URL that is not https.
+        do {
+            try configuration.validate()
+        } catch {
+            FieldLog.log("map: start failed · configuration: \(error.localizedDescription)")
+            let failure = ProximiMapError.startFailed(error.localizedDescription)
+            status = .failed(failure)
+            throw failure
+        }
         status = .starting
         runSession()
         do {

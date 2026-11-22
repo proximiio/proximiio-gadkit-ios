@@ -29,6 +29,22 @@ struct VenueTitlesTests {
         #expect(VenueTitles.title(in: titles, language: "fr") == nil)
     }
 
+    /// `metadata.title_i18n` names the kind in the languages `title_i18n` does not have.
+    @Test func theMetadataTranslationsCountAfterTitleI18n() {
+        let metadata = JSONValue.object(["in_search": .string("true"), "title_i18n": .object([
+            "ar": .string("غرفة الصلاة"), "en": .string("Prayer room (metadata)"), "fr": .number(1), "de": .string(" "),
+        ])])
+        let prayer = ProximiioAmenity(id: "a-prayer", title: "Prayer Room", metadata: metadata, titleTranslations: ["en": "Prayer Room"])
+        let titles = VenueTitles.titles(of: prayer, untaggedLanguage: "en")
+        #expect(VenueTitles.title(in: titles, language: "ar") == "غرفة الصلاة")
+        #expect(VenueTitles.title(in: titles, language: "en") == "Prayer Room")
+        #expect(VenueTitles.title(in: titles, language: "fr") == nil)
+        #expect(VenueTitles.title(in: titles, language: "de") == nil)
+        // Metadata without the key, or with another shape, adds nothing.
+        let plain = ProximiioAmenity(id: "a", title: "Shop", metadata: .object(["title_i18n": .string("x")]), titleTranslations: [:])
+        #expect(VenueTitles.translations(of: plain).isEmpty)
+    }
+
     /// A kind takes the titles of its one amenity with a place. Two amenities of a kind leave the
     /// package's text; so does an amenity no place uses.
     @Test func aKindTakesTheTitlesOfItsOnlyUsedAmenity() {

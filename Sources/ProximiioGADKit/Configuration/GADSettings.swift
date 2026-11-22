@@ -112,6 +112,12 @@ public struct GADSettings: Equatable, Sendable {
     /// `ordersVisitorGalleryFirst` count the visitor in it. A position that crosses a border for a
     /// shorter time changes no order. 0 counts the first fix.
     public var galleryEntryOrderSeconds: TimeInterval = 3
+    /// Seconds the visitor's position lies in a gallery that holds an artwork still to visit, while
+    /// the current artwork is in another gallery, before `ProximiMapEvent.galleryNearby` reports
+    /// that gallery. `nil`: `galleryEntryOrderSeconds`, so the report comes on the position that
+    /// orders the journey again. 0 reports on the first fix inside, as before 1.71.0. The gallery
+    /// of the current artwork is reported without a delay.
+    public var otherGalleryNearbySeconds: TimeInterval?
     /// Personalised journeys: every order from the visitor puts the artworks of the gallery the
     /// visitor is in first, also when an artwork of another gallery is nearer by the route. So the
     /// entry of a gallery (`ordersAtGalleryEntry`), a resume and an order off the route lead to an
@@ -225,6 +231,9 @@ public struct GADSettings: Equatable, Sendable {
     /// button, and a tap on it asks for the skip. `true` since 1.64.0 (PM and Nagarro, Monday
     /// 2026-11-20: no second step).
     public var skipsAtSwipe = true
+    /// With `skipsAtSwipe`: a swipe towards either edge asks for the skip. `false`: only a swipe
+    /// towards the leading edge (left in a left-to-right layout), as before 1.71.0.
+    public var skipsAtSwipeBothWays = true
     /// The journey list while the journey is paused (`ProximiMapView`'s `isPaused`, "Add a stop"):
     /// `false`, the default since 1.59.0: a swipe on an artwork skips nothing, reports no event and
     /// shows "Resume your journey to skip the artwork" with "Dismiss"; the text also replaces the

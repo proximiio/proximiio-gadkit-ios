@@ -168,7 +168,8 @@ struct VisitView: View {
         _monitor = StateObject(wrappedValue: TrackingMonitor(sdk: venue.sdk, settings: settings))
         _stopNearby = State(initialValue: StopNearbyDetector(nearbyMeters: settings.stopNearbyMeters))
         _galleryNearby = State(initialValue: GalleryNearbyDetector(nearbyMeters: settings.galleryNearbyMeters,
-                                                                         entranceAmenityID: settings.galleryEntranceAmenityID))
+                                                                         entranceAmenityID: settings.galleryEntranceAmenityID,
+                                                                         otherGallerySeconds: settings.otherGalleryNearbySeconds ?? settings.galleryEntryOrderSeconds))
         _liveActivity = State(initialValue: VisitLiveActivity(minimumUpdateInterval: settings.liveActivityMinimumInterval))
         _floorGuide = StateObject(wrappedValue: FloorWithoutPositioningGuide(settings: settings))
         let session = MapStyle.session(
@@ -245,7 +246,7 @@ struct VisitView: View {
                 // "List view transparency", 2026-11-02; Figma 03.P.03D). The map stays loaded.
                 .opacity(showsList ? 0 : 1)
             if showsList {
-                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, isSkipPaused: controller.isPaused && !settings.skipsWhilePaused, showsNumbers: settings.showsStopNumbers, showsIcons: settings.showsStopIcons, skipsAtSwipe: settings.skipsAtSwipe, onSkip: requestSkip)
+                VisitStopList(controller: controller, galleries: galleries, galleryNames: galleryNames, groupsByGallery: kind.listsGalleries, places: places, allowsSkip: kind.allowsSkip, isSkipPaused: controller.isPaused && !settings.skipsWhilePaused, showsNumbers: settings.showsStopNumbers, showsIcons: settings.showsStopIcons, skipsAtSwipe: settings.skipsAtSwipe, skipsBothWays: settings.skipsAtSwipeBothWays, onSkip: requestSkip)
                     .background(Palette.white.opacity(Self.listBackgroundOpacity))
                     .transition(.opacity)
             }
@@ -1951,7 +1952,10 @@ private struct SkipConfirmation: View {
                 .textStyle(.bodySmallRegular)
                 .padding(.bottom, 20)
             Button(String(localized: "Skip it", bundle: .localized), action: onSkip).buttonStyle(.primary)
+            // 14 pt more between the two buttons: a touch meant for "Skip it" landed on "Keep it"
+            // (PM's video, 2026-11-22).
             Button(String(localized: "Keep it", bundle: .localized), action: onKeep).buttonStyle(.textAction)
+                .padding(.top, 14)
         }
         // Less space under "Keep it" (PM, Monday "Skip artwork popup too large", 2026-10-28).
         .overlaySheetStyle(bottomPadding: 12)

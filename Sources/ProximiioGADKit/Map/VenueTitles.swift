@@ -8,7 +8,9 @@
 //  when the data has no title in that language, when two amenities of the kind have a place (the
 //  women's and the men's restroom), or when `GADSettings.usesVenueAmenityTitles` is `false`.
 //
-//  The title of a language is the amenity's `title_i18n[language]`. The untagged `title` counts
+//  The title of a language is the amenity's `title_i18n[language]`, then
+//  `metadata.title_i18n[language]`: the amenities are edited by hand through the REST API, and
+//  `metadata` is the field that takes any key (operator, 2026-11-22). The untagged `title` counts
 //  only for `GADSettings.venueDataLanguage` ("en"): in Arabic an English `title` does not replace
 //  the package's Arabic text.
 //
@@ -36,15 +38,30 @@ enum VenueTitles {
         return titles[base]
     }
 
-    /// The titles of `amenity` by language code, lowercased: `title_i18n`, and the untagged `title`
-    /// under `untaggedLanguage` when `title_i18n` has no title for it. Blank titles are left out.
+    /// The translated titles of `amenity` by language code, lowercased: `title_i18n`, then the
+    /// object `metadata.title_i18n` for the languages `title_i18n` does not have. Blank titles and
+    /// values that are no text are left out. Pure; covered by tests.
+    static func translations(of amenity: ProximiioAmenity) -> [String: String] {
+        var titles: [String: String] = [:]
+        func take(_ language: String, _ title: String) {
+            let code = language.lowercased().replacingOccurrences(of: "_", with: "-")
+            let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty, titles[code] == nil { titles[code] = trimmed }
+        }
+        for (language, title) in amenity.titleTranslations { take(language, title) }
+        if case .object(let metadata)? = amenity.metadata, case .object(let translated)? = metadata["title_i18n"] {
+            for (language, value) in translated {
+                if case .string(let title) = value { take(language, title) }
+            }
+        }
+        return titles
+    }
+
+    /// The titles of `amenity` by language code, lowercased: `translations(of:)`, and the untagged
+    /// `title` under `untaggedLanguage` when they have no title for it. Blank titles are left out.
     /// Pure; covered by tests.
     static func titles(of amenity: ProximiioAmenity, untaggedLanguage: String) -> [String: String] {
-        var titles: [String: String] = [:]
-        for (language, title) in amenity.titleTranslations {
-            let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { titles[language.lowercased().replacingOccurrences(of: "_", with: "-")] = trimmed }
-        }
+        var titles = translations(of: amenity)
         let untagged = untaggedLanguage.lowercased()
         if !untagged.isEmpty, Self.title(in: titles, language: untagged) == nil,
            let title = amenity.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {

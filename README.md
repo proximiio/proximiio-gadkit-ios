@@ -782,7 +782,7 @@ position, search and routes.
 | `journeyChanged(JourneySummary?)` | A new, planned, edited or deleted (`nil`) journey, and the progress after the journey screen closed. |
 | `nextStop(ProximiStop)` | The route leads to this stop now. |
 | `stopNearby(ProximiStop)` | The active stop is less than `stopNearbyMeters` away on the visitor's level. Once per stop. The package posts no notification for it. |
-| `galleryNearby(ProximiGallery, stop: ProximiStop)` | The gallery of the active stop is nearby: one of its entrances is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. An entrance is a POI with the amenity `galleryEntranceAmenityID` and the gallery's id in `metadata.gallery_id`; a gallery without an entrance POI uses its own POI. Since 1.42.0 it is also sent when the visitor enters another gallery that has an artwork of the journey still to visit, once per entry, with the first such artwork as `stop`. Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
+| `galleryNearby(ProximiGallery, stop: ProximiStop)` | The gallery of the active stop is nearby: one of its entrances is less than `galleryNearbyMeters` away in a straight line on the visitor's level, or the visitor is inside the gallery's outline. An entrance is a POI with the amenity `galleryEntranceAmenityID` and the gallery's id in `metadata.gallery_id`; a gallery without an entrance POI uses its own POI. Since 1.42.0 it is also sent when the visitor enters another gallery that has an artwork of the journey still to visit, once per entry, with the first such artwork as `stop`, after the visitor has been inside for `otherGalleryNearbySeconds`. Sent once while the gallery stays the gallery of the active stop, also for a journey opened there. Two stops in a row in one gallery send it once; a journey that comes back to a gallery sends it again. Not sent during a pause or a detour; sent again when the journey resumes. |
 | `positionUncertain(ProximiStop)` | `ProximiMapView` without `.uncertainPositionPrompt`: the position's accuracy is worse than `uncertainAccuracyMeters` and the active stop is within it. At most once per `locationQuestionQuietPeriod`. With `.uncertainPositionPrompt` the view asks "Probably at …" instead. |
 | `artworkArrived(ProximiStop)` | The visitor is at an artwork of the journey. Once per visit of the artwork. The active stop: the visitor is in its artwork geofence (they entered it, a fix lies in it, or the SDK counts them inside it: `enteredGeofenceIds`, also for a journey opened inside it). With `advancesOnArtworkExit` `false` it comes at the same moment, before `artworkAdvanceDelay`. An artwork further down a personalised journey: after `outOfOrderDwell` inside its geofence it becomes the active stop (`nextStop`), then `artworkArrived` comes; with `visitsOutOfOrderAtEntry` it comes just before its `artworkVisited`. Not sent during a detour, while the journey is paused, for the other artworks of a curated tour, or for an artwork the host app marked visited. Every fix is checked, also on a leg without a route. `geofenceEntered` arrives at the enter. |
 | `artworkVisited(ProximiStop, cause: ArtworkVisitCause)` | An artwork of the journey is visited: its stop is done. Sent for every cause: `.left` (the visitor was more than `artworkVisitedMeters` from the border of the geofence for `artworkVisitedSeconds`), `.enteredAnotherArtwork` (a fix outside the artwork's geofence and in the geofence of another open artwork of a personalised journey, or of the next artwork of a curated tour), `.advanceDelay` (`artworkAdvanceDelay` after the arrival, with `advancesOnArtworkExit` `false`), `.outOfOrder` (personalised journeys with `visitsOutOfOrderAtEntry`, or with `advancesOnArtworkExit` `false`: the visitor was at an artwork further down the journey; the stops ahead are ordered again), `.journeyMovedOn` (a detour ended or the visitor chose another stop while at the artwork) and `.app` (the host app set the stop to `.visited` through the `journey` binding of `ProximiMapView`). The host app does not set the stop to `.visited` again for this event. For one artwork the order is `artworkArrived`, `artworkVisited`, then `nextStop`, `stopOrderChanged` or `journeyFinished`. The SDK's `geofenceExited` of the artwork does not move the journey. |
@@ -848,6 +848,7 @@ let configuration = GADConfiguration(
 | `privacyZoneExitDelay` | 1 s | Time outside an entered privacy zone before the SDK reports its exit (`ProximiioConfiguration.privacyZoneExitDelay`, SDK 6.0.0-beta.72). The first position after a privacy zone comes after this time. `nil` uses `geofenceExitDelay`. Set by `ProximiMap`; `ProximiMapView` uses the host app's SDK configuration. |
 | `stopNearbyMeters` | 5 m | The distance of `ProximiMapEvent.stopNearby`. |
 | `galleryNearbyMeters` | 5 m | The distance of `ProximiMapEvent.galleryNearby`, from an entrance of the gallery, or from the gallery's POI when it has no entrance POI. |
+| `otherGalleryNearbySeconds` | `nil` | Seconds inside a gallery that is not the gallery of the current artwork before `galleryNearby` reports it. `nil` takes `galleryEntryOrderSeconds`, the position that orders the journey again. 0 reports on the first position inside. |
 | `galleryEntranceAmenityID` | the GAD entrance amenity | The amenity of the gallery entrance POIs. An entrance names its gallery in `metadata.gallery_id`; a gallery can have several (GAD PM, 2026-11-15). |
 | `mapTopFadeHeight`, `mapBottomFadeHeight` | 110 pt, 170 pt | The heights over which the journey map fades out at the top and the bottom of its card. The faded part, and the whole card in List mode, show what the host app draws behind `ProximiMapView`. 0: no fade. |
 | `offRouteMeters`, `offRouteSeconds` | 12 m, 300 s | "Looks like you've left your route": this far from the leg to the current destination, or off the journey this long. Back within two thirds of the distance the visitor is on the leg again. |
@@ -867,6 +868,7 @@ let configuration = GADConfiguration(
 | `galleryLeftMeters` | 5 m | Gallery first: an artwork whose gallery the visitor has left, this far outside its outline or on another floor, leads to the gallery again. |
 | `skipsWhilePaused` | `false` | Journey list while the journey is paused: `false`: a swipe on an artwork skips nothing, reports no event and shows "Resume your journey to skip the artwork" with "Dismiss"; the same text replaces the swipe hint. `true` keeps the swipe. |
 | `skipsAtSwipe` | `true` | Journey list: a swipe on an artwork asks for the skip at once (`skipRequested`, and the dialog with `.skipPrompt`). `false`: the swipe reveals the skip button, and a tap on it asks for the skip. |
+| `skipsAtSwipeBothWays` | `true` | With `skipsAtSwipe`: a swipe towards either edge asks for the skip. `false`: only a swipe towards the leading edge. |
 | `wrongFloorSeconds` | 10 s | Time on a floor the route does not take before the visitor counts as off the route. |
 | `routeSnapMeters` | 0.5 m | The dot is drawn on the route within this distance. Display only. |
 | `progressCorridorMeters` | 3 m | The walked part of the route moves only while the position is within this distance of the leg. `nil`: at any distance. The remaining distance and the instructions follow every position. |
@@ -1125,6 +1127,45 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.71.0 (2026-11-22)
+
+- `ProximiMapEvent.galleryNearby` for a gallery that is not the gallery of the current artwork
+  (the visitor walked into another gallery that holds an artwork still to visit) is sent after the
+  visitor has been inside for `GADSettings.otherGalleryNearbySeconds`. The default `nil` takes
+  `galleryEntryOrderSeconds` (3 s), so the event comes on the position that orders the journey
+  again and sends `nextStop`. Before, the event came on the first position inside the outline: a
+  visitor at a gallery's edge got the event and no new route (sandbox test, 2026-11-22: 52 s
+  between the two). `otherGalleryNearbySeconds = 0` keeps the behaviour of 1.70.0. The gallery of
+  the current artwork is reported as before, without a delay.
+- The journey list: with `GADSettings.skipsAtSwipe`, a swipe towards either edge asks for the
+  skip (`GADSettings.skipsAtSwipeBothWays`, default `true`). Before, only a swipe towards the
+  leading edge did; a swipe the other way did nothing. `false` keeps the one direction.
+- "Leave this artwork out?": 14 pt more space between "Skip it" and "Keep it".
+- The name of an amenity is also read from `metadata.title_i18n` (an object of language code to
+  text, for example `{"ar": "…"}`), for the languages the amenity's `title_i18n` does not have.
+  This applies to the amenity kinds of 1.70.0 and to the other search shortcuts.
+- `GADConfiguration.validate()` throws a `GADConfigurationError` for a backend value the SDK
+  cannot start with: an API or relay-api base URL without a host (`api.example.com` without
+  `https://`), a base URL that is not https (http is accepted for localhost), an empty token, a
+  token with a space or a line break. The error's `localizedDescription` names the value, in
+  English, for the developer; it holds no token.
+- `ProximiMap.start()` runs the check first and throws `ProximiMapError.startFailed` with that
+  text. Before, such a configuration reached the SDK: `Proximiio(configuration:)` of SDK
+  6.0.0-beta.75 stops the process on a base URL that is not https (Nagarro, 2026-11-22).
+- A host app that creates the SDK or the wristband binding itself checks its values with
+  `GADConfiguration.validate(_: ProximiioConfiguration)` before `Proximiio(configuration:)`, and
+  with `GADConfiguration.validate(_: BlueiotBindingConfiguration)` before
+  `BlueiotWristbandBinding(configuration:)`:
+
+  ```swift
+  do {
+      try GADConfiguration.validate(configuration)
+      let proximiio = try Proximiio(configuration: configuration)
+  } catch {
+      // error.localizedDescription: The API base URL "api.example.com" has no host. …
+  }
+  ```
 
 ### 1.70.0 (2026-11-22)
 
