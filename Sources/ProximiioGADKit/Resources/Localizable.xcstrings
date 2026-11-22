@@ -1026,16 +1026,6 @@
         }
       }
     },
-    "Men’s restroom" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "دورة مياه الرجال"
-          }
-        }
-      }
-    },
     "Museum" : {
       "localizations" : {
         "ar" : {
@@ -1933,16 +1923,6 @@
         }
       }
     },
-    "Women’s restroom" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "دورة مياه النساء"
-          }
-        }
-      }
-    },
     "Wristband" : {
       "localizations" : {
         "ar" : {
@@ -2175,6 +2155,36 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "مسح هاتف آخر سوارك. اربطه مجددًا لمتابعته على هذا الهاتف."
+          }
+        }
+      }
+    },
+    "Toilet" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "دورة المياه"
+          }
+        }
+      }
+    },
+    "Restaurant" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "المطعم"
+          }
+        }
+      }
+    },
+    "Theatre" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "المسرح"
           }
         }
       }

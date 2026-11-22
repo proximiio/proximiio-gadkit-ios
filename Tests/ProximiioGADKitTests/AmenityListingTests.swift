@@ -48,7 +48,7 @@ struct AmenityListingTests {
             Self.amenity("a-men", "Men's Restroom", ["in_search": .string("true"), "search_order": .string("2")]),
             Self.amenity("a-help", "Helpdesk"),
         ])
-        #expect(listing.shortcuts(places: Self.places) == [.womensRestroom, .mensRestroom, .cafe, .prayerRoom, .museumShop])
+        #expect(listing.shortcuts(places: Self.places) == [.restroom, .cafe, .prayerRoom, .museumShop])
     }
 
     /// An amenity with the flag true that is none of the kinds is a shortcut too, with its own title, in
@@ -67,8 +67,8 @@ struct AmenityListingTests {
             Self.place("p-gallery", "G205 Pauliina", amenity: "a-gallery"),
         ]
         let shortcuts = AmenityListing.search(amenities).searchShortcuts(places: places, amenities: amenities, language: "en")
-        #expect(shortcuts.map(\.title) == ["Women’s restroom", "Museum Shop", "Learning & Engagement", "Single Artist Gallery"])
-        #expect(shortcuts.map(\.kind) == [.womensRestroom, .museumShop, nil, nil])
+        #expect(shortcuts.map(\.title) == ["Toilet", "Museum Shop", "Learning & Engagement", "Single Artist Gallery"])
+        #expect(shortcuts.map(\.kind) == [.restroom, .museumShop, nil, nil])
         #expect(shortcuts[2].matches(places.first { $0.id == "p-learning" }!))
         #expect(!shortcuts[2].matches(places.first { $0.id == "p-gallery" }!))
         // Without a flag true the shortcuts are the kinds alone.

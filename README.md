@@ -737,14 +737,14 @@ follow.
   galleries the museum's POIs use, with their map icons, and "Elevator" and "Stairs" when the venue
   has lifts or staircases. A second tap, or a drag down on the panel's
   top, closes it.
-- Icons: the design's glyph of an amenity kind (restrooms, café, help desk, prayer room, shop,
+- Icons: the design's glyph of an amenity kind (toilet, café, restaurant, help desk, prayer room, shop, theatre,
   stairs, lift), else the icon of the POI's amenity in the venue data, the icon the map draws.
   - Spaces: the galleries. The gallery geofence (`geofence_type` gallery) gives the outline, else the
     gallery's polygon feature with the id in `metadata.gallery_id`. The POI with the same `remote_id` gives the name, the level, the category (its amenity, such as "Thematic
     Gallery") and the description.
   - Highlights: the artworks that list the "Highlight" amenity in `included_amenities`
     (`VenuePlace.highlightAmenityID`), with `metadata.artist_name` and the gallery.
-  - Amenities: restrooms, café, help desk, prayer room and shop. Stairs and lifts are not listed.
+  - Amenities: toilet, café, help desk, prayer room and shop. Stairs and lifts are not listed.
   - Only the museum's POIs are listed: the `place_id` of the gallery POIs. The GAD organisation also
     holds the DCT office.
 - The map draws no amenity icons: the Amenities list and the callout show them. A gallery's icon
@@ -1124,6 +1124,23 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.67.0 (2026-11-22)
+
+No change is needed in the code of a host app.
+
+- The icons of the lift, the stairs and the prayer room are the PM's set of 2026-11-22. They are
+  bundled in the package, as glyphs of 16 pt and map markers of 30 pt, with the sizes of the first
+  set. An amenity of one of the kinds below is drawn with the bundled icon on the maps, in the
+  search and in the map legend; its icon in the venue data is not used.
+- The women's and the men's restroom are one kind, "Toilet", with one icon. An amenity is of this
+  kind when its title has "restroom", "toilet", "women", "men's", "ladies" or "gents". The search
+  has one "Toilet" shortcut; it leads to the nearest place of the kind. Before, the search had
+  "Women's restroom" and "Men's restroom".
+- New kinds: "Restaurant" (title has "restaurant") and "Theatre" ("theatre" or "theater"), each with
+  the PM's icon. They are search shortcuts only when the data sets `in_search` on their amenity.
+- The icons of the café, the help desk and the museum shop, and the gallery icons from the venue
+  data, did not change.
 
 ### 1.66.4 (2026-11-21)
 

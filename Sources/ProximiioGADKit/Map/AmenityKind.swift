@@ -3,10 +3,11 @@
 //  ProximiioGADKit
 //
 //  The amenity shortcuts and legend of the map (Figma "MAP Functionality Approach 02",
-//  node 10889:116263): Women's restroom, Men's restroom, Café, Help Desk, Prayer Room,
-//  Stairs, Elevator, Museum Shop.
+//  node 10889:116263): Toilet, Café, Restaurant, Help Desk, Prayer Room, Stairs, Elevator,
+//  Museum Shop, Theatre. The women's and the men's restroom are one kind with one icon since the
+//  PM's icon set of 2026-11-22.
 //
-//  An amenity has a kind when its title names it ("Prayer Room", "Women's Restroom"). A place
+//  An amenity has a kind when its title names it ("Prayer Room", "Toilet"). A place
 //  matches a kind by its amenity (`VenuePlace.amenityKind`), not by its own title: the prayer room
 //  shortcut led to the artwork "Endless Prayers XIII" (PM, Monday "Amenity search & Map legend
 //  views", 2026-10-28).
@@ -15,64 +16,69 @@ import Foundation
 import Proximiio
 
 enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
-    case womensRestroom, mensRestroom, cafe, helpDesk, prayerRoom, stairs, elevator, museumShop
+    case restroom, cafe, restaurant, helpDesk, prayerRoom, stairs, elevator, museumShop, theatre
 
     var id: String { rawValue }
 
-    /// Shortcuts shown as chips on the map. Stairs and Elevator are legend entries only.
-    static let shortcuts: [AmenityKind] = [.womensRestroom, .mensRestroom, .cafe, .helpDesk, .prayerRoom, .museumShop]
+    /// Shortcuts shown as chips on the map. The other kinds are a shortcut only when the data flags
+    /// their amenity (`in_search`).
+    static let shortcuts: [AmenityKind] = [.restroom, .cafe, .helpDesk, .prayerRoom, .museumShop]
 
     var title: String {
         switch self {
-        case .womensRestroom: String(localized: "Women’s restroom", bundle: .localized)
-        case .mensRestroom: String(localized: "Men’s restroom", bundle: .localized)
+        case .restroom: String(localized: "Toilet", bundle: .localized)
         case .cafe: String(localized: "Café", bundle: .localized)
+        case .restaurant: String(localized: "Restaurant", bundle: .localized)
         case .helpDesk: String(localized: "Help Desk", bundle: .localized)
         case .prayerRoom: String(localized: "Prayer Room", bundle: .localized)
         case .stairs: String(localized: "Stairs", bundle: .localized)
         case .elevator: String(localized: "Elevator", bundle: .localized)
         case .museumShop: String(localized: "Museum Shop", bundle: .localized)
+        case .theatre: String(localized: "Theatre", bundle: .localized)
         }
     }
 
     /// The design's icon (`icons-svg`).
     var icon: GADIcon {
         switch self {
-        case .womensRestroom: .femaleToilet
-        case .mensRestroom: .maleToilet
+        case .restroom: .toilet
         case .cafe: .cafe
+        case .restaurant: .restaurant
         case .helpDesk: .info
         case .prayerRoom: .prayerRoom
         case .stairs: .stairs
         case .elevator: .elevator
         case .museumShop: .shop
+        case .theatre: .theatre
         }
     }
 
     var symbol: String {
         switch self {
-        case .womensRestroom: "figure.stand.dress"
-        case .mensRestroom: "figure.stand"
+        case .restroom: "figure.dress.line.vertical.figure"
         case .cafe: "cup.and.saucer"
+        case .restaurant: "fork.knife"
         case .helpDesk: "info.circle"
         case .prayerRoom: "moon.stars"
         case .stairs: "figure.stairs"
         case .elevator: "arrow.up.arrow.down.square"
         case .museumShop: "bag"
+        case .theatre: "theatermasks"
         }
     }
 
     /// Lower-case fragments matched against an amenity's id and title.
     private var keywords: [String] {
         switch self {
-        case .womensRestroom: ["women", "female", "ladies"]
-        case .mensRestroom: ["men's", "mens", "male", "gents"]
+        case .restroom: ["restroom", "toilet", "women", "female", "ladies", "men's", "mens", "gents"]
         case .cafe: ["cafe", "café", "coffee"]
+        case .restaurant: ["restaurant"]
         case .helpDesk: ["help", "welcome desk", "information", "info"]
         case .prayerRoom: ["prayer"]
         case .stairs: ["stair"]
         case .elevator: ["elevator", "lift"]
         case .museumShop: ["shop", "store"]
+        case .theatre: ["theatre", "theater"]
         }
     }
 
@@ -89,13 +95,7 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
 
     /// `text` is lower case: an amenity id and a title.
     private func matches(text: String) -> Bool {
-        switch self {
-        case .mensRestroom:
-            // "women's restroom" contains "men's"; exclude it.
-            return keywords.contains { text.contains($0) } && !AmenityKind.womensRestroom.matches(text: text)
-        default:
-            return keywords.contains { text.contains($0) }
-        }
+        keywords.contains { text.contains($0) }
     }
 
     /// The kind an amenity's id and title name, or `nil`. The data's variants for a visited stop

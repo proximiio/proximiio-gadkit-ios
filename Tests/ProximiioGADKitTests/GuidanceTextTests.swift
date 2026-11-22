@@ -40,9 +40,9 @@ struct AmenityKindTests {
         return place
     }
 
-    @Test func restroomsAreNotConfused() {
-        #expect(AmenityKind.kind(forAmenityID: "a1", title: "Women's Restroom") == .womensRestroom)
-        #expect(AmenityKind.kind(forAmenityID: "a2", title: "Men's Restroom") == .mensRestroom)
+    @Test func restroomsAreOneKind() {
+        #expect(AmenityKind.kind(forAmenityID: "a1", title: "Women's Restroom") == .restroom)
+        #expect(AmenityKind.kind(forAmenityID: "a2", title: "Men's Restroom") == .restroom)
         #expect(AmenityKind.kind(forAmenityID: "a3", title: "Womens restroom visited") == nil)
     }
 

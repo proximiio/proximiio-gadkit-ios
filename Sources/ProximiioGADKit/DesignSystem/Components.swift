@@ -135,12 +135,14 @@ enum GADIcon: String, CaseIterable {
     case compass = "IconCompass"
     case elevator = "IconElevator"
     case info = "IconInfo"
-    case maleToilet = "IconMaleToilet"
-    case femaleToilet = "IconFemaleToilet"
     case prayerRoom = "IconPrayerRoom"
+    case restaurant = "IconRestaurant"
     case search = "IconSearch"
     case shop = "IconShop"
     case stairs = "IconStairs"
+    case theatre = "IconTheatre"
+    /// The women's and the men's restroom: one icon (PM, 2026-11-22).
+    case toilet = "IconToilet"
     /// The accessible routes button: the ISA wheelchair of the design (Figma Path · 1, node
     /// 16444:202832; PM, Monday "Accessible route icon", 2026-11-02).
     case wheelchair = "IconWheelchair"
