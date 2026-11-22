@@ -1952,10 +1952,7 @@ private struct SkipConfirmation: View {
                 .textStyle(.bodySmallRegular)
                 .padding(.bottom, 20)
             Button(String(localized: "Skip it", bundle: .localized), action: onSkip).buttonStyle(.primary)
-            // 14 pt more between the two buttons: a touch meant for "Skip it" landed on "Keep it"
-            // (PM's video, 2026-11-22).
             Button(String(localized: "Keep it", bundle: .localized), action: onKeep).buttonStyle(.textAction)
-                .padding(.top, 14)
         }
         // Less space under "Keep it" (PM, Monday "Skip artwork popup too large", 2026-10-28).
         .overlaySheetStyle(bottomPadding: 12)

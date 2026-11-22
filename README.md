@@ -1128,6 +1128,11 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.71.1 (2026-11-22)
+
+- "Leave this artwork out?": the space between "Skip it" and "Keep it" is as before 1.71.0. The
+  14 pt added in 1.71.0 are taken back (PM, 2026-11-22: no change of the design).
+
 ### 1.71.0 (2026-11-22)
 
 - `ProximiMapEvent.galleryNearby` for a gallery that is not the gallery of the current artwork
