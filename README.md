@@ -1126,6 +1126,24 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.70.0 (2026-11-22)
+
+- The amenity kinds the package knows (toilet, café, restaurant, help desk, prayer room, stairs,
+  lift, museum shop, theatre) are named with the title of their amenity in the venue data, in the
+  app language, in the search shortcuts and the amenity chips over the maps. The names are edited
+  in the Proximi portal. Before, a kind always showed the package's own text, so
+  an amenity renamed "Accessible Toilet" still showed "Toilet".
+- The title of a language is the amenity's `title_i18n[language]` (the exact code, then the base
+  language). The untagged `title` counts only for `GADSettings.venueDataLanguage` (default
+  `"en"`): an Arabic app shows the package's Arabic text until the amenity has `title_i18n.ar`.
+- The package's text stays when the data has no title in the app language, and when two
+  amenities of one kind have a place (a women's and a men's restroom), as for the icons of
+  1.68.0.
+- `GADSettings.usesVenueAmenityTitles` (default `true`). `false` shows the package's texts, as up
+  to 1.69.0.
+- An amenity of no known kind is unchanged: it shows `ProximiioAmenity.title(language:)`, which
+  falls back to the untagged `title`.
+
 ### 1.69.0 (2026-11-22)
 
 Breaking: `proximiio-sdk-ios-binary` 6.0.0-beta.75 and `proximiio-map-ios-binary` 6.0.0-beta.68. A

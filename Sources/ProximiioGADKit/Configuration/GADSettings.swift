@@ -138,6 +138,16 @@ public struct GADSettings: Equatable, Sendable {
     /// two amenities of one kind have a place. `false` draws the bundled glyphs everywhere, as up
     /// to 1.67.0.
     public var usesVenueAmenityIcons = true
+    /// The amenity kinds the package knows are named with the title of their amenity in the venue
+    /// data, in the app language, so the names are edited in the Proximi portal (operator,
+    /// 2026-11-22). The title of a language is the amenity's `title_i18n[language]`. The package's
+    /// own text is shown when the data has no title in the app language, and when two amenities of
+    /// one kind have a place. `false` shows the package's texts everywhere, as up to 1.69.0.
+    public var usesVenueAmenityTitles = true
+    /// The language of the untagged `title` of an amenity in the venue data. The untagged title
+    /// names a kind only in this language: with `"en"`, an Arabic app shows the package's Arabic
+    /// text until the amenity has `title_i18n.ar`. An empty string never uses the untagged title.
+    public var venueDataLanguage = "en"
     /// How the wristband positions reach the phone from the relay-api (`GET /v1/me/position`).
     public enum WristbandTransport: String, Sendable, Equatable, CaseIterable {
         /// Server-Sent Events. A proxy that buffers responses delivers them in bursts.

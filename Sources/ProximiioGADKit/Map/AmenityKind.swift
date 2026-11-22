@@ -24,7 +24,12 @@ enum AmenityKind: String, CaseIterable, Identifiable, Sendable {
     /// their amenity (`in_search`).
     static let shortcuts: [AmenityKind] = [.restroom, .cafe, .helpDesk, .prayerRoom, .museumShop]
 
-    var title: String {
+    /// The title of the kind's amenity in the venue data, in the app language (`VenueTitles`);
+    /// else the package's text.
+    var title: String { VenueTitles.title(for: self) ?? packageTitle }
+
+    /// The package's text for the kind, in the app language.
+    var packageTitle: String {
         switch self {
         case .restroom: String(localized: "Toilet", bundle: .localized)
         case .cafe: String(localized: "Café", bundle: .localized)

@@ -704,6 +704,8 @@ struct VisitView: View {
                                   uniquingKeysWith: { first, _ in first })
         let levelChangers = LevelChangerPlace.all(in: features)
         let usedAmenities = Set(allPlaces.compactMap(\.amenityID) + levelChangers.compactMap(\.amenityID))
+        VenueTitles.update(amenities: amenities, used: usedAmenities, enabled: settings.usesVenueAmenityTitles,
+                           untaggedLanguage: settings.venueDataLanguage)
         if VenueGlyphs.update(amenities: amenities, used: usedAmenities, icons: amenityIcons, enabled: settings.usesVenueAmenityIcons) {
             mapLayers.kindGlyphsChanged()
         }

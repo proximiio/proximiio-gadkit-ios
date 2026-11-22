@@ -425,6 +425,8 @@ struct ExploreMuseumView: View {
                                     uniquingKeysWith: { first, _ in first })
         let levelChangers = LevelChangerPlace.all(in: features)
         let usedAmenities = Set(allPlaces.compactMap(\.amenityID) + levelChangers.compactMap(\.amenityID))
+        VenueTitles.update(amenities: amenities, used: usedAmenities, enabled: venue.settings.usesVenueAmenityTitles,
+                           untaggedLanguage: venue.settings.venueDataLanguage)
         if VenueGlyphs.update(amenities: amenities, used: usedAmenities, icons: amenityIcons, enabled: venue.settings.usesVenueAmenityIcons) {
             mapLayers.kindGlyphsChanged()
         }
