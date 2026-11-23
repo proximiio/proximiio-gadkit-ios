@@ -181,14 +181,8 @@ extension WristbandSession: WristbandConnecting {
     /// resolves every label format. The new session replaces any current one.
     /// - Throws: `BlueiotBindingError`.
     func bind(_ label: String) async throws {
-        do {
-            let session = try await binding.bind(tagID: label)
-            self.label = label
-            FieldLog.log("wristband bind: \(BindingLog.bind(label: label, bindingID: session.bindingID))")
-        } catch {
-            FieldLog.log("wristband bind: \(BindingLog.bind(label: label, error: error))")
-            throw error
-        }
+        try await FieldLog.bind(tagID: label, with: binding)
+        self.label = label
     }
 }
 

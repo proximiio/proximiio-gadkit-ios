@@ -70,7 +70,8 @@ to the package screens too.
 
 The package views show Arabic when the language is Arabic, else English. The language is:
 
-- the language of the `\.locale` the host app gives `ProximiMapView`, `ProximiExploreView` or the
+- `GADSettings.language`, when the host app has set it (`"ar"` or `"en"`);
+- else the language of the `\.locale` the host app gives `ProximiMapView`, `ProximiExploreView` or the
   screens of `.proximiMap(_:)`, when it is not the language the app started in;
 - else the first of the app's `AppleLanguages` (iOS Settings, or an app that sets it itself).
 
@@ -82,12 +83,20 @@ new language: an open map starts again, at the journey's current state.
 
 A host app that switches its language another way, such as its own string bundle, changes neither the
 `\.locale` nor `AppleLanguages`, and the package views keep their language. The field log shows each
-change the package takes: `app language <ar|en> (host locale <id>)` or `(AppleLanguages)`.
+change the package takes: `app language <ar|en> (GADSettings.language <value>)`, `(host locale <id>)`
+or `(AppleLanguages)`.
 
 ```swift
-// A host app that switches its language with the SwiftUI environment:
+// A host app that sets the language of every package view itself. One value for the process:
+// set it at the start of the app and at each change of the app's language. `nil` follows the app.
+GADSettings.language = "ar"   // or "en"
+
+// A host app that switches its language with the SwiftUI environment gives each package view
+// the locale. A view without it keeps the language of `AppleLanguages`.
 ProximiMapView(sdk: sdk, journey: $journey)
     .environment(\.locale, Locale(identifier: language))   // "ar" or "en"
+ProximiExploreView(sdk: sdk)
+    .environment(\.locale, Locale(identifier: language))
 ```
 
 ### Fonts
@@ -1029,6 +1038,15 @@ FieldLog.startUploading(binding: binding, interval: 300)
 
 - `FieldLog.startUploading(relayURL:appToken:interval:)` takes the two values directly.
   `FieldLog.stopUploading()` stops the uploads.
+- With `ProximiMapView`, bind the wristband with `FieldLog.bind(tagID:with:)` in place of
+  `binding.bind(tagID:)`. It returns and throws the same, and writes
+  `wristband bind: tag <label> · started` before the request and the result after it, so a bind
+  that fails, is cancelled or does not return is in the log:
+
+```swift
+let session = try await FieldLog.bind(tagID: label, with: binding)
+```
+
 - With `FieldLog.isEnabled` `false` nothing is written and nothing is sent.
 - A chunk the relay did not accept is sent again unchanged, with the same sequence number
   (`X-Log-Seq`). The other headers are `X-Log-Install` (a random id per install), `X-Log-Platform`,
@@ -1127,6 +1145,30 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.72.0 (2026-11-23)
+
+- New: `GADSettings.language`, a static value: `"ar"`, `"en"` or `nil`. It sets the language of
+  every package view of the process: the package's texts, the texts of the venue data, the layout
+  direction and the map labels of `ProximiMapView`, `ProximiExploreView` and the screens of
+  `.proximiMap(_:)`. It goes before the `\.locale` of a view and before `AppleLanguages`, and
+  applies at once, also to open maps. `nil`, the default, is the behaviour up to 1.71.2
+  (Nagarro's Explore map showed English in an Arabic app, 2026-11-23: a package view that does
+  not get the `\.locale` keeps the language of `AppleLanguages`).
+- New: `FieldLog.bind(tagID:with:)` binds through the host app's `BlueiotWristbandBinding`, as
+  `binding.bind(tagID:)` does, and writes the attempt to the field log. A host app that binds
+  itself calls it in place of `binding.bind(tagID:)`:
+
+  ```swift
+  let session = try await FieldLog.bind(tagID: label, with: binding)
+  ```
+
+  Lines: `wristband bind: tag <label> · started` before the request, then
+  `wristband bind: tag <label> · binding <id>` or `wristband bind: tag <label> · failed: <error>`.
+  Up to 1.71.2 a host app that called `binding.bind(tagID:)` itself left no line for a bind,
+  and a failed, cancelled or hanging attempt was not in the log (Nagarro, 2026-11-22 and 23:
+  "Tag not connecting", `CancellationError`).
+- The bind of `ProximiMap` (the GAD app) writes the `started` line too.
 
 ### 1.71.2 (2026-11-23)
 

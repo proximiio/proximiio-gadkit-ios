@@ -29,4 +29,15 @@ struct AppLanguageTests {
         #expect(String(localized: "Search", bundle: AppLanguage.strings(in: "en")) == "Search")
         #expect(String(localized: "Level \(2)", bundle: AppLanguage.strings(in: "en")) == "Level 2")
     }
+
+    /// `GADSettings.language` goes before the host's `\.locale`, and that before `AppleLanguages`.
+    @Test func theLanguageTheHostAppSetsGoesFirst() {
+        #expect(AppLanguage.resolved(fixed: "ar", host: "en", preferred: "en") == "ar")
+        #expect(AppLanguage.resolved(fixed: "en", host: "ar", preferred: "ar") == "en")
+        #expect(AppLanguage.resolved(fixed: nil, host: "ar", preferred: "en") == "ar")
+        #expect(AppLanguage.resolved(fixed: nil, host: nil, preferred: "ar") == "ar")
+        // The value is "ar" or "en" for any identifier.
+        #expect(AppLanguage.code(of: "ar-AE") == "ar")
+        #expect(AppLanguage.code(of: "fr") == "en")
+    }
 }

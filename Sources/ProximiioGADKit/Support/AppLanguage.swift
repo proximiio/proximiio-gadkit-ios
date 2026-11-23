@@ -4,10 +4,11 @@
 //
 //  The package's language, "ar" or "en":
 //
-//  - the language of the `\.locale` the host app gives a package view, when it is not the language
+//  - `GADSettings.language`, when the host app has set it;
+//  - else the language of the `\.locale` the host app gives a package view, when it is not the language
 //    the process started in: an app that switches its language with SwiftUI's environment;
 //  - else the first of the app's `AppleLanguages`: the visitor's choice in iOS Settings (per-app
-//    language), or an app that switches its language itself.
+//    language), or an app that sets `AppleLanguages` itself.
 //
 //  A change applies at once to the package's texts, the layout direction of its views and the labels
 //  of the open maps (Nagarro, 2026-10-30: the language changed wrongly while the app ran; PM, Monday
@@ -67,6 +68,17 @@ enum AppLanguage {
         }
     }
 
+    /// `GADSettings.language` changed: the host app's own choice, or `nil` to follow the app again.
+    static func set(fixed language: String?) {
+        guard AppLanguageState.shared.set(fixed: language.map { code(of: $0) }) else { return }
+        Task { @MainActor in languageChanged(reason: "GADSettings.language \(language ?? "nil")") }
+    }
+
+    /// The language from its three sources, first the one the host app has set. Pure; covered by tests.
+    static func resolved(fixed: String?, host: String?, preferred: String) -> String {
+        fixed ?? host ?? preferred
+    }
+
     /// Posted on the main thread after `current` changed.
     static let didChange = Notification.Name("ProximiioGADKit.AppLanguage.didChange")
 
@@ -96,9 +108,10 @@ final class AppLanguageState: @unchecked Sendable {
     static let shared = AppLanguageState()
 
     private struct Storage: Sendable {
+        var fixed: String?
         var host: String?
         var preferred: String
-        var language: String { host ?? preferred }
+        var language: String { AppLanguage.resolved(fixed: fixed, host: host, preferred: preferred) }
     }
 
     private let storage: OSAllocatedUnfairLock<Storage>
@@ -116,6 +129,15 @@ final class AppLanguageState: @unchecked Sendable {
     var language: String {
         if #available(iOS 17, *) { AppLanguageTracking.shared.access() }
         return storage.withLock { $0.language }
+    }
+
+    /// `GADSettings.language`.
+    var fixed: String? { storage.withLock { $0.fixed } }
+
+    /// Returns whether `language` changed.
+    @discardableResult
+    func set(fixed: String?) -> Bool {
+        change { $0.fixed = fixed }
     }
 
     /// Returns whether `language` changed.
@@ -230,5 +252,20 @@ private final class MapLanguageFollower {
         for session in entries.compactMap(\.session) {
             session.options.language = language
         }
+    }
+}
+
+extension GADSettings {
+    /// The language of every package view: `"ar"` or `"en"` (an identifier that starts with "ar"
+    /// counts as Arabic, any other as English). `nil`, the default, follows the app: the `\.locale`
+    /// the host app gives a package view, else the first of `AppleLanguages`.
+    ///
+    /// One value for the process, not for one view. It applies at once, also to open maps: the
+    /// package's texts, the texts of the venue data, the layout direction and the map labels of
+    /// `ProximiMapView`, `ProximiExploreView` and the screens of `.proximiMap(_:)`. Set it from
+    /// any thread, at the start of the app and at each change of the app's language.
+    public static var language: String? {
+        get { AppLanguageState.shared.fixed }
+        set { AppLanguage.set(fixed: newValue) }
     }
 }

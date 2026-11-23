@@ -153,6 +153,18 @@ struct WristbandCopyTests {
             .hasSuffix("privacy zone since \(since.formatted(.iso8601))") == true)
     }
 
+    /// The attempt has a line before the request, and `FieldLog.bind(tagID:with:)` returns the
+    /// session and throws the error of the bind, a cancelled bind too (Nagarro, 2026-11-23).
+    @Test func theBindAttemptIsLoggedFromItsStart() async throws {
+        #expect(BindingLog.bindStarted(label: "GAD-0042") == "tag GAD-0042 · started")
+        let session = BlueiotBindingSession(bindingID: UUID(), endsAt: .distantFuture, tokenExpiresAt: .distantFuture)
+        #expect(try await FieldLog.logged(tagID: "GAD-0042") { session } == session)
+        await #expect(throws: CancellationError.self) {
+            try await FieldLog.logged(tagID: "GAD-0042") { throw CancellationError() }
+        }
+        #expect(BindingLog.bind(label: "GAD-0042", error: CancellationError()) == "tag GAD-0042 · failed: CancellationError()")
+    }
+
     /// The bind line names the band as scanned and the relay's binding (relay-api, 2026-10-28).
     @Test func bindLineNamesTheBandAndTheBinding() {
         let id = UUID(uuidString: "594694A5-83FA-432D-B1A4-7641E885231D")!

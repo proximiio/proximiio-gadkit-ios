@@ -35,6 +35,11 @@ enum BindingLog {
         return parts.joined(separator: " · ")
     }
 
+    /// "tag <label> · started" before the bind request.
+    static func bindStarted(label: String) -> String {
+        "tag \(label) · started"
+    }
+
     /// "tag <label> · binding <id>" after a bind.
     static func bind(label: String, bindingID: UUID) -> String {
         "tag \(label) · binding \(bindingID.uuidString.lowercased())"
@@ -67,5 +72,41 @@ enum BindingLog {
 
     private static func seconds(_ value: TimeInterval?) -> String {
         value.map { String(format: "%.1f s", $0) } ?? "-"
+    }
+}
+
+public extension FieldLog {
+    /// Binds this phone to the band with `tagID` through `binding`, as `binding.bind(tagID:)` does,
+    /// and writes the attempt to the field log:
+    ///
+    ///     wristband bind: tag <label> · started
+    ///     wristband bind: tag <label> · binding <id>
+    ///     wristband bind: tag <label> · failed: <error>
+    ///
+    /// The first line is written before the request, so an attempt that does not return, or that
+    /// the app cancels, is in the log too (Nagarro, 2026-11-22 and 23: "Tag not connecting" and
+    /// a `CancellationError` left no line). A host app that binds itself calls this in place of
+    /// `binding.bind(tagID:)`.
+    ///
+    /// - Returns: The session of the bind.
+    /// - Throws: What `binding.bind(tagID:)` throws.
+    @discardableResult
+    static func bind(tagID: String, with binding: BlueiotWristbandBinding) async throws -> BlueiotBindingSession {
+        try await logged(tagID: tagID) { try await binding.bind(tagID: tagID) }
+    }
+
+    /// The lines of `bind(tagID:with:)` around `bind`. Covered by tests.
+    internal static func logged(
+        tagID: String, bind: () async throws -> BlueiotBindingSession
+    ) async throws -> BlueiotBindingSession {
+        log("wristband bind: \(BindingLog.bindStarted(label: tagID))")
+        do {
+            let session = try await bind()
+            log("wristband bind: \(BindingLog.bind(label: tagID, bindingID: session.bindingID))")
+            return session
+        } catch {
+            log("wristband bind: \(BindingLog.bind(label: tagID, error: error))")
+            throw error
+        }
     }
 }
