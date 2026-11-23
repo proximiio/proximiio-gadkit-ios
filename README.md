@@ -1128,6 +1128,23 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.71.2 (2026-11-23)
+
+- Journey list: a swipe asks to skip the artwork of the row under the finger. On a phone the row
+  of the last artwork asked to skip an artwork that was skipped before; the prompt named that
+  artwork, "Skip it" did nothing and the row did not slide (Nagarro's video and field log,
+  2026-11-23 08:22 UTC). From iOS 18 each row had its own pan recognizer. The swipe ran the
+  action of a removed row; why it did is not known, and the fault was not reproduced in the
+  simulator (iOS 26.3 and 27). The list now has one pan recognizer and finds the row by the
+  place of the touch, so no row holds a recognizer or a stop.
+- Journey list: the skip reads the stop again from the journey. A stop that is skipped or visited
+  opens no prompt and sends no `skipRequested`; the field log has
+  `list skip: <stop id> is not a stop to skip`.
+- Journey list: a swipe can start on any part of a row, also where the row has no text or icon
+  (Nagarro's screenshot, 2026-11-23).
+- Field log: `list swipe: not begun · no row to skip at <x>, <y> pt` for a horizontal drag that
+  starts on a header, on a visited row or between rows.
+
 ### 1.71.1 (2026-11-22)
 
 - "Leave this artwork out?": the space between "Skip it" and "Keep it" is as before 1.71.0. The

@@ -73,4 +73,40 @@ struct SkipSwipeTests {
         #expect(SkipSwipe.offset(isRevealed: false, drag: 172, bothWays: true) == 102)
         #expect(SkipSwipe.offset(isRevealed: false, drag: 50) == 10)
     }
+
+    /// Nagarro's video, 2026-11-23: the row of the last artwork asked to skip an artwork that was
+    /// skipped before. The list's pan takes the stop from the row under the finger, and only a
+    /// stop the list names as one to skip.
+    @MainActor @Test func theListsPanTakesTheRowUnderTheFinger() {
+        let router = SwipeRouter()
+        var began: [String] = []
+        var ended: [(String, CGFloat, CGFloat)] = []
+        router.update(skippable: ["active", "last"], onBegan: { began.append($0) }, onEnded: { ended.append(($0, $1, $2)) })
+        router.frames["visited"] = CGRect(x: 20, y: 100, width: 350, height: 70)
+        router.frames["active"] = CGRect(x: 20, y: 220, width: 350, height: 70)
+        // The frame of a skipped row that is still stored lies where the last row is now.
+        router.frames["skipped"] = CGRect(x: 20, y: 340, width: 350, height: 70)
+        router.frames["last"] = CGRect(x: 20, y: 340, width: 350, height: 70)
+
+        #expect(router.stopID(at: CGPoint(x: 300, y: 370)) == "last")
+        #expect(router.stopID(at: CGPoint(x: 300, y: 250)) == "active")
+        // A visited row, a header, the space between rows.
+        #expect(router.stopID(at: CGPoint(x: 300, y: 130)) == nil)
+        #expect(router.stopID(at: CGPoint(x: 300, y: 300)) == nil)
+
+        router.begin(at: CGPoint(x: 300, y: 370))
+        router.move(-80)
+        #expect(router.dragID == "last" && router.dragX == -80)
+        router.end(translation: -120, velocity: -400)
+        #expect(began == ["last"])
+        #expect(ended.count == 1 && ended[0].0 == "last" && ended[0].1 == -120 && ended[0].2 == -400)
+        router.reset()
+        #expect(router.dragID == nil && router.dragX == 0)
+
+        // A drag that starts on no row to skip moves no row and ends without a call.
+        router.begin(at: CGPoint(x: 300, y: 130))
+        router.move(-80)
+        router.end(translation: -120, velocity: 0)
+        #expect(router.dragID == nil && router.dragX == 0 && ended.count == 1)
+    }
 }

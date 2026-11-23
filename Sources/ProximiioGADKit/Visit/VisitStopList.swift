@@ -83,10 +83,17 @@ private struct StopList: View {
     @State private var revealedStopID: String?
     /// True while a row is dragged horizontally; vertical scrolling pauses meanwhile.
     @State private var isSwiping = false
+    /// Takes the list's pan to the row under the finger (iOS 18 and later).
+    @State private var router = SwipeRouter()
     @Environment(\.layoutDirection) private var layoutDirection
 
     var body: some View {
         let numbers = VisitPlan.numbers(for: navigator.journey)
+        let _ = router.update(
+            skippable: allowsSkip ? Set(visibleStops.filter(SkipSwipe.canSkip).map(\.id)) : [],
+            onBegan: { FieldLog.log("list swipe: began · revealed \(revealedStopID == $0)") },
+            onEnded: endSwipe
+        )
         ScrollView {
             LazyVStack(spacing: 10) {
                 // One flat ForEach: stops did not move between nested ForEach groups, which showed
@@ -104,6 +111,8 @@ private struct StopList: View {
                     case .stop(let stop):
                         let canSkip = allowsSkip && SkipSwipe.canSkip(stop)
                         SwipeToSkipRow(
+                            stopID: stop.id,
+                            router: router,
                             isRevealed: Binding(
                                 get: { revealedStopID == stop.id },
                                 set: { revealedStopID = $0 ? stop.id : nil }
@@ -112,10 +121,7 @@ private struct StopList: View {
                             isSwiping: $isSwiping,
                             skipsAtSwipe: skipsAtSwipe || isSkipPaused,
                             skipsBothWays: skipsBothWays,
-                            onSkip: {
-                                revealedStopID = nil
-                                onSkip(stop)
-                            }
+                            onSkip: { skip(stop.id) }
                         ) {
                             row(stop, number: numbers[stop.id] ?? 0, isRevealed: revealedStopID == stop.id)
                         }
@@ -145,6 +151,33 @@ private struct StopList: View {
         }
         .scrollIndicators(.hidden)
         .scrollDisabled(isSwiping)
+        .modifier(ListSwipe(router: router))
+    }
+
+    /// Asks to skip the stop with `stopID` as the navigator holds it now. A row can hold an older
+    /// value of its stop, so the stop is read again; a stop that is skipped or visited is refused.
+    private func skip(_ stopID: String) {
+        revealedStopID = nil
+        guard let stop = navigator.journey.stops.first(where: { $0.id == stopID }), SkipSwipe.canSkip(stop) else {
+            FieldLog.log("list skip: \(stopID) is not a stop to skip")
+            return
+        }
+        onSkip(stop)
+    }
+
+    /// Ends the list's pan on the row of `stopID`. `translation` and `velocity` are screen values.
+    private func endSwipe(_ stopID: String, translation: CGFloat, velocity: CGFloat) {
+        let projected = (translation + velocity * 0.2) * SkipSwipe.sign(layoutDirection)
+        let end = SkipSwipe.end(
+            isRevealed: revealedStopID == stopID, projected: projected,
+            skipsAtSwipe: skipsAtSwipe || isSkipPaused, bothWays: skipsBothWays
+        )
+        FieldLog.log(String(format: "list swipe: ended · %.0f pt · skip %@", projected, end.skips ? "asked" : end.revealed ? "shown" : "hidden"))
+        withAnimation(.snappy(duration: 0.25)) {
+            router.reset()
+            revealedStopID = end.revealed ? stopID : nil
+        }
+        if end.skips { skip(stopID) }
     }
 
     /// The section header of a stop: its gallery, else its level.
@@ -256,6 +289,8 @@ enum SkipSwipe {
 /// is at the left (PM, Monday "Skipping in Arabic goes the wrong way"). The drag locks to one axis: a horizontal drag pauses
 /// scrolling; a vertical drag scrolls and leaves the row in place.
 private struct SwipeToSkipRow<Content: View>: View {
+    let stopID: String
+    @ObservedObject var router: SwipeRouter
     @Binding var isRevealed: Bool
     let isEnabled: Bool
     @Binding var isSwiping: Bool
@@ -266,7 +301,8 @@ private struct SwipeToSkipRow<Content: View>: View {
 
     private enum Axis { case undecided, horizontal, vertical }
 
-    @State private var dragX: CGFloat = 0
+    /// The drag of the row's own gesture (before iOS 18).
+    @State private var ownDragX: CGFloat = 0
     @State private var axis: Axis = .undecided
     /// True while the drag gesture runs. SwiftUI resets it when the gesture ends or is cancelled;
     /// a cancelled drag does not call `onEnded`, which left scrolling paused (PM review 2026-10-12).
@@ -276,6 +312,9 @@ private struct SwipeToSkipRow<Content: View>: View {
 
     /// 1 or -1: screen distance to logical distance.
     private var sign: CGFloat { SkipSwipe.sign(layoutDirection) }
+
+    /// The screen distance of the drag: the list's pan on this row, else the row's own gesture.
+    private var dragX: CGFloat { router.dragID == stopID ? router.dragX : ownDragX }
 
     /// The logical offset of the row; `dragX` is a screen distance.
     private var offset: CGFloat {
@@ -309,47 +348,45 @@ private struct SwipeToSkipRow<Content: View>: View {
             guard !dragging, axis != .undecided || isSwiping else { return }
             axis = .undecided
             isSwiping = false
-            withAnimation(.snappy(duration: 0.25)) { dragX = 0 }
+            withAnimation(.snappy(duration: 0.25)) { ownDragX = 0 }
         }
+        // The frame of the row for the list's pan. The offset of the content does not move it.
+        .background {
+            GeometryReader { geometry in
+                let frame = geometry.frame(in: .global)
+                Color.clear
+                    .onAppear { router.frames[stopID] = frame }
+                    .onValueChange(of: frame) { _, frame in router.frames[stopID] = frame }
+            }
+        }
+        .onDisappear { router.frames[stopID] = nil }
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: Text("Skip", bundle: .localized)) { if isEnabled { onSkip() } }
         // For UI tests; VoiceOver does not read identifiers.
         .accessibilityIdentifier(isRevealed ? "journeyStopRow.skipShown" : "journeyStopRow")
     }
 
-    /// From iOS 18 a SwiftUI drag on a row takes every drag that starts on it, also as a
-    /// simultaneous gesture, and the list did not scroll (PM 2026-10-12 and 2026-10-14,
-    /// `ListScrollUITests`). There the row uses a pan recognizer that begins only for a mostly
-    /// horizontal drag; a vertical drag stays with the scroll view.
+    /// Before iOS 18 the row has its own drag. From iOS 18 a SwiftUI drag on a row takes every drag
+    /// that starts on it, also as a simultaneous gesture, and the list did not scroll (PM 2026-10-12
+    /// and 2026-10-14, `ListScrollUITests`). There the list has one pan (`ListSwipe`).
     @ViewBuilder
     private func draggable(_ row: some View) -> some View {
         if !isEnabled {
             row
         } else if #available(iOS 18.0, *) {
-            // No `isSwiping`: the list's pan already waits for this one (`HorizontalPan`).
-            row.gesture(HorizontalPan(
-                onBegan: { FieldLog.log("list swipe: began · revealed \(isRevealed)") },
-                onChanged: { dragX = $0 },
-                onEnded: { translation, velocity in
-                    let projected = (translation + velocity * 0.2) * sign
-                    end(projected: projected)
-                },
-                onCancelled: {
-                    FieldLog.log("list swipe: cancelled")
-                    withAnimation(.snappy(duration: 0.25)) { dragX = 0 }
-                }
-            ))
+            row
         } else {
             row.simultaneousGesture(drag)
         }
     }
 
-    /// Ends a horizontal drag that would stop `projected` logical points from its start.
+    /// Ends a horizontal drag of the row's own gesture that would stop `projected` logical points
+    /// from its start.
     private func end(projected: CGFloat) {
         let end = SkipSwipe.end(isRevealed: isRevealed, projected: projected, skipsAtSwipe: skipsAtSwipe, bothWays: skipsBothWays)
         FieldLog.log(String(format: "list swipe: ended · %.0f pt · skip %@", projected, end.skips ? "asked" : end.revealed ? "shown" : "hidden"))
         withAnimation(.snappy(duration: 0.25)) {
-            dragX = 0
+            ownDragX = 0
             isRevealed = end.revealed
         }
         if end.skips { onSkip() }
@@ -366,7 +403,7 @@ private struct SwipeToSkipRow<Content: View>: View {
                     if axis == .horizontal { isSwiping = true }
                 }
                 guard axis == .horizontal else { return }
-                dragX = value.translation.width
+                ownDragX = value.translation.width
             }
             .onEnded { value in
                 defer {
@@ -380,10 +417,10 @@ private struct SwipeToSkipRow<Content: View>: View {
     }
 }
 
-/// The pan of a list row, with a field-log line for every touch that reaches the row: `list touch:
+/// The pan of the list, with a field-log line for every touch that reaches the list: `list touch:
 /// down` at the touch, and `list touch: up` with the distance moved when the touch ends before the
 /// pan was asked to begin. A swipe that moves no row and leaves no `list touch` line did not reach
-/// the row; a view of the host app took it (PM, Monday "Swipe bug on iOS 27", video of
+/// the list; a view of the host app took it (PM, Monday "Swipe bug on iOS 27", video of
 /// 2026-11-20 17:23 UTC: two refused swipes without any line).
 @available(iOS 18.0, *)
 private final class TouchLoggingPan: UIPanGestureRecognizer {
@@ -421,17 +458,88 @@ private final class TouchLoggingPan: UIPanGestureRecognizer {
     }
 }
 
-/// A pan that begins only when the drag is more horizontal than vertical. Reports the horizontal
-/// translation, and the horizontal velocity at the end.
+/// Takes the list's one pan to the row under the finger. The rows report their frames by stop id,
+/// and the list names the stops that can be skipped. The pan holds no stop and no row. With a
+/// pan on each row, a swipe on the row "The Golden Sphere" ran the action of the removed row
+/// "The Black Angel": the prompt named that artwork and the row did not slide (Nagarro's video
+/// and field log, 2026-11-23 08:22 UTC; not reproduced in the simulator).
+@MainActor
+final class SwipeRouter: ObservableObject {
+    /// The stop of the dragged row, and the screen distance of the drag.
+    @Published private(set) var dragID: String?
+    @Published private(set) var dragX: CGFloat = 0
+    /// Row frames in the global coordinate space, by stop id.
+    var frames: [String: CGRect] = [:]
+    private var skippable: Set<String> = []
+    private var onBegan: (String) -> Void = { _ in }
+    private var onEnded: (_ stopID: String, _ translation: CGFloat, _ velocity: CGFloat) -> Void = { _, _, _ in }
+
+    /// The list calls this at every update.
+    func update(
+        skippable: Set<String>,
+        onBegan: @escaping (String) -> Void,
+        onEnded: @escaping (_ stopID: String, _ translation: CGFloat, _ velocity: CGFloat) -> Void
+    ) {
+        self.skippable = skippable
+        self.onBegan = onBegan
+        self.onEnded = onEnded
+    }
+
+    /// The stop that can be skipped whose row holds `point`.
+    func stopID(at point: CGPoint) -> String? {
+        skippable.first { frames[$0]?.contains(point) == true }
+    }
+
+    func begin(at point: CGPoint) {
+        dragID = stopID(at: point)
+        dragX = 0
+        if let dragID { onBegan(dragID) }
+    }
+
+    func move(_ x: CGFloat) {
+        if dragID != nil { dragX = x }
+    }
+
+    /// The owner of `onEnded` calls `reset()` inside its animation.
+    func end(translation: CGFloat, velocity: CGFloat) {
+        guard let dragID else { return }
+        onEnded(dragID, translation, velocity)
+    }
+
+    func cancel() {
+        FieldLog.log("list swipe: cancelled")
+        withAnimation(.snappy(duration: 0.25)) { reset() }
+    }
+
+    func reset() {
+        dragID = nil
+        dragX = 0
+    }
+}
+
+/// The list's pan, from iOS 18. The content shape makes the whole list take the touch: a touch on
+/// the part of a row without text did not reach a pan on the row (Nagarro, 2026-11-23).
+private struct ListSwipe: ViewModifier {
+    let router: SwipeRouter
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.contentShape(Rectangle()).gesture(HorizontalPan(router: router))
+        } else {
+            content
+        }
+    }
+}
+
+/// A pan that begins only when the drag is more horizontal than vertical and starts on a row that
+/// can be skipped. Reports the start, the horizontal translation, and the horizontal velocity at
+/// the end to the `SwipeRouter`.
 @available(iOS 18.0, *)
 private struct HorizontalPan: UIGestureRecognizerRepresentable {
-    let onBegan: () -> Void
-    let onChanged: (CGFloat) -> Void
-    let onEnded: (_ translation: CGFloat, _ velocity: CGFloat) -> Void
-    let onCancelled: () -> Void
+    let router: SwipeRouter
 
     func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
-        Coordinator()
+        Coordinator(router: router, converter: converter)
     }
 
     func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
@@ -444,30 +552,50 @@ private struct HorizontalPan: UIGestureRecognizerRepresentable {
         let translation = pan.translation(in: pan.view).x
         switch pan.state {
         case .began:
-            onBegan()
-            onChanged(translation)
+            router.begin(at: context.coordinator.start)
+            router.move(translation)
         case .changed:
-            onChanged(translation)
+            router.move(translation)
         case .ended:
-            onEnded(translation, pan.velocity(in: pan.view).x)
+            router.end(translation: translation, velocity: pan.velocity(in: pan.view).x)
         case .cancelled, .failed:
-            onCancelled()
+            router.cancel()
         default:
             break
         }
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        private let router: SwipeRouter
+        private let converter: CoordinateSpaceConverter
+
+        init(router: SwipeRouter, converter: CoordinateSpaceConverter) {
+            self.router = router
+            self.converter = converter
+        }
+
+        /// Where the drag started, in the global coordinate space.
+        var start: CGPoint {
+            let location = converter.location(in: .global)
+            let translation = converter.translation(in: .global) ?? .zero
+            return CGPoint(x: location.x - translation.x, y: location.y - translation.y)
+        }
+
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
             guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
             let velocity = pan.velocity(in: pan.view)
-            let begins = abs(velocity.x) > abs(velocity.y)
             // Every refused drag is logged, a vertical scroll too: a swipe that moves no row and
-            // leaves no line did not reach the row (PM, Monday "Swipe bug on iOS 27", 2026-11-20).
-            if !begins {
+            // leaves no line did not reach the list (PM, Monday "Swipe bug on iOS 27", 2026-11-20).
+            guard abs(velocity.x) > abs(velocity.y) else {
                 FieldLog.log(String(format: "list swipe: not begun · velocity %.0f, %.0f pt/s", velocity.x, velocity.y))
+                return false
             }
-            return begins
+            let start = start
+            guard router.stopID(at: start) != nil else {
+                FieldLog.log(String(format: "list swipe: not begun · no row to skip at %.0f, %.0f pt", start.x, start.y))
+                return false
+            }
+            return true
         }
 
         /// The list's pan waits for this one. A vertical drag fails it at once, so scrolling
