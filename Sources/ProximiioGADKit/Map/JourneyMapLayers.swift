@@ -535,7 +535,7 @@ final class JourneyMapLayers {
         case .visited: (.white, red, 2, ink)
         case .standard: (.white, ink, 1.5, ink)
         }
-        let font = UIFont(name: "GuggenheimSansDisplay-SemiBold", size: 14) ?? .systemFont(ofSize: 14, weight: .semibold)
+        let font = GADFonts.uiFont("GuggenheimSansDisplay-SemiBold", size: 14) ?? .systemFont(ofSize: 14, weight: .semibold)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: text]
         let title = name as NSString
         let textSize = title.size(withAttributes: attributes)

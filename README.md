@@ -101,11 +101,15 @@ ProximiExploreView(sdk: sdk)
 
 ### Fonts
 
-The package registers Guggenheim Sans Display for its screens. The host app lists no fonts.
+The package registers Guggenheim Sans Display and Guggenheim Arabic for its screens. The host app
+lists no fonts. While the package's language is Arabic, the screens and the gallery names on the map
+use Guggenheim Arabic (BETA v2) in the weight of the design. Guggenheim Sans Display has no Arabic
+glyphs.
 
 The widget extension does not register fonts. Add `GuggenheimSansDisplay-Regular.ttf`, `-Medium.ttf`
 and `-Bold.ttf` from `Sources/ProximiioGADKit/Resources/Fonts` to the extension and list them in its
-`UIAppFonts`.
+`UIAppFonts`. The widget does not use Guggenheim Arabic: iOS draws its Arabic text in the system
+Arabic font.
 
 ## Quick start
 
@@ -1145,6 +1149,21 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.73.0 (2026-11-24)
+
+- New: the package bundles Guggenheim Arabic (BETA v2; Light, Regular, Medium, SemiBold, Bold) and
+  registers it with Guggenheim Sans Display. While the package's language is Arabic, every text of
+  the package's screens and the gallery names on the map use it, in the weight of the design. Up to
+  1.72.0 iOS drew Arabic text in the system Arabic font, because Guggenheim Sans Display has no
+  Arabic glyphs (tester report "Arabic - Explore Museum > Museum Map", 2026-11-24).
+- Latin text and digits in an Arabic screen come from Guggenheim Arabic too. Its Latin glyphs have
+  the advance widths of Guggenheim Sans Display.
+- Guggenheim Arabic has a line gap of 27 % of the point size. A text of more than one line is
+  taller in Arabic than up to 1.72.0.
+- Not changed: the labels the map style draws (they use the style's fonts from the glyph server),
+  the stop numbers on the map, and the Live Activity widget.
+- No change for a host app. The host app lists no fonts.
 
 ### 1.72.0 (2026-11-23)
 

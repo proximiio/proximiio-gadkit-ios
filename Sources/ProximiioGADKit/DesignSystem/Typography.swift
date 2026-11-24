@@ -11,8 +11,14 @@
 //  The font files are package resources (`Resources/Fonts`). `GADFonts` registers them for the
 //  process the first time a font is created, so a host app lists no `UIAppFonts`.
 //
+//  Guggenheim Sans Display has no Arabic glyphs. While the package's language is Arabic, every style
+//  uses Guggenheim Arabic in the same weight (`GADFonts.name(_:language:)`). Guggenheim Arabic holds
+//  the Latin glyphs of Guggenheim Sans Display with the same advance widths, and a line gap of 27 %
+//  of the point size between the lines of a text.
+//
 import CoreText
 import SwiftUI
+import UIKit
 
 @_spi(GADApp) public enum TextStyle: CaseIterable, Sendable {
     case cardTitle
@@ -74,7 +80,7 @@ import SwiftUI
     public var font: Font { GADFonts.custom(postScriptName, size: size, relativeTo: relativeTo) }
 }
 
-/// The Guggenheim Sans Display fonts of the package bundle.
+/// The Guggenheim Sans Display and Guggenheim Arabic fonts of the package bundle.
 @_spi(GADApp) public enum GADFonts {
     /// Registers the fonts for this process. Later calls do nothing. `TextStyle.font` calls it;
     /// a host app calls it only before it creates a font by name, for example with
@@ -84,15 +90,34 @@ import SwiftUI
     }
 
     private static let registration: Void = {
-        for url in Bundle.module.urls(forResourcesWithExtension: "ttf", subdirectory: nil) ?? [] {
-            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        for type in ["ttf", "otf"] {
+            for url in Bundle.module.urls(forResourcesWithExtension: type, subdirectory: nil) ?? [] {
+                CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            }
         }
     }()
 
-    /// A Guggenheim Sans Display font by PostScript name, scaled with Dynamic Type.
+    static let latinPrefix = "GuggenheimSansDisplay-"
+    static let arabicPrefix = "GuggenheimArabicBETAv2-"
+
+    /// The PostScript name to draw `name` with in `language`: the Guggenheim Arabic font of the same
+    /// weight for a Guggenheim Sans Display name in Arabic, else `name`. Pure; covered by tests.
+    static func name(_ name: String, language: String) -> String {
+        guard language == "ar", name.hasPrefix(latinPrefix) else { return name }
+        return arabicPrefix + name.dropFirst(latinPrefix.count)
+    }
+
+    /// A package font by the PostScript name of its Guggenheim Sans Display file, scaled with
+    /// Dynamic Type. In Arabic it is the Guggenheim Arabic font of the same weight.
     static func custom(_ name: String, size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
         register()
-        return .custom(name, size: size, relativeTo: style)
+        return .custom(Self.name(name, language: AppLanguage.current), size: size, relativeTo: style)
+    }
+
+    /// The same font for UIKit drawing, at a fixed size.
+    static func uiFont(_ name: String, size: CGFloat) -> UIFont? {
+        register()
+        return UIFont(name: Self.name(name, language: AppLanguage.current), size: size)
     }
 }
 

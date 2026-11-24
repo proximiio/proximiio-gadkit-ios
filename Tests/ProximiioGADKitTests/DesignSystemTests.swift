@@ -8,6 +8,32 @@ import UIKit
 
 @MainActor
 struct DesignSystemTests {
+    /// Every text style has a registered Guggenheim Arabic font of its weight.
+    @Test(arguments: TextStyle.allCases)
+    func everyTextStyleHasAnArabicFont(_ style: TextStyle) {
+        GADFonts.register()
+        let name = GADFonts.name(style.postScriptName, language: "ar")
+        #expect(name == "GuggenheimArabicBETAv2-\(style.weight.rawValue)")
+        #expect(UIFont(name: name, size: style.size) != nil, "\(name) is not registered")
+    }
+
+    /// The Arabic font has Arabic glyphs; the Latin font has none.
+    @Test func theArabicFontDrawsArabicLetters() throws {
+        GADFonts.register()
+        let arabic = try #require(UIFont(name: "GuggenheimArabicBETAv2-Regular", size: 16))
+        let latin = try #require(UIFont(name: "GuggenheimSansDisplay-Regular", size: 16))
+        let letters = CharacterSet(charactersIn: "معرض")
+        #expect(arabic.fontDescriptor.object(forKey: .characterSet).flatMap { $0 as? CharacterSet }?.isSuperset(of: letters) == true)
+        #expect(latin.fontDescriptor.object(forKey: .characterSet).flatMap { $0 as? CharacterSet }?.isSuperset(of: letters) == false)
+    }
+
+    /// Other languages and other fonts keep their name.
+    @Test func onlyArabicChangesTheFontName() {
+        #expect(GADFonts.name("GuggenheimSansDisplay-Bold", language: "en") == "GuggenheimSansDisplay-Bold")
+        #expect(GADFonts.name("GuggenheimSansDisplay-Bold", language: "ar") == "GuggenheimArabicBETAv2-Bold")
+        #expect(GADFonts.name("Helvetica", language: "ar") == "Helvetica")
+    }
+
     /// Every text style resolves to a font file that the package bundles and registers.
     @Test(arguments: TextStyle.allCases)
     func everyTextStyleFontIsBundled(_ style: TextStyle) {
