@@ -875,6 +875,7 @@ let configuration = GADConfiguration(
 | `ordersNearestArtworkInGalleryFirst` | `true` | Personalised journeys: in the gallery of the current artwork, the nearest open artwork of that gallery becomes the current stop when it is `orderSwitchMinimumMeters` nearer to the visitor, in a straight line, also for a visitor on the leg. Checked at most every `galleryRouteRefreshSeconds`. `false`: the stop changes only off the leg. |
 | `ordersInOpenArea`, `openAreaOrderMinimumMeters`, `openAreaOrderSeconds` | `true`, 15 m, 20 s | Personalised journeys, the visitor in no gallery of the journey: the stops ahead are ordered again from the visitor when that order starts with another artwork and saves this many metres of walking by the route. Checked at most this often. `false`: outside the galleries the order changes only after a visit and after a detour. |
 | `followsAgainAtGalleryChange` | `true` | The journey map follows the visitor again each time they enter or leave a gallery, when a gesture left the camera free. Not while the journey is paused. `false`: only "Centre on me" takes the follow again. |
+| `followsAgainAfterSeconds` | `5` | The journey map follows the visitor again this many seconds after the last pan, zoom or rotation that left the camera free. `0`: off. Not while the journey is paused, while the map shows a picked place, the stop without a position, the lift or stairs view or another floor than the visitor's. |
 | `connectsRouteToPosition` | `false` | The journey map draws a line from the visitor to the nearest point of the route ahead, at every position, on the visitor's floor. The route is not computed again. No line within 2 m of the route's end or after the arrival. |
 | `routeConnectorMaximumMeters` | 6 m | The longest line `connectsRouteToPosition` draws. Further from the route there is no line. |
 | `visitsArtworkAtAnotherArtwork` | `true` | An artwork the visitor has arrived at is marked visited when the visitor enters the geofence of another artwork of the journey and is outside its own. `false`: only `artworkVisitedMeters` and `artworkVisitedSeconds` mark it visited. |
@@ -1149,6 +1150,22 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.75.0 (2026-11-27)
+
+- New: `GADSettings.followsAgainAfterSeconds` (default `5`). On the journey map, a pan, a zoom or a
+  rotation leaves the camera free; the map follows the visitor again, on their floor, when the
+  camera has not moved for this many seconds. The time counts from the last movement of the
+  camera, so it starts again while the visitor moves the map. `0` turns it off: the camera stays
+  free until "Centre on me" or a gallery change (`followsAgainAtGalleryChange`), as up to 1.74.0.
+- The map does not follow again by this time while the journey is paused, while it shows a place
+  the visitor picked in the search, the amenity list, the stop without a position, the journey
+  list or the lift or stairs view, and while it shows another floor than the visitor's. The time
+  starts when such a state ends.
+- Changed by default: with the default of 5 s a host app's journey map follows again without a
+  change in its code. `settings.followsAgainAfterSeconds = 0` keeps the behaviour of 1.74.0.
+- Field log: `recentre (camera still for 5.0 s) · …` for each such follow.
+- Not changed: the Explore map, which does not follow the visitor.
 
 ### 1.74.0 (2026-11-27)
 

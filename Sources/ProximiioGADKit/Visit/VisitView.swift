@@ -632,6 +632,7 @@ struct VisitView: View {
             }
             .task(id: controller.isRerouting) { await followRerouting() }
             .task { await MapDiagnostics.follow(controller.session, name: "journey") }
+            .task(id: settings.followsAgainAfterSeconds) { await followAgainAfterIdle() }
     }
 
     /// "Rerouting you…" after 0.5 s of routing; hidden when the routing ends.
@@ -957,6 +958,42 @@ struct VisitView: View {
         else { return }
         controller.session.followMyFloor()
         recentre(reason: visitorGalleryID == nil ? "gallery left" : "gallery entered")
+    }
+
+    /// Reads the camera every `FollowAfterIdle.interval` and follows the visitor again when a gesture
+    /// left the camera free and it has been still for `GADSettings.followsAgainAfterSeconds`.
+    private func followAgainAfterIdle() async {
+        let seconds = settings.followsAgainAfterSeconds
+        guard seconds > 0 else { return }
+        var idle = FollowAfterIdle()
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(FollowAfterIdle.interval))
+            let session = controller.session
+            let camera = session.camera.center.flatMap { centre in
+                session.camera.zoomLevel.map { zoom in
+                    FollowAfterIdle.Camera(latitude: centre.latitude, longitude: centre.longitude, zoom: zoom,
+                                           direction: session.camera.direction ?? 0)
+                }
+            }
+            let isAllowed = Self.followsAgainAfterIdle(
+                isPaused: controller.isPaused, isFloorGuideActive: floorGuide.isActive, isStartZoomPending: startZoomFollow != nil,
+                showsPlace: selectedAmenity != nil || isShowingAmenities || showsStopWithoutPosition || showsList,
+                visitorLevel: session.position?.floor?.level, shownLevel: session.selectedFloor.level)
+            guard idle.reading(camera, isFree: session.cameraMode == .free, isAllowed: isAllowed, seconds: seconds,
+                               now: ProcessInfo.processInfo.systemUptime) else { continue }
+            session.followMyFloor()
+            recentre(reason: "camera still for \(seconds) s")
+        }
+    }
+
+    /// Whether a still, free camera may take the follow again: the journey is not paused, the lift
+    /// or stairs view and the start zoom are not running, the map shows no place the visitor picked
+    /// and no list, and the map shows the visitor's floor. Without a position it may not. Pure;
+    /// covered by tests.
+    static func followsAgainAfterIdle(isPaused: Bool, isFloorGuideActive: Bool, isStartZoomPending: Bool, showsPlace: Bool,
+                                      visitorLevel: Double?, shownLevel: Double) -> Bool {
+        guard !isPaused, !isFloorGuideActive, !isStartZoomPending, !showsPlace, let visitorLevel else { return false }
+        return VenueLevel.same(visitorLevel, shownLevel)
     }
 
     /// Whether a gallery change takes the follow again: the setting is on, the camera does not

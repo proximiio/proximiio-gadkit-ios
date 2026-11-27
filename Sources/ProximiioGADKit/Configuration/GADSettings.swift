@@ -205,6 +205,14 @@ public struct GADSettings: Equatable, Sendable {
     /// Not while the journey is paused. `false`: only "Centre on me" takes the follow again, as
     /// before 1.63.0.
     public var followsAgainAtGalleryChange = true
+    /// The journey map follows the visitor again this many seconds after the last pan, zoom or
+    /// rotation that left the camera free (owner, 2026-11-27). The time counts from the last
+    /// movement of the camera, so it starts again while the visitor moves the map. `0`: off, the
+    /// camera stays free until "Centre on me" or a gallery change (`followsAgainAtGalleryChange`),
+    /// as before 1.75.0. Not while the journey is paused, while the map shows a place the visitor
+    /// picked, the stop without a position or the lift or stairs view, and not while the map
+    /// shows another floor than the visitor's.
+    public var followsAgainAfterSeconds: TimeInterval = 5
     /// The journey map draws a line from the visitor to the nearest point of the route ahead, at
     /// every position, on the visitor's floor (PM, Monday "Route drawing feels off", 2026-11-20:
     /// the route did not start at the blue dot). The route itself is not computed again. No line
