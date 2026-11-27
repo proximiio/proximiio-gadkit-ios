@@ -61,9 +61,15 @@ struct ExploreMuseumView: View {
     @State private var hiddenFeatureIDs: Set<String> = []
     /// The size of the map.
     @State private var mapSize: CGSize = .zero
+    /// The start has set the first level and the camera.
+    @State private var isFramed = false
+    /// The map is on screen (`GADSettings.exploreMapRevealMaximumSeconds`).
+    @State private var isRevealed: Bool
+    @State private var opened = ContinuousClock.now
 
     init(venue: VenueService) {
         self.venue = venue
+        _isRevealed = State(initialValue: venue.settings.exploreMapRevealMaximumSeconds <= 0)
         _session = StateObject(wrappedValue: MapStyle.session(sdk: venue.sdk, options: MapStyle.exploreOptions(settings: venue.settings), galleryIcons: true,
                                                           venueIcons: venue.settings.usesVenueAmenityIcons))
     }
@@ -77,7 +83,10 @@ struct ExploreMuseumView: View {
                 .softEdges(cornerRadius: 40)
                 .ignoresSafeArea(edges: .bottom)
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { mapSize = $0 }
-            MapLoadingSpinner(session: session, timeout: venue.settings.mapLoadingTimeout)
+                // Hidden until the whole venue is drawn (`GADSettings.exploreMapRevealMaximumSeconds`).
+                .opacity(isRevealed ? 1 : 0)
+                .animation(.easeInOut(duration: 0.25), value: isRevealed)
+            MapLoadingSpinner(session: session, timeout: venue.settings.mapLoadingTimeout, isBusy: !isRevealed)
             if panel == nil, let selected {
                 ExploreCallout(item: selected, session: session, icons: amenityIcons, target: ExploreCalloutLayout.target(in: mapSize)) {
                     self.selected = nil
@@ -103,6 +112,11 @@ struct ExploreMuseumView: View {
         .animation(.easeInOut(duration: 0.25), value: panel)
         .animation(.easeInOut(duration: 0.2), value: selected)
         .task { await start() }
+        .task {
+            // The map shows after `mapLoadingTimeout` whatever the start does.
+            try? await Task.sleep(for: .seconds(venue.settings.mapLoadingTimeout))
+            reveal("after the loading timeout")
+        }
         .task { await MapDiagnostics.follow(session, name: "explore") }
         .onReceive(venue.data.$version.dropFirst()) { _ in
             Task { await load() }
@@ -131,6 +145,8 @@ struct ExploreMuseumView: View {
             Text(String(localized: "Level \(Int(level.rounded()))", bundle: .localized))
                 .textStyle(.h1Regular)
                 .padding(.top, 8)
+                // The first level is known when the start has read the venue data.
+                .opacity(isFramed ? 1 : 0)
                 .accessibilityIdentifier("exploreLevel")
             Spacer()
             // Shown once the museum's levels are known, so its menu is never empty.
@@ -418,6 +434,45 @@ struct ExploreMuseumView: View {
         if let bounds = PlaceFraming.bounds(of: framed.flatMap { $0 }, minimumMeters: 60) {
             session.camera.fit(bounds: bounds, padding: mapInsets, animated: false)
         }
+        isFramed = true
+        await revealWhenDrawn()
+    }
+
+    /// Shows the map when the map library has nothing left to draw after the camera was set, or
+    /// after `GADSettings.exploreMapRevealMaximumSeconds`.
+    private func revealWhenDrawn() async {
+        guard !isRevealed else { return }
+        let framedAt = ContinuousClock.now
+        // The library reports the idle map once. A map that was idle before the camera was set
+        // draws the new frame without a report.
+        let wasIdle = session.venueDrawing == .idle
+        while !Task.isCancelled {
+            let elapsed = Double(MeasurementLog.milliseconds(since: framedAt)) / 1000
+            if let reason = Self.revealReason(elapsed: elapsed, isIdle: session.venueDrawing == .idle, wasIdleAtFrame: wasIdle,
+                                              hasError: session.lastError != nil,
+                                              maximumSeconds: venue.settings.exploreMapRevealMaximumSeconds) {
+                return reveal(reason)
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    /// Seconds a map that was idle before the camera was set gets to draw the new frame.
+    static let revealSettleSeconds: TimeInterval = 0.5
+
+    /// Why the hidden map shows now, `elapsed` seconds after the camera was set; `nil` while it
+    /// waits. Pure; covered by tests.
+    static func revealReason(elapsed: TimeInterval, isIdle: Bool, wasIdleAtFrame: Bool, hasError: Bool, maximumSeconds: TimeInterval) -> String? {
+        if hasError { return "map error" }
+        if elapsed >= maximumSeconds { return "after the longest wait" }
+        if wasIdleAtFrame { return elapsed >= revealSettleSeconds ? "drawn before the camera was set" : nil }
+        return isIdle ? "venue drawn" : nil
+    }
+
+    private func reveal(_ reason: String) {
+        guard !isRevealed else { return }
+        isRevealed = true
+        FieldLog.log("explore map shown: \(reason) · \(MeasurementLog.milliseconds(since: opened)) ms after the view started")
     }
 
     /// The lists, at the start and after a change of the venue data.

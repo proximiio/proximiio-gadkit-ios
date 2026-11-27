@@ -361,6 +361,13 @@ public struct GADSettings: Equatable, Sendable {
     /// venue. The spinner goes when the venue's features are on the map, when the map reports an
     /// error, or after this time.
     public var mapLoadingTimeout: TimeInterval = 20
+    /// The Explore map stays hidden under its spinner until the map library has drawn the whole
+    /// venue at the first frame of the camera: the floor plan, the tiles, the galleries, the icons
+    /// and the labels. It then fades in at once (Nagarro, 2026-11-27: the parts of the map came on
+    /// screen one after another). This is the longest time in seconds the map waits for that after
+    /// its camera is set; after it the map shows as it is. `0`: the map shows from the start, as
+    /// before 1.76.0. `mapLoadingTimeout` still ends the spinner.
+    public var exploreMapRevealMaximumSeconds: TimeInterval = 4
     /// The smallest width and height in metres of the area the map shows for an amenity picked in
     /// the menu, so a near amenity does not zoom the map in further than this.
     public var amenityFramingMinimumMeters: Double = 40

@@ -906,6 +906,7 @@ let configuration = GADConfiguration(
 | `ordersGalleriesByWalkingTime` | `true` | `true` picks the first gallery on a floor and the gallery after a finished one by routed walking time (`JourneyOrderStrategy.floorThenGalleryRouted`, map 6.0.0-beta.62). `false` picks them by straight-line distance. Which floor comes next and the order inside a gallery use straight-line distance in both. A stop without a route uses the straight line. The first proposal asks the SDK for the walking time between every pair of stops; the time on the GAD venue is not measured. |
 | `smoothsPosition` | `false` | `true` slides the position dot toward each fix; `false` draws it on each fix, without the delay of the sliding. |
 | `mapLoadingTimeout` | 20 s | The longest time a map shows its spinner while the venue's features are not on the map. |
+| `exploreMapRevealMaximumSeconds` | 4 s | The Explore map stays hidden under its spinner until the map library has drawn the whole venue at the first frame of the camera, then fades in at once. This is the longest wait after the camera is set. `0`: the map shows from the start. |
 | `amenityFramingMinimumMeters` | 40 m | The smallest area the map shows for an amenity picked in the menu. |
 | `exploreFramingMaximumMeters` | 150 m | The Explore Museum map opens on the spaces whose centre is at most this far from the median centre of all spaces. `nil` frames every space. |
 | `galleryFirstMarginMeters` | 50 m | Gallery first: an artwork farther than this outside its gallery's geofence, or on another floor, is routed to directly. |
@@ -1150,6 +1151,27 @@ xcodebuild test -scheme ProximiioGADKit-Package -destination 'platform=iOS Simul
 Every version is a git tag. **Breaking** marks a change that needs a change in the host app's code or
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
+
+### 1.76.0 (2026-11-27)
+
+- Explore map (`ProximiExploreView`): the map stays hidden under its spinner until the map library
+  has drawn the whole venue at the first frame of the camera, and then fades in at once, in 0.25 s.
+  Up to 1.75.0 the spinner went when the venue's features reached the map: the visitor then saw
+  the map at the camera of the style on level 0, the galleries about 0.5 s later, first in another
+  colour, and the floor plan about 1 s after them (Nagarro's video, 2026-11-27).
+- The map shows when the map library reports the idle map after the venue was drawn
+  (`venueDrawing == .idle`): no camera move, tile load or fade is left. A map that was idle before
+  the camera was set shows 0.5 s after it.
+- New: `GADSettings.exploreMapRevealMaximumSeconds` (default 4 s), the longest wait after the
+  camera is set; after it the map shows as it is. A map error shows the map at once, and
+  `mapLoadingTimeout` shows it whatever the start does. `0`: the map shows from the start, as up to
+  1.75.0.
+- The level title of the Explore map shows when the first level is known. Before, it read
+  "Level 0" until then.
+- Field log: `explore map shown: <venue drawn | drawn before the camera was set | after the longest wait | map error | after the loading timeout> · <ms> ms after the view started`.
+- Changed by default: the spinner of the Explore map stays longer, until the map is complete. In
+  the simulator the map showed 1.7 s after the view started.
+- Not changed: the journey map.
 
 ### 1.75.0 (2026-11-27)
 
