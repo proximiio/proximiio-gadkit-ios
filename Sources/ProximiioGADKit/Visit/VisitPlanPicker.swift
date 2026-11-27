@@ -23,7 +23,7 @@ struct VisitPlanPicker: View {
 
     var body: some View {
         NavigationStack {
-            List(VenuePlace.matching(query, in: places)) { place in
+            List(MeasurementLog.places(matching: query, in: places, screen: "plan")) { place in
                 Button {
                     if let index = picked.firstIndex(of: place.id) {
                         picked.remove(at: index)

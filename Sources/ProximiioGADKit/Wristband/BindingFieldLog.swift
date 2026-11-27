@@ -38,6 +38,7 @@ enum BindingFieldLog {
             return tasks
         }
         old.forEach { $0.cancel() }
+        MeasurementLog.latestRelayPosition.withLock { $0 = nil }
         guard FieldLog.isEnabled else { return }
         var new: [Task<Void, Never>] = []
         new.append(Task {
@@ -54,8 +55,11 @@ enum BindingFieldLog {
         })
         new.append(Task {
             var last: TimeInterval?
+            var rate = MeasurementLog.RateLog()
             for await sample in binding.positionProvider.samples() {
                 let now = ProcessInfo.processInfo.systemUptime
+                MeasurementLog.latestRelayPosition.withLock { $0 = sample }
+                if let line = rate.position(at: now) { FieldLog.log(line) }
                 guard Self.logsPosition(now: now, last: last) else { continue }
                 last = now
                 FieldLog.log(Self.positionLine(timestamp: sample.timestamp, now: Date()))

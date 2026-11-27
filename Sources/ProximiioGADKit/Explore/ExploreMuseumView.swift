@@ -54,6 +54,8 @@ struct ExploreMuseumView: View {
     @State private var amenityIcons: [String: UIImage] = [:]
     /// The place whose card is open.
     @State private var selected: ExploreItem?
+    /// When the visitor asked for the open list, until its field log line is written.
+    @State private var listRequestedAt: ContinuousClock.Instant?
     /// The features the map does not draw: artworks, level changers (drawn by `mapLayers`) and the
     /// amenities of `AmenityKind`.
     @State private var hiddenFeatureIDs: Set<String> = []
@@ -243,6 +245,7 @@ struct ExploreMuseumView: View {
             panel = nil
         } else {
             selected = nil
+            if case .list = target { listRequestedAt = .now }
             panel = target
         }
     }
@@ -337,6 +340,13 @@ struct ExploreMuseumView: View {
                         .padding(.horizontal, 24)
                         // Clear of the tab bar.
                         .padding(.bottom, 110)
+                        // Field log only: the time from the tap on the tab to the list on screen.
+                        .task(id: tab) {
+                            guard let start = listRequestedAt else { return }
+                            listRequestedAt = nil
+                            FieldLog.log(MeasurementLog.listLine(tab: String(describing: tab), items: items(for: tab).count,
+                                                                 milliseconds: MeasurementLog.milliseconds(since: start)))
+                        }
     }
 
     /// The map legend of the PM's screen: the facilities and the galleries the museum's POIs use, with

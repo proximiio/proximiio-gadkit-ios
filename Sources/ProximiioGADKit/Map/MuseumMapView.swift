@@ -319,7 +319,7 @@ struct MuseumMapView: View {
     private func routeToNearest(_ kind: AmenityShortcut) {
         let here = session.position
         let from = here.map { ProximiioCoordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude) }
-        guard let place = kind.nearest(in: places, from: from, level: here?.floor?.level) else { return }
+        guard let place = MeasurementLog.nearest(of: kind, in: places, from: from, level: here?.floor?.level, screen: "museum") else { return }
         selectedPlace = nil
         Task {
             await route(to: place)

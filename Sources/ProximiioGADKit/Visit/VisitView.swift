@@ -1600,15 +1600,22 @@ struct VisitView: View {
             return
         }
         guard let destination else { return }
-        Task { await route(to: destination) }
+        let start = ContinuousClock.now
+        Task { await route(to: destination, requestedAt: start) }
     }
 
     /// Routes to the host app's destination at once, as "Go here" does without "Change your
     /// route?": the visitor agreed with the host app (the audio guide). A stop of the journey still
     /// to visit becomes the next stop instead.
-    private func route(to destination: ProximiDestination) async {
+    /// `requestedAt` is the time the host app's change of `destination` arrived, for the field log.
+    private func route(to destination: ProximiDestination, requestedAt: ContinuousClock.Instant) async {
         guard let place = VenuePlace.place(withID: destination.poiID, in: places) else {
             return destinationFailed(destination.poiID, .unknownPlace)
+        }
+        // Field log only: the time from the host app's change to the outcome.
+        func log(_ outcome: String) {
+            FieldLog.log(MeasurementLog.destinationLine(title: place.title, outcome: outcome,
+                                                        milliseconds: MeasurementLog.milliseconds(since: requestedAt)))
         }
         // The feature id; the host app can give `properties.id`.
         let id = place.id
@@ -1621,17 +1628,22 @@ struct VisitView: View {
             await route(to: place)
             guard routedDestination == routed, routedAmenity?.id == id else { return }
             if controller.session.position == nil {
+                log("no position")
                 endAmenityRoute()
                 destinationFailed(routed.requested, .noPosition)
             } else if amenityRouteError != nil {
+                log("no route")
                 endAmenityRoute()
                 destinationFailed(routed.requested, .noRoute)
+            } else {
+                log("routed")
             }
             return
         }
         if let stop = controller.navigator.journey.stops.first(where: { ($0.poiID ?? $0.id) == id && $0.kind != .detour }),
            stop.state == .pending || stop.state == .active || stop.state == .reached {
             if stop.state == .pending { await controller.activate(stopID: stop.id) }
+            log("journey stop made the next stop")
             clearDestination()
             return
         }
@@ -1639,9 +1651,11 @@ struct VisitView: View {
         emit(.detourStarted(place))
         guard routedDestination == routed else { return }
         if controller.navigator.noRouteReasons[stopID] != nil {
+            log("no route")
             await controller.cancelDetour()
             return destinationFailed(routed.requested, .noRoute)
         }
+        log("routed")
         // As "Add a stop": the host app's pause control shows the journey paused, and its resume is
         // "Resume your Journey" (Nagarro, 2026-11-15: a destination paused the journey on the map
         // only).
@@ -1692,7 +1706,7 @@ struct VisitView: View {
     private func detour(to shortcut: AmenityShortcut) {
         let here = controller.session.position
         let from = here.map { ProximiioCoordinate(latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude) }
-        selectedAmenity = shortcut.nearest(in: places, from: from, level: here?.floor?.level)
+        selectedAmenity = MeasurementLog.nearest(of: shortcut, in: places, from: from, level: here?.floor?.level, screen: "journey")
         if let selectedAmenity { emit(.amenitySelected(selectedAmenity)) }
     }
 

@@ -205,6 +205,7 @@ final class VenueService {
         sampleLog = Task {
             let levels = Dictionary(await sdk.floors().map { ($0.id, Int($0.level)) }) { first, _ in first }
             for await sample in samples {
+                MeasurementLog.latestRelayPosition.withLock { $0 = sample }
                 let floor = sample.floorID.map { levels[$0].map(String.init) ?? $0 } ?? "-"
                 FieldLog.log(String(format: "relay %.6f,%.6f L%@ acc %.1f age %.2f",
                                     sample.coordinate.latitude, sample.coordinate.longitude, floor,

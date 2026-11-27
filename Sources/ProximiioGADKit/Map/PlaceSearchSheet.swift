@@ -43,7 +43,7 @@ struct PlaceSearchSheet: View {
                     }
                 }
                 Section {
-                    ForEach(VenuePlace.matching(query, in: places)) { place in
+                    ForEach(MeasurementLog.places(matching: query, in: places, screen: "museum")) { place in
                         Button { onPick(place) } label: {
                             HStack {
                                 Text(place.title).textStyle(.bodyMedium)

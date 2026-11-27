@@ -1150,6 +1150,35 @@ Every version is a git tag. **Breaking** marks a change that needs a change in t
 dependencies; the entry says what to change. Entries before 1.0.0 name the types of the API before
 `ProximiMap`.
 
+### 1.74.0 (2026-11-27)
+
+Field log only, for the measurements of the contract KPIs (Metis T-1950). No change of behaviour, no
+new API, no new setting, no pin change. A host app raises the version.
+
+Added to the field log:
+
+- `search category <title> (<screen>): <n> places · nearest <title> L<level> · <ms> ms` for each
+  amenity category the visitor picks in the search of the journey map (`journey`): the count of the
+  category's places, the place the map shows, and the time from the pick to the result.
+- `explore list <spaces|highlights|amenities>: <n> items · shown in <ms> ms` for each list the visitor
+  opens in `ProximiExploreView`: the time from the tap on the tab to the list on screen.
+- `destination <title>: <outcome> in <ms> ms` for each `destination` the host app sets on
+  `ProximiMapView`: the time from the change of the binding to the outcome. The outcome is `routed`,
+  `journey stop made the next stop`, `no route` or `no position`. The package has no text search in
+  `ProximiMapView` and `ProximiExploreView`: a host app measures its own search up to this change.
+- `drawn position <journey|explore>: <lat>,<lng> L<level> · at <epoch ms> · fix <lat>,<lng> ts <epoch ms> · relay <lat>,<lng> ts <epoch ms>`,
+  at most one line a second for each open map, and only while a value of the line changes. The first
+  coordinate is the centre of the position dot in the last frame the map drew, `at` the time of the
+  line. `fix` is the position of the SDK the dot moves toward, with its floor (`L`) and its time.
+  `relay` is the last position of the relay-api the binding gave, with the time of the positioning
+  engine (the relay-api `ts`); it links the line to the relay's history. Coordinates have 7 decimals.
+  `relay -` means the log follows no binding: a host app on `ProximiMapView` gets the relay part
+  after `FieldLog.startUploading(binding:)`.
+- `relay positions: <n> in <s> s`, about once a minute: the positions the binding gave in that time.
+  The line is written with the first position after the minute, so a gap shows as a longer time.
+- `search text <n> chars (<screen>): <n> of <n> places · <ms> ms` for the text search of the screens of
+  `.proximiMap(_:)`. The line holds the length of the query, not its text.
+
 ### 1.73.0 (2026-11-24)
 
 - New: the package bundles Guggenheim Arabic (BETA v2; Light, Regular, Medium, SemiBold, Bold) and

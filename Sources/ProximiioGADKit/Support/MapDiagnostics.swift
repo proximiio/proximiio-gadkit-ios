@@ -186,7 +186,13 @@ enum MapDiagnostics {
         let timing = TimingRecorder(session: session, name: name)
         defer { timing.close() }
         var last: Snapshot?
+        var lastDrawn: MeasurementLog.DrawnSample?
         while !Task.isCancelled {
+            // One line a second while the dot, its position or the relay position changes.
+            if let drawn = MeasurementLog.drawnSample(of: session), drawn != lastDrawn {
+                FieldLog.log(MeasurementLog.drawnLine(drawn, map: name, now: Date()))
+                lastDrawn = drawn
+            }
             var snapshot = Snapshot(
                 features: session.featureCount,
                 dropped: session.droppedFeatureCount,
